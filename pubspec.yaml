@@ -1,0 +1,66 @@
+name: dawacare
+description: "DawaCare (دواء كير) — تطبيق تذكير بالأدوية للمرضى والعائلة"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Backend / Auth / DB
+  supabase_flutter: ^2.8.0
+
+  # State management
+  provider: ^6.1.2
+
+  # Local storage / offline-first
+  sqflite: ^2.4.1
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  shared_preferences: ^2.3.3
+  flutter_secure_storage: ^9.2.2
+
+  # Notifications / reminders
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.4
+  flutter_timezone: ^3.0.1
+  permission_handler: ^11.3.1
+
+  # Push notifications (caregiver missed-dose alerts)
+  firebase_core: ^4.4.0
+  firebase_messaging: ^16.1.1
+
+  # Connectivity / sync
+  connectivity_plus: ^6.1.0
+
+  # Utilities
+  intl: 0.20.2
+  uuid: ^4.5.1
+  fl_chart: ^0.69.0
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#0D6E6E"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  min_sdk_android: 21

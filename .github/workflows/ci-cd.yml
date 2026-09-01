@@ -1,0 +1,120 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      publish_to_play_store:
+        description: "Upload the built AAB to Play Store (internal track)"
+        type: boolean
+        default: false
+
+env:
+  FLUTTER_VERSION: "3.44.0"
+
+jobs:
+  analyze_and_test:
+    name: Analyze & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze
+        continue-on-error: true # surfaces lints without blocking early CI runs
+
+      - name: Unit tests
+        run: flutter test
+
+  build_android:
+    name: Build signed AAB
+    needs: analyze_and_test
+    runs-on: ubuntu-latest
+    # Only build/sign on pushes to main or an explicit manual run — PRs get
+    # analyze+test only, so a fork PR never needs access to signing secrets.
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # ---- Android signing -------------------------------------------------
+      # KEYSTORE_BASE64 = `base64 -i upload-keystore.jks | pbcopy` (or -w0 on Linux)
+      # See README.md → "Android signing" for how to generate the keystore
+      # and where each of these secrets is set in GitHub → Settings → Secrets.
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+
+      - name: Write key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.KEYSTORE_STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEYSTORE_KEY_ALIAS }}
+          storeFile=upload-keystore.jks
+          EOF
+
+      # google-services.json is only needed if you wired up FCM push (see
+      # supabase/README.md §5). Skips harmlessly if the secret isn't set.
+      - name: Write google-services.json
+        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Build App Bundle
+        run: |
+          flutter build appbundle --release \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Build APK (for quick manual testing / GitHub Releases)
+        run: |
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dawacare-release
+          path: |
+            build/app/outputs/bundle/release/app-release.aab
+            build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      # ---- Optional: publish straight to Play Console -----------------------
+      # Requires a Play Console service-account JSON with API access
+      # (Play Console → Setup → API access) stored as the
+      # PLAY_SERVICE_ACCOUNT_JSON secret, and at least one manual upload to
+      # the app already done (Play Console won't accept the very first
+      # upload of a new app via API).
+      - name: Publish to Play Store (internal track)
+        if: ${{ github.event.inputs.publish_to_play_store == 'true' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.comptaflow.dawacare
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          status: draft

@@ -1,0 +1,44 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+# NOTE: pubspec.lock is intentionally NOT ignored — for an app (not a
+# package), committing it pins exact dependency versions so `flutter pub get`
+# resolves identically on your machine, teammates' machines, and CI.
+
+# Android
+android/.gradle/
+android/local.properties
+android/**/gradle-wrapper.jar
+android/key.properties
+android/app/upload-keystore.jks
+android/app/*.jks
+*.keystore
+# Firebase config is injected by CI from the GOOGLE_SERVICES_JSON secret
+# (see .github/workflows/ci-cd.yml) rather than committed — add it back
+# locally after `flutter create` if you enable push (see supabase/README.md §5).
+android/app/google-services.json
+
+# iOS (not targeted in v1 but kept for future)
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Secrets / env
+.env
+.env.*
+lib/core/config/env_keys.dart
+
+# OS
+.DS_Store
+Thumbs.db

@@ -34,6 +34,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
       appBar: AppBar(title: const Text('أدويتي')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
+          final medicationProvider = context.read<MedicationProvider>();
           final added = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
               builder: (_) => const AddMedicationPage(),
@@ -43,7 +44,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
           if (!mounted) return;
 
           if (added == true && userId != null) {
-            await context.read<MedicationProvider>().load(userId);
+            await medicationProvider.load(userId);
           }
         },
         icon: const Icon(Icons.add_rounded),

@@ -18,7 +18,7 @@ void main() {
       final occurrences = DoseEngine.computeOccurrences(
         schedule: schedule,
         windowStart: DateTime(2026, 1, 1),
-        windowEnd: DateTime(2026, 1, 5),
+        windowEnd: DateTime(2026, 1, 5, 23, 59, 59),
       );
 
       expect(occurrences.length, 5);
@@ -64,7 +64,7 @@ void main() {
       final occurrences = DoseEngine.computeOccurrences(
         schedule: schedule,
         windowStart: DateTime(2026, 1, 1),
-        windowEnd: DateTime(2026, 1, 10),
+        windowEnd: DateTime(2026, 1, 10, 23, 59, 59),
       );
 
       expect(occurrences, [

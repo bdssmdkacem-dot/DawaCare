@@ -12,18 +12,23 @@ import 'add_edit_medication_page.dart';
 
 class MedicationListPage extends StatefulWidget {
   const MedicationListPage({super.key});
-  @override State<MedicationListPage> createState() => _MedicationListPageState();
+
+  @override
+  State<MedicationListPage> createState() => _MedicationListPageState();
 }
 
 class _MedicationListPageState extends State<MedicationListPage> {
   bool _loadedOnce = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_loadedOnce) {
       _loadedOnce = true;
       final userId = context.read<AuthProvider>().profile?.id;
-      if (userId != null) context.read<MedicationProvider>().load(userId);
+      if (userId != null) {
+        context.read<MedicationProvider>().load(userId);
+      }
     }
   }
 
@@ -31,19 +36,48 @@ class _MedicationListPageState extends State<MedicationListPage> {
     final l = AppLocalizations.of(context);
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      builder: (ctx) => SafeArea(child: Wrap(children: [
-        ListTile(leading: const Icon(Icons.camera_alt_rounded), title: Text(l.cameraMedicine), onTap: () => Navigator.pop(ctx, ImageSource.camera)),
-        ListTile(leading: const Icon(Icons.photo_library_rounded), title: Text(l.galleryMedicine), onTap: () => Navigator.pop(ctx, ImageSource.gallery)),
-      ])),
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: Text(l.cameraMedicine),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: Text(l.galleryMedicine),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
     );
     if (source == null || !mounted) return;
-    final file = await ImagePicker().pickImage(source: source, maxWidth: 1200, maxHeight: 1200, imageQuality: 82);
+
+    final file = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 82,
+    );
     if (file == null || !mounted) return;
+
     final bytes = await file.readAsBytes();
     if (!mounted) return;
-    final ok = await context.read<MedicationProvider>().updateMedicationImage(medication, bytes);
+
+    final ok = await context
+        .read<MedicationProvider>()
+        .updateMedicationImage(medication, bytes);
     if (!mounted || ok) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<MedicationProvider>().error ?? l.unexpectedError)));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          context.read<MedicationProvider>().error ?? l.unexpectedError,
+        ),
+      ),
+    );
   }
 
   Future<void> _removeImage(Medication medication) async {
@@ -51,10 +85,17 @@ class _MedicationListPageState extends State<MedicationListPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l.removeMedicineImageTitle), content: Text(l.removeMedicineImageBody),
+        title: Text(l.removeMedicineImageTitle),
+        content: Text(l.removeMedicineImageBody),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l.deleteImage)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.deleteImage),
+          ),
         ],
       ),
     );
@@ -67,37 +108,61 @@ class _MedicationListPageState extends State<MedicationListPage> {
     final l = AppLocalizations.of(context);
     final provider = context.watch<MedicationProvider>();
     final userId = context.read<AuthProvider>().profile?.id;
+
     return Scaffold(
       appBar: AppBar(title: Text(l.medicines)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final medicationProvider = context.read<MedicationProvider>();
-          final added = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const AddMedicationPage()));
+          final added = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (_) => const AddMedicationPage(),
+            ),
+          );
           if (!mounted) return;
-          if (added == true && userId != null) await medicationProvider.load(userId);
+          if (added == true && userId != null) {
+            await medicationProvider.load(userId);
+          }
         },
-        icon: const Icon(Icons.add_rounded), label: Text(l.newMedicine),
+        icon: const Icon(Icons.add_rounded),
+        label: Text(l.newMedicine),
       ),
       body: _buildBody(provider, l),
     );
   }
 
   Widget _buildBody(MedicationProvider provider, AppLocalizations l) {
-    if (provider.isLoading && provider.medications.isEmpty) return const LoadingIndicator();
-    if (provider.medications.isEmpty) return EmptyState(icon: Icons.medication_outlined, title: l.noMedicinesYet, subtitle: l.addMedicineHint);
+    if (provider.isLoading && provider.medications.isEmpty) {
+      return const LoadingIndicator();
+    }
+
+    if (provider.medications.isEmpty) {
+      return EmptyState(
+        icon: Icons.medication_outlined,
+        title: l.noMedicinesYet,
+        subtitle: l.addMedicineHint,
+      );
+    }
+
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       itemCount: provider.medications.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final med = provider.medications[index];
-        final schedules = provider.schedulesByMedicationId[med.id] ?? const [];
+        final schedules =
+            provider.schedulesByMedicationId[med.id] ?? const [];
+
         return _MedicationTile(
           medication: med,
-          scheduleLabel: schedules.isNotEmpty ? DoseEngine.describeSchedule(schedules.first) : null,
+          scheduleLabel: schedules.isNotEmpty
+              ? DoseEngine.describeSchedule(schedules.first)
+              : null,
           imageUrlFuture: provider.signedMedicationImageUrl(med.imageUrl),
           onChangeImage: () => _changeImage(med),
-          onRemoveImage: med.imageUrl == null ? null : () => _removeImage(med),
+          onRemoveImage: med.imageUrl == null
+              ? null
+              : () => _removeImage(med),
           onDeactivate: () => _confirmDeactivate(med),
         );
       },
@@ -106,10 +171,23 @@ class _MedicationListPageState extends State<MedicationListPage> {
 
   Future<void> _confirmDeactivate(Medication medication) async {
     final l = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: Text(l.deactivateMedicineTitle), content: Text(l.deactivateMedicineBody(medication.name)),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)), TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l.stop))],
-    ));
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.deactivateMedicineTitle),
+        content: Text(l.deactivateMedicineBody(medication.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.stop),
+          ),
+        ],
+      ),
+    );
     if (!mounted || confirmed != true) return;
     await context.read<MedicationProvider>().deactivate(medication);
   }
@@ -122,27 +200,102 @@ class _MedicationTile extends StatelessWidget {
   final VoidCallback onChangeImage;
   final VoidCallback? onRemoveImage;
   final VoidCallback onDeactivate;
-  const _MedicationTile({required this.medication, required this.scheduleLabel, required this.imageUrlFuture, required this.onChangeImage, required this.onRemoveImage, required this.onDeactivate});
+
+  const _MedicationTile({
+    required this.medication,
+    required this.scheduleLabel,
+    required this.imageUrlFuture,
+    required this.onChangeImage,
+    required this.onRemoveImage,
+    required this.onDeactivate,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context); final l = AppLocalizations.of(context);
-    return Card(child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      leading: FutureBuilder<String?>(future: imageUrlFuture, builder: (context, snapshot) {
-        if (snapshot.data == null) return CircleAvatar(backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12), child: Icon(Icons.medication_liquid_rounded, color: theme.colorScheme.primary));
-        return ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(snapshot.data!, width: 58, height: 58, fit: BoxFit.cover, errorBuilder: (_, __, ___) => CircleAvatar(backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12), child: Icon(Icons.medication_liquid_rounded, color: theme.colorScheme.primary)));
-      }),
-      title: Text(medication.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: Text([if (medication.strength != null && medication.strength!.isNotEmpty) medication.strength!, if (scheduleLabel != null) scheduleLabel!].join(' · ')),
-      trailing: PopupMenuButton<String>(
-        onSelected: (value) { if (value == 'change_image') onChangeImage(); if (value == 'remove_image') onRemoveImage?.call(); if (value == 'deactivate') onDeactivate(); },
-        itemBuilder: (context) => [
-          PopupMenuItem(value: 'change_image', child: Text(l.changeMedicineImage)),
-          if (onRemoveImage != null) PopupMenuItem(value: 'remove_image', child: Text(l.deleteMedicineImage)),
-          PopupMenuItem(value: 'deactivate', child: Text(l.deactivateMedicine)),
-        ],
+    final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
+
+    final subtitleParts = <String>[
+      if (medication.strength != null && medication.strength!.isNotEmpty)
+        medication.strength!,
+      if (scheduleLabel != null && scheduleLabel!.isNotEmpty) scheduleLabel!,
+    ];
+
+    return Card(
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 8,
+        ),
+        leading: FutureBuilder<String?>(
+          future: imageUrlFuture,
+          builder: (context, snapshot) {
+            if (snapshot.data == null) {
+              return CircleAvatar(
+                backgroundColor:
+                    theme.colorScheme.primary.withValues(alpha: 0.12),
+                child: Icon(
+                  Icons.medication_liquid_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+              );
+            }
+
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                snapshot.data!,
+                width: 58,
+                height: 58,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => CircleAvatar(
+                  backgroundColor:
+                      theme.colorScheme.primary.withValues(alpha: 0.12),
+                  child: Icon(
+                    Icons.medication_liquid_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        title: Text(
+          medication.name,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(subtitleParts.join(' · ')),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'change_image':
+                onChangeImage();
+                break;
+              case 'remove_image':
+                onRemoveImage?.call();
+                break;
+              case 'deactivate':
+                onDeactivate();
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem<String>(
+              value: 'change_image',
+              child: Text(l.changeMedicineImage),
+            ),
+            if (onRemoveImage != null)
+              PopupMenuItem<String>(
+                value: 'remove_image',
+                child: Text(l.deleteMedicineImage),
+              ),
+            PopupMenuItem<String>(
+              value: 'deactivate',
+              child: Text(l.deactivateMedicine),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 }

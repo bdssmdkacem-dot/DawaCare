@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/localization/locale_controller.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
 
 class LanguageSelectionPage extends StatefulWidget {
   const LanguageSelectionPage({super.key});
@@ -46,22 +45,13 @@ class _LanguageSelectionPageState extends State<LanguageSelectionPage> {
                   const SizedBox(height: 52),
                   Text(l10n.chooseLanguage, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 20),
-                  _LanguageTile(code: 'ar', title: 'العربية', subtitle: 'العربية', selected: _selected == 'ar', onTap: () => setState(() => _selected = 'ar')),
+                  _LanguageTile(code: 'AR', title: 'العربية', selected: _selected == 'ar', onTap: () => setState(() => _selected = 'ar')),
                   const SizedBox(height: 12),
-                  _LanguageTile(code: 'en', title: 'English', subtitle: 'English', selected: _selected == 'en', onTap: () => setState(() => _selected = 'en')),
+                  _LanguageTile(code: 'EN', title: 'English', selected: _selected == 'en', onTap: () => setState(() => _selected = 'en')),
                   const SizedBox(height: 12),
-                  _LanguageTile(code: 'fr', title: 'Français', subtitle: 'Français', selected: _selected == 'fr', onTap: () => setState(() => _selected = 'fr')),
+                  _LanguageTile(code: 'FR', title: 'Français', selected: _selected == 'fr', onTap: () => setState(() => _selected = 'fr')),
                   const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await controller.setLanguage(_selected);
-                        if (mounted) context.read<AuthProvider>();
-                      },
-                      child: Text(l10n.continueLabel),
-                    ),
-                  ),
+                  SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => controller.setLanguage(_selected), child: Text(l10n.continueLabel))),
                 ],
               ),
             ),
@@ -73,11 +63,10 @@ class _LanguageSelectionPageState extends State<LanguageSelectionPage> {
 }
 
 class _LanguageTile extends StatelessWidget {
-  const _LanguageTile({required this.code, required this.title, required this.subtitle, required this.selected, required this.onTap});
+  const _LanguageTile({required this.code, required this.title, required this.selected, required this.onTap});
 
   final String code;
   final String title;
-  final String subtitle;
   final bool selected;
   final VoidCallback onTap;
 
@@ -98,7 +87,7 @@ class _LanguageTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              CircleAvatar(radius: 22, backgroundColor: scheme.primary.withValues(alpha: 0.10), child: Text(code.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w800, color: scheme.primary))),
+              CircleAvatar(radius: 22, backgroundColor: scheme.primary.withValues(alpha: 0.10), child: Text(code, style: TextStyle(fontWeight: FontWeight.w800, color: scheme.primary))),
               const SizedBox(width: 14),
               Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
               Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: selected ? scheme.primary : scheme.outline),

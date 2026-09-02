@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "875948507490",
+    "project_id": "dawacare-bc4ac",
+    "storage_bucket": "dawacare-bc4ac.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:875948507490:android:af7f62fba44d2e40f2ec3b",
+        "android_client_info": {
+          "package_name": "com.comptaflow.dawacare.dawacare"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsMr1M14BEkkJMV6aipa6TLSLpHuPdTiA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

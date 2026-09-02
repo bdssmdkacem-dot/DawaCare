@@ -8,6 +8,7 @@ import '../../../patient/presentation/widgets/dose_card.dart';
 import '../../data/caregiver_repository.dart';
 import '../../domain/adherence_calculator.dart';
 import '../widgets/adherence_chart.dart';
+import 'voice_recorder_page.dart';
 
 class PatientDetailPage extends StatefulWidget {
   final CaregiverLink link;
@@ -45,6 +46,22 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: AdherenceChart(stats: AdherenceCalculator.compute(doseProvider.all)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => VoiceRecorderPage(
+                            patientId: widget.link.patientId,
+                            patientName: widget.link.patientName,
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.mic_rounded),
+                      label: const Text('إرسال رسالة صوتية'),
                     ),
                   ),
                   const SizedBox(height: 20),

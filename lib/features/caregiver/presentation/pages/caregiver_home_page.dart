@@ -179,7 +179,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                           onCancel: () async {
                             final caregiverProvider = context.read<CaregiverProvider>();
                             final ok = await caregiverProvider.cancelSentRequest(r);
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             if (ok) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('تم إلغاء الطلب')),

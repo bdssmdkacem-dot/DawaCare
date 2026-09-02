@@ -43,18 +43,14 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
     if (!mounted) return;
 
     if (provider.activeCode == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'تعذّر إنشاء الرمز')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error ?? 'تعذّر إنشاء الرمز')));
       return;
     }
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => LinkCodeSheet(
         initialCode: provider.activeCode!,
         onRegenerate: () async {
@@ -105,10 +101,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
     if (result != true || codeCtrl.text.trim().isEmpty || !mounted) return;
 
     final provider = context.read<CaregiverProvider>();
-    final patientName = await provider.submitCode(
-      codeCtrl.text.trim(),
-      relationshipLabel: relationshipCtrl.text.trim(),
-    );
+    final patientName = await provider.submitCode(codeCtrl.text.trim(), relationshipLabel: relationshipCtrl.text.trim());
     if (!mounted) return;
 
     if (patientName != null) {
@@ -117,9 +110,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
       );
       await _reload();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'تعذّر إرسال الطلب')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error ?? 'تعذّر إرسال الطلب')));
     }
   }
 
@@ -183,20 +174,19 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                   if (provider.sentRequests.isNotEmpty) ...[
                     Text('طلباتي المعلّقة', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 10),
-                    ...provider.sentRequests.map(
-                      (r) => _SentRequestTile(
-                        request: r,
-                        onCancel: () async {
-                          final caregiverProvider = context.read<CaregiverProvider>();
-                          final ok = await caregiverProvider.cancelSentRequest(r);
-                          if (ok && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('تم إلغاء الطلب')),
-                            );
-                          }
-                        },
-                      ),
-                    ),
+                    ...provider.sentRequests.map((r) => _SentRequestTile(
+                          request: r,
+                          onCancel: () async {
+                            final caregiverProvider = context.read<CaregiverProvider>();
+                            final ok = await caregiverProvider.cancelSentRequest(r);
+                            if (!mounted) return;
+                            if (ok) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('تم إلغاء الطلب')),
+                              );
+                            }
+                          },
+                        )),
                     const SizedBox(height: 20),
                   ],
                   if (provider.alerts.isNotEmpty) ...[
@@ -311,9 +301,7 @@ class _PatientLinkTile extends StatelessWidget {
         title: Text(link.patientName, style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_left_rounded),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => PatientDetailPage(link: link)),
-        ),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPage(link: link))),
       ),
     );
   }

@@ -13,6 +13,7 @@ import 'features/caregiver/presentation/providers/caregiver_provider.dart';
 import 'features/doses/presentation/providers/dose_provider.dart';
 import 'features/medications/presentation/providers/medication_provider.dart';
 import 'features/sync/sync_engine.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,17 +26,13 @@ Future<void> main() async {
   await NotificationService.instance.init();
   await NotificationService.instance.requestPermissions();
 
-  // Firebase is optional until the Android Firebase project configuration is
-  // installed. The local reminder system must keep working without it.
-  try {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(
-      dawacareFirebaseMessagingBackgroundHandler,
-    );
-    await PushNotificationService.instance.init();
-  } catch (_) {
-    // Do not block app startup if FCM is not configured yet.
-  }
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  FirebaseMessaging.onBackgroundMessage(
+    dawacareFirebaseMessagingBackgroundHandler,
+  );
+  await PushNotificationService.instance.init();
 
   SyncEngine.instance.start();
 

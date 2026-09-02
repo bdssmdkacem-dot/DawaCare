@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'core/config/supabase_config.dart';
+import 'core/localization/locale_controller.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/notifications/push_notification_service.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
@@ -36,9 +37,13 @@ Future<void> main() async {
 
   SyncEngine.instance.start();
 
+  final localeController = LocaleController();
+  await localeController.load();
+
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: localeController),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => DoseProvider()),
         ChangeNotifierProvider(create: (_) => MedicationProvider()),

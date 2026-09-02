@@ -2,20 +2,12 @@ import 'package:flutter/material.dart';
 
 class AppLocalizations {
   const AppLocalizations(this.locale);
-
   final Locale locale;
-
   static const supportedLocales = [Locale('ar'), Locale('en'), Locale('fr')];
   static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
   static AppLocalizations of(BuildContext context) => Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   bool get isArabic => locale.languageCode == 'ar';
-
-  String _tr(String ar, String en, String fr) => switch (locale.languageCode) {
-        'en' => en,
-        'fr' => fr,
-        _ => ar,
-      };
-
+  String _tr(String ar, String en, String fr) => switch (locale.languageCode) { 'en' => en, 'fr' => fr, _ => ar };
   String get appName => _tr('دواء كير', 'DawaCare', 'DawaCare');
   String get tagline => _tr('ما تنساش دوا حتى مرة', 'Never miss your medicine', 'N’oubliez plus vos médicaments');
   String get chooseLanguage => _tr('اختر لغتك', 'Choose your language', 'Choisissez votre langue');
@@ -35,7 +27,6 @@ class AppLocalizations {
   String get enterName => _tr('أدخل اسمك', 'Enter your name', 'Saisissez votre nom');
   String get accountCreated => _tr('تم إنشاء الحساب بنجاح!', 'Account created successfully!', 'Compte créé avec succès !');
   String get unexpectedError => _tr('حدث خطأ غير متوقع. حاول مرة أخرى.', 'Something went wrong. Please try again.', 'Une erreur est survenue. Réessayez.');
-
   String get followUpMessages => _tr('رسائل المتابعة', 'Care messages', 'Messages de suivi');
   String get followUpMessagesSubtitle => _tr('استمع إلى الرسائل الصوتية من متابعيك', 'Listen to voice messages from your caregivers', 'Écoutez les messages vocaux de vos accompagnants');
   String get noScheduledMedicines => _tr('لا توجد أدوية مجدولة اليوم', 'No medicines scheduled today', 'Aucun médicament prévu aujourd’hui');
@@ -45,7 +36,6 @@ class AppLocalizations {
   String skippedDose(String name) => _tr('سيتم تسجيل $name كـ"متخطاة" لهذه المرة.', '$name will be recorded as skipped this time.', '$name sera enregistré comme dose ignorée cette fois.');
   String get cancel => _tr('إلغاء', 'Cancel', 'Annuler');
   String get skip => _tr('تخطي', 'Skip', 'Ignorer');
-
   String get newMedicine => _tr('دواء جديد', 'New medicine', 'Nouveau médicament');
   String get cameraMedicine => _tr('تصوير الدواء بالكاميرا', 'Take a photo of the medicine', 'Photographier le médicament');
   String get galleryMedicine => _tr('اختيار صورة من الهاتف', 'Choose a photo from your phone', 'Choisir une photo du téléphone');
@@ -80,16 +70,24 @@ class AppLocalizations {
   String get startDate => _tr('تاريخ البدء', 'Start date', 'Date de début');
   String get endDateOptional => _tr('تاريخ الانتهاء (اختياري)', 'End date (optional)', 'Date de fin (facultatif)');
   String get saveMedicine => _tr('حفظ الدواء', 'Save medicine', 'Enregistrer le médicament');
-
+  String dosageFormLabel(String value) => switch (value) {
+        'قرص' => _tr('قرص', 'Tablet', 'Comprimé'),
+        'كبسولة' => _tr('كبسولة', 'Capsule', 'Gélule'),
+        'شراب' => _tr('شراب', 'Syrup', 'Sirop'),
+        'حقنة' => _tr('حقنة', 'Injection', 'Injection'),
+        'قطرة' => _tr('قطرة', 'Drops', 'Gouttes'),
+        _ => _tr('أخرى', 'Other', 'Autre'),
+      };
+  String weekdayLabel(int day) => switch (day) {
+        1 => _tr('الإثنين', 'Monday', 'Lundi'), 2 => _tr('الثلاثاء', 'Tuesday', 'Mardi'), 3 => _tr('الأربعاء', 'Wednesday', 'Mercredi'),
+        4 => _tr('الخميس', 'Thursday', 'Jeudi'), 5 => _tr('الجمعة', 'Friday', 'Vendredi'), 6 => _tr('السبت', 'Saturday', 'Samedi'), 7 => _tr('الأحد', 'Sunday', 'Dimanche'), _ => '',
+      };
   String get enableReminderNotifications => _tr('تفعيل إشعارات التذكير', 'Enable reminder notifications', 'Activer les notifications de rappel');
   String get reminderNotificationsRequired => _tr('مطلوب لتصلك تذكيرات موعد الدواء', 'Required to receive medicine reminders', 'Nécessaire pour recevoir les rappels de médicaments');
   String get notificationPermissionRequested => _tr('تم طلب أذونات الإشعارات', 'Notification permission requested', 'Autorisation des notifications demandée');
   String get logout => _tr('تسجيل الخروج', 'Sign out', 'Se déconnecter');
   String get language => _tr('اللغة', 'Language', 'Langue');
-  String get arabic => 'العربية';
-  String get english => 'English';
-  String get french => 'Français';
-
+  String get arabic => 'العربية'; String get english => 'English'; String get french => 'Français';
   String get familyRequests => _tr('طلبات بانتظار موافقتك', 'Requests awaiting your approval', 'Demandes en attente de votre approbation');
   String get inviteToMedicines => _tr('دعوة فرد لأدويتي', 'Invite someone to my medicines', 'Inviter quelqu’un à mes médicaments');
   String get followSomeone => _tr('متابعة شخص آخر', 'Follow someone', 'Suivre quelqu’un');
@@ -98,14 +96,12 @@ class AppLocalizations {
   String get familyMembers => _tr('أفراد العائلة', 'Family members', 'Membres de la famille');
   String get noFamilyLinked => _tr('لم تربط أي فرد من العائلة بعد', 'No family member linked yet', 'Aucun membre de la famille lié');
   String get requestFollowNow => _tr('طلب متابعة أحد الآن', 'Request to follow someone now', 'Demander à suivre quelqu’un');
-  String get accept => _tr('قبول', 'Accept', 'Accepter');
-  String get reject => _tr('رفض', 'Reject', 'Refuse');
+  String get accept => _tr('قبول', 'Accept', 'Accepter'); String get reject => _tr('رفض', 'Reject', 'Refuser');
   String get waitingApproval => _tr('بانتظار الموافقة', 'Awaiting approval', 'En attente d’approbation');
   String get removeLink => _tr('إزالة الربط', 'Remove link', 'Supprimer le lien');
   String get removeLinkTitle => _tr('إزالة الربط؟', 'Remove link?', 'Supprimer le lien ?');
   String removeLinkBody(String name) => _tr('لن تتمكن بعد الآن من متابعة أدوية $name.', 'You will no longer be able to follow $name’s medicines.', 'Vous ne pourrez plus suivre les médicaments de $name.');
   String get sendGeneralVoice => _tr('إرسال رسالة صوتية عامة', 'Send a general voice message', 'Envoyer un message vocal général');
-
   String get voiceMessagesEmpty => _tr('لا توجد رسائل صوتية بعد', 'No voice messages yet', 'Aucun message vocal pour le moment');
   String get linkedDoseMessage => _tr('رسالة مرتبطة بجرعة', 'Message linked to a dose', 'Message lié à une dose');
   String doseLabel(String value) => _tr('الجرعة: $value', 'Dose: $value', 'Dose : $value');

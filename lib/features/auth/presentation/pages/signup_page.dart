@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/localization/auth_error_localizer.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../providers/auth_provider.dart';
 
@@ -30,13 +31,21 @@ class _SignupPageState extends State<SignupPage> {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
     final l10n = AppLocalizations.of(context);
-    final ok = await auth.signUp(email: _emailCtrl.text.trim(), password: _passwordCtrl.text, fullName: _nameCtrl.text.trim());
+    final ok = await auth.signUp(
+      email: _emailCtrl.text.trim(),
+      password: _passwordCtrl.text,
+      fullName: _nameCtrl.text.trim(),
+    );
     if (!mounted) return;
     if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.accountCreated)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.accountCreated)),
+      );
       Navigator.of(context).pop();
     } else if (auth.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(auth.errorMessage!)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(localizeAuthError(context, auth.errorMessage))),
+      );
     }
   }
 
@@ -54,13 +63,37 @@ class _SignupPageState extends State<SignupPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextFormField(controller: _nameCtrl, decoration: InputDecoration(labelText: l10n.fullName), validator: (v) => (v == null || v.trim().isEmpty) ? l10n.enterName : null),
+                TextFormField(
+                  controller: _nameCtrl,
+                  decoration: InputDecoration(labelText: l10n.fullName),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? l10n.enterName
+                      : null,
+                ),
                 const SizedBox(height: 14),
-                TextFormField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, decoration: InputDecoration(labelText: l10n.email), validator: (v) => (v == null || !v.contains('@')) ? l10n.invalidEmail : null),
+                TextFormField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(labelText: l10n.email),
+                  validator: (v) => (v == null || !v.contains('@'))
+                      ? l10n.invalidEmail
+                      : null,
+                ),
                 const SizedBox(height: 14),
-                TextFormField(controller: _passwordCtrl, obscureText: true, decoration: InputDecoration(labelText: l10n.password), validator: (v) => (v == null || v.length < 6) ? l10n.passwordMin : null),
+                TextFormField(
+                  controller: _passwordCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(labelText: l10n.password),
+                  validator: (v) => (v == null || v.length < 6)
+                      ? l10n.passwordMin
+                      : null,
+                ),
                 const SizedBox(height: 24),
-                PrimaryButton(label: l10n.register, onPressed: _submit, loading: auth.isLoading),
+                PrimaryButton(
+                  label: l10n.register,
+                  onPressed: _submit,
+                  loading: auth.isLoading,
+                ),
               ],
             ),
           ),

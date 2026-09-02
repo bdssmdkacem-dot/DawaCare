@@ -20,6 +20,7 @@ Future<void> main() async {
   );
 
   await NotificationService.instance.init();
+  await NotificationService.instance.requestPermissions();
   SyncEngine.instance.start();
 
   runApp(

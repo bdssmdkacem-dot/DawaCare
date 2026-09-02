@@ -22,10 +22,7 @@ class MedicationRepository {
     return rows.map((r) => MedicationSchedule.fromMap(r)).toList();
   }
 
-  Future<Medication> createMedication(
-    Medication medication, {
-    Uint8List? imageBytes,
-  }) async {
+  Future<Medication> createMedication(Medication medication, {Uint8List? imageBytes}) async {
     final row = await _client.from('medications').insert(medication.toInsertMap()).select().single();
     var created = Medication.fromMap(row);
 
@@ -44,12 +41,10 @@ class MedicationRepository {
             .single();
         created = Medication.fromMap(updated);
       } catch (_) {
-        await _imageService.delete(
-          _imageService.pathFor(
-            patientId: medication.patientId,
-            medicationId: medication.id,
-          ),
-        );
+        await _imageService.delete(_imageService.pathFor(
+          patientId: medication.patientId,
+          medicationId: medication.id,
+        ));
         await _client.from('medications').delete().eq('id', medication.id);
         rethrow;
       }
@@ -58,7 +53,7 @@ class MedicationRepository {
     return created;
   }
 
-  Future<void> updateMedicationImage({
+  Future<String> updateMedicationImage({
     required Medication medication,
     required Uint8List bytes,
   }) async {
@@ -67,28 +62,19 @@ class MedicationRepository {
       medicationId: medication.id,
       bytes: bytes,
     );
-    await _client
-        .from('medications')
-        .update({'image_url': path})
-        .eq('id', medication.id);
+    await _client.from('medications').update({'image_url': path}).eq('id', medication.id);
+    return path;
   }
 
   Future<void> removeMedicationImage(Medication medication) async {
     await _imageService.delete(medication.imageUrl);
-    await _client
-        .from('medications')
-        .update({'image_url': null})
-        .eq('id', medication.id);
+    await _client.from('medications').update({'image_url': null}).eq('id', medication.id);
   }
 
   Future<String?> signedMedicationImageUrl(String? imagePath) => _imageService.signedUrl(imagePath);
 
   Future<MedicationSchedule> createSchedule(String medicationId, MedicationSchedule schedule) async {
-    final row = await _client
-        .from('medication_schedules')
-        .insert(schedule.toInsertMap(medicationId))
-        .select()
-        .single();
+    final row = await _client.from('medication_schedules').insert(schedule.toInsertMap(medicationId)).select().single();
     return MedicationSchedule.fromMap(row);
   }
 

@@ -7,6 +7,7 @@ class VoiceMessage {
   final int? durationMs;
   final DateTime createdAt;
   final DateTime? readAt;
+  final int completedListens;
   final String senderName;
 
   const VoiceMessage({
@@ -18,6 +19,7 @@ class VoiceMessage {
     this.durationMs,
     required this.createdAt,
     this.readAt,
+    this.completedListens = 0,
     this.senderName = 'المتابع',
   });
 
@@ -32,6 +34,7 @@ class VoiceMessage {
       durationMs: map['duration_ms'] as int?,
       createdAt: DateTime.parse(map['created_at'] as String).toLocal(),
       readAt: map['read_at'] == null ? null : DateTime.parse(map['read_at'] as String).toLocal(),
+      completedListens: (map['completed_listens'] as num?)?.toInt() ?? 0,
       senderName: (sender?['full_name'] as String?)?.trim().isNotEmpty == true
           ? sender!['full_name'] as String
           : 'المتابع',

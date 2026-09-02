@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/caregiver_link.dart';
+import '../../../../models/dose_instance.dart';
 import '../../../doses/presentation/providers/dose_provider.dart';
 import '../../../patient/presentation/widgets/dose_card.dart';
 import '../../data/caregiver_repository.dart';
@@ -29,6 +30,21 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     });
   }
 
+  void _openVoiceRecorder({DoseInstance? dose}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VoiceRecorderPage(
+          patientId: widget.link.patientId,
+          patientName: widget.link.patientName,
+          doseId: dose?.id,
+          medicationName: dose?.medicationName,
+          doseAmount: dose?.doseAmount,
+          scheduledAt: dose?.scheduledAt,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final doseProvider = context.watch<DoseProvider>();
@@ -52,16 +68,9 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => VoiceRecorderPage(
-                            patientId: widget.link.patientId,
-                            patientName: widget.link.patientName,
-                          ),
-                        ),
-                      ),
+                      onPressed: () => _openVoiceRecorder(),
                       icon: const Icon(Icons.mic_rounded),
-                      label: const Text('إرسال رسالة صوتية'),
+                      label: const Text('إرسال رسالة صوتية عامة'),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -78,6 +87,7 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: DoseCard(
                           dose: dose,
+                          onTap: () => _openVoiceRecorder(dose: dose),
                           onConfirm: () => context.read<DoseProvider>().confirm(dose, source: 'CAREGIVER'),
                           onSnooze: () => context.read<DoseProvider>().snooze(dose, source: 'CAREGIVER'),
                           onSkip: () => context.read<DoseProvider>().skip(dose, source: 'CAREGIVER'),

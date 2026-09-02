@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -5,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app/app.dart';
 import 'core/config/supabase_config.dart';
 import 'core/notifications/notification_service.dart';
+import 'core/notifications/push_notification_service.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/caregiver/presentation/providers/caregiver_provider.dart';
 import 'features/doses/presentation/providers/dose_provider.dart';
@@ -21,6 +24,19 @@ Future<void> main() async {
 
   await NotificationService.instance.init();
   await NotificationService.instance.requestPermissions();
+
+  // Firebase is optional until the Android Firebase project configuration is
+  // installed. The local reminder system must keep working without it.
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(
+      dawacareFirebaseMessagingBackgroundHandler,
+    );
+    await PushNotificationService.instance.init();
+  } catch (_) {
+    // Do not block app startup if FCM is not configured yet.
+  }
+
   SyncEngine.instance.start();
 
   runApp(

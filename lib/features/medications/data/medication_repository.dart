@@ -28,24 +28,27 @@ class MedicationRepository {
 
     if (imageBytes != null) {
       try {
+        // The database generates the persisted medication id. Always use that
+        // id for the storage path and image_url update instead of the client
+        // model id, which is not included in toInsertMap().
         final path = await _imageService.upload(
-          patientId: medication.patientId,
-          medicationId: medication.id,
+          patientId: created.patientId,
+          medicationId: created.id,
           bytes: imageBytes,
         );
         final updated = await _client
             .from('medications')
             .update({'image_url': path})
-            .eq('id', medication.id)
+            .eq('id', created.id)
             .select()
             .single();
         created = Medication.fromMap(updated);
       } catch (_) {
         await _imageService.delete(_imageService.pathFor(
-          patientId: medication.patientId,
-          medicationId: medication.id,
+          patientId: created.patientId,
+          medicationId: created.id,
         ));
-        await _client.from('medications').delete().eq('id', medication.id);
+        await _client.from('medications').delete().eq('id', created.id);
         rethrow;
       }
     }

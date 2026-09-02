@@ -9,12 +9,15 @@ class MedicationImageService {
   String pathFor({required String patientId, required String medicationId}) =>
       '$patientId/$medicationId.jpg';
 
+  String _uniquePath({required String patientId, required String medicationId}) =>
+      '$patientId/$medicationId/${DateTime.now().microsecondsSinceEpoch}.jpg';
+
   Future<String> upload({
     required String patientId,
     required String medicationId,
     required Uint8List bytes,
   }) async {
-    final path = pathFor(patientId: patientId, medicationId: medicationId);
+    final path = _uniquePath(patientId: patientId, medicationId: medicationId);
     await _client.storage.from(bucket).uploadBinary(
           path,
           bytes,

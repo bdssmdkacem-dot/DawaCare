@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/date_time_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/dose_instance.dart';
@@ -11,9 +12,7 @@ import 'voice_messages_page.dart';
 
 class PatientHomePage extends StatefulWidget {
   const PatientHomePage({super.key});
-
-  @override
-  State<PatientHomePage> createState() => _PatientHomePageState();
+  @override State<PatientHomePage> createState() => _PatientHomePageState();
 }
 
 class _PatientHomePageState extends State<PatientHomePage> {
@@ -31,108 +30,85 @@ class _PatientHomePageState extends State<PatientHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final auth = context.watch<AuthProvider>();
     final doseProvider = context.watch<DoseProvider>();
     final userId = auth.profile?.id;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('اليوم')),
+      appBar: AppBar(title: Text(l.today)),
       body: RefreshIndicator(
-        onRefresh: () async {
-          if (userId != null) await context.read<DoseProvider>().load(userId);
-        },
-        child: _buildBody(doseProvider),
+        onRefresh: () async { if (userId != null) await context.read<DoseProvider>().load(userId); },
+        child: _buildBody(doseProvider, l),
       ),
     );
   }
 
-  Widget _buildBody(DoseProvider provider) {
+  Widget _buildBody(DoseProvider provider, AppLocalizations l) {
     if (provider.isLoading && provider.all.isEmpty) return const LoadingIndicator();
-
     if (provider.error != null && provider.all.isEmpty) {
-      return EmptyState(
-        icon: Icons.wifi_off_rounded,
-        title: provider.error!,
-        subtitle: 'اسحب للأسفل للمحاولة مرة أخرى',
-      );
+      return EmptyState(icon: Icons.wifi_off_rounded, title: provider.error!, subtitle: l.pullToRetry);
     }
-
     final today = provider.todayDoses;
-
     if (today.isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _voiceMessagesButton(),
+          _voiceMessagesButton(l),
           const SizedBox(height: 28),
-          const EmptyState(
-            icon: Icons.check_circle_outline_rounded,
-            title: 'لا توجد أدوية مجدولة اليوم',
-            subtitle: 'أضف دواءك الأول من تبويب "أدويتي"',
-          ),
+          EmptyState(icon: Icons.check_circle_outline_rounded, title: l.noScheduledMedicines, subtitle: l.addFirstMedicine),
         ],
       );
     }
-
     final now = DateTime.now();
     final next = today.firstWhere(
       (d) => d.status == DoseStatus.pending || d.status == DoseStatus.reminderSent || d.status == DoseStatus.snoozed,
       orElse: () => today.first,
     );
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _voiceMessagesButton(),
+        _voiceMessagesButton(l),
         const SizedBox(height: 16),
         Text(DateTimeUtils.relativeDayLabel(now), style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
-        ...today.map(
-          (dose) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: DoseCard(
-              dose: dose,
-              compact: dose.id != next.id &&
-                  !(dose.status == DoseStatus.pending ||
-                      dose.status == DoseStatus.reminderSent ||
-                      dose.status == DoseStatus.snoozed),
-              onConfirm: () => context.read<DoseProvider>().confirm(dose),
-              onSnooze: () => context.read<DoseProvider>().snooze(dose),
-              onSkip: () => _confirmSkip(dose),
-            ),
+        ...today.map((dose) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: DoseCard(
+            dose: dose,
+            compact: dose.id != next.id && !(dose.status == DoseStatus.pending || dose.status == DoseStatus.reminderSent || dose.status == DoseStatus.snoozed),
+            onConfirm: () => context.read<DoseProvider>().confirm(dose),
+            onSnooze: () => context.read<DoseProvider>().snooze(dose),
+            onSkip: () => _confirmSkip(dose),
           ),
-        ),
+        )),
         const SizedBox(height: 24),
       ],
     );
   }
 
-  Widget _voiceMessagesButton() {
-    return Card(
-      child: ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.mic_rounded)),
-        title: const Text('رسائل المتابعة', style: TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: const Text('استمع إلى الرسائل الصوتية من متابعيك'),
-        trailing: const Icon(Icons.chevron_left_rounded),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VoiceMessagesPage())),
-      ),
-    );
-  }
+  Widget _voiceMessagesButton(AppLocalizations l) => Card(
+    child: ListTile(
+      leading: const CircleAvatar(child: Icon(Icons.mic_rounded)),
+      title: Text(l.followUpMessages, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(l.followUpMessagesSubtitle),
+      trailing: const Icon(Icons.chevron_left_rounded),
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VoiceMessagesPage())),
+    ),
+  );
 
   Future<void> _confirmSkip(DoseInstance dose) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('تخطي هذه الجرعة؟'),
-        content: Text('سيتم تسجيل ${dose.medicationName} كـ"متخطاة" لهذه المرة.'),
+        title: Text(l.skipDoseTitle),
+        content: Text(l.skippedDose(dose.medicationName)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('تخطي')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l.skip)),
         ],
       ),
     );
-    if (confirmed == true && mounted) {
-      await context.read<DoseProvider>().skip(dose);
-    }
+    if (confirmed == true && mounted) await context.read<DoseProvider>().skip(dose);
   }
 }

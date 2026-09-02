@@ -9,6 +9,7 @@ class DoseCard extends StatelessWidget {
   final VoidCallback? onConfirm;
   final VoidCallback? onSnooze;
   final VoidCallback? onSkip;
+  final VoidCallback? onTap;
   final bool compact;
 
   const DoseCard({
@@ -17,6 +18,7 @@ class DoseCard extends StatelessWidget {
     this.onConfirm,
     this.onSnooze,
     this.onSkip,
+    this.onTap,
     this.compact = false,
   });
 
@@ -28,7 +30,7 @@ class DoseCard extends StatelessWidget {
         dose.status == DoseStatus.reminderSent ||
         dose.status == DoseStatus.snoozed;
 
-    return Card(
+    final card = Card(
       child: Padding(
         padding: EdgeInsets.all(compact ? 14 : 18),
         child: Column(
@@ -50,10 +52,14 @@ class DoseCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(dose.medicationName,
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                      Text('${dose.doseAmount} — ${DateTimeUtils.formatTime(dose.scheduledAt)}',
-                          style: theme.textTheme.bodySmall),
+                      Text(
+                        dose.medicationName,
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        '${dose.doseAmount} — ${DateTimeUtils.formatTime(dose.scheduledAt)}',
+                        style: theme.textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),
@@ -85,6 +91,18 @@ class DoseCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+
+    if (onTap == null) return card;
+
+    return Semantics(
+      button: true,
+      label: 'فتح ${dose.medicationName}',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: card,
       ),
     );
   }
@@ -126,8 +144,14 @@ class _StatusChip extends StatelessWidget {
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(20)),
-      child: Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700),
+      ),
     );
   }
 }

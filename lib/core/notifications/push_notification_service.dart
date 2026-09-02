@@ -19,7 +19,9 @@ class PushNotificationService {
   bool _initialized = false;
   String? _latestToken;
   String? _pendingVoiceMessageId;
-  final StreamController<String> _voiceMessageController = StreamController<String>.broadcast();
+  StreamSubscription<String>? _localVoiceSubscription;
+  final StreamController<String> _voiceMessageController =
+      StreamController<String>.broadcast();
 
   Stream<String> get voiceMessageOpened => _voiceMessageController.stream;
 
@@ -28,12 +30,26 @@ class PushNotificationService {
 
     await _messaging.requestPermission(alert: true, badge: true, sound: true);
 
+    _localVoiceSubscription =
+        NotificationService.instance.voiceMessageOpened.listen((messageId) {
+      _queueVoiceMessageId(messageId);
+    });
+
     FirebaseMessaging.onMessage.listen((message) async {
       final notification = message.notification;
       if (notification == null) return;
+      final type = message.data['type'];
+      final messageId = message.data['voice_message_id'];
+      final payload = type == 'VOICE_MESSAGE' &&
+              messageId is String &&
+              messageId.isNotEmpty
+          ? 'VOICE_MESSAGE:$messageId'
+          : null;
+
       await NotificationService.instance.showCaregiverAlert(
         title: notification.title ?? 'دواء كير — تنبيه',
         body: notification.body ?? 'لديك تنبيه جديد من أحد أفراد العائلة.',
+        payload: payload,
       );
     });
 
@@ -60,11 +76,20 @@ class PushNotificationService {
   void _queueOpenedMessage(RemoteMessage message) {
     final type = message.data['type'];
     final messageId = message.data['voice_message_id'];
-    if (type != 'VOICE_MESSAGE' || messageId is! String || messageId.isEmpty) return;
+    if (type != 'VOICE_MESSAGE' ||
+        messageId is! String ||
+        messageId.isEmpty) {
+      return;
+    }
+    _queueVoiceMessageId(messageId);
+  }
 
+  void _queueVoiceMessageId(String messageId) {
     _pendingVoiceMessageId = messageId;
     debugPrint('DawaCare FCM voice deep link: $messageId');
-    if (!_voiceMessageController.isClosed) _voiceMessageController.add(messageId);
+    if (!_voiceMessageController.isClosed) {
+      _voiceMessageController.add(messageId);
+    }
   }
 
   /// Consumed by the app shell after authentication/navigation is ready.
@@ -84,7 +109,12 @@ class PushNotificationService {
     final user = _client.auth.currentUser;
     if (user == null) return;
     try {
-      final existing = await _client.from('devices').select('id').eq('user_id', user.id).eq('push_token', token).maybeSingle();
+      final existing = await _client
+          .from('devices')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('push_token', token)
+          .maybeSingle();
       final values = {
         'user_id': user.id,
         'platform': 'android',
@@ -101,9 +131,16 @@ class PushNotificationService {
       // Device registration must never prevent app startup.
     }
   }
+
+  void dispose() {
+    _localVoiceSubscription?.cancel();
+    _localVoiceSubscription = null;
+  }
 }
 
 @pragma('vm:entry-point')
-Future<void> dawacareFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> dawacareFirebaseMessagingBackgroundHandler(
+  RemoteMessage message,
+) async {
   await Firebase.initializeApp();
 }

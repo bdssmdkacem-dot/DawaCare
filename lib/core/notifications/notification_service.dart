@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -23,13 +24,18 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   final SupabaseClient _client = Supabase.instance.client;
+  final StreamController<String> _voiceMessageController =
+      StreamController<String>.broadcast();
   bool _initialized = false;
 
   static const String _channelId = 'dose_reminders';
   static const String _caregiverChannelId = 'caregiver_alerts';
   static const String _imageBucket = 'medication-images';
+  static const String _voicePayloadPrefix = 'VOICE_MESSAGE:';
   static const String _actionTaken = 'DOSE_TAKEN';
   static const String _actionSnooze = 'DOSE_SNOOZE';
+
+  Stream<String> get voiceMessageOpened => _voiceMessageController.stream;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -84,7 +90,16 @@ class NotificationService {
   }
 
   Future<void> _onNotificationResponse(NotificationResponse response) async {
-    final doseId = response.payload;
+    final payload = response.payload;
+    if (payload != null && payload.startsWith(_voicePayloadPrefix)) {
+      final messageId = payload.substring(_voicePayloadPrefix.length);
+      if (messageId.isNotEmpty && !_voiceMessageController.isClosed) {
+        _voiceMessageController.add(messageId);
+      }
+      return;
+    }
+
+    final doseId = payload;
     if (doseId == null || doseId.isEmpty) return;
 
     final action = response.actionId;
@@ -286,6 +301,7 @@ class NotificationService {
   Future<void> showCaregiverAlert({
     required String title,
     required String body,
+    String? payload,
   }) async {
     await _plugin.show(
       DateTime.now().millisecondsSinceEpoch.remainder(100000),
@@ -300,6 +316,7 @@ class NotificationService {
           priority: Priority.high,
         ),
       ),
+      payload: payload,
     );
   }
 

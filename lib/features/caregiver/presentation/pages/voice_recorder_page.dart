@@ -8,11 +8,19 @@ import '../../../../core/voice/voice_message_service.dart';
 class VoiceRecorderPage extends StatefulWidget {
   final String patientId;
   final String patientName;
+  final String? doseId;
+  final String? medicationName;
+  final String? doseAmount;
+  final DateTime? scheduledAt;
 
   const VoiceRecorderPage({
     super.key,
     required this.patientId,
     required this.patientName,
+    this.doseId,
+    this.medicationName,
+    this.doseAmount,
+    this.scheduledAt,
   });
 
   @override
@@ -105,6 +113,7 @@ class _VoiceRecorderPageState extends State<VoiceRecorderPage> {
     try {
       await _voice.sendRecording(
         patientId: widget.patientId,
+        doseId: widget.doseId,
         localPath: path,
         durationMs: _duration.inMilliseconds,
       );
@@ -132,6 +141,8 @@ class _VoiceRecorderPageState extends State<VoiceRecorderPage> {
 
   @override
   Widget build(BuildContext context) {
+    final contextual = widget.doseId != null;
+
     return Scaffold(
       appBar: AppBar(title: const Text('رسالة صوتية')),
       body: Padding(
@@ -139,11 +150,25 @@ class _VoiceRecorderPageState extends State<VoiceRecorderPage> {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            const Icon(Icons.record_voice_over_rounded, size: 72),
+            Icon(contextual ? Icons.medication_liquid_rounded : Icons.record_voice_over_rounded, size: 72),
             const SizedBox(height: 16),
-            Text('إرسال رسالة إلى ${widget.patientName}', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              contextual && widget.medicationName != null
+                  ? 'رسالة حول ${widget.medicationName}'
+                  : 'إرسال رسالة إلى ${widget.patientName}',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            if (contextual && widget.doseAmount != null && widget.scheduledAt != null) ...[
+              const SizedBox(height: 8),
+              Text('${widget.doseAmount} — ${_time(widget.scheduledAt!)}'),
+            ],
             const SizedBox(height: 8),
-            const Text('يمكنك تسجيل رسالة تصل إلى دقيقة واحدة.'),
+            Text(
+              contextual
+                  ? 'ستُربط الرسالة بهذه الجرعة.'
+                  : 'يمكنك تسجيل رسالة عامة تصل إلى دقيقة واحدة.',
+            ),
             const Spacer(),
             Text(_format(_duration), style: Theme.of(context).textTheme.displaySmall),
             const SizedBox(height: 24),
@@ -176,7 +201,9 @@ class _VoiceRecorderPageState extends State<VoiceRecorderPage> {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: _sending ? null : _send,
-                  icon: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.send_rounded),
+                  icon: _sending
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.send_rounded),
                   label: Text(_sending ? 'جارٍ الإرسال...' : 'إرسال الرسالة'),
                 ),
               ),
@@ -185,5 +212,11 @@ class _VoiceRecorderPageState extends State<VoiceRecorderPage> {
         ),
       ),
     );
+  }
+
+  String _time(DateTime value) {
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 }

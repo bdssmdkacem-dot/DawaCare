@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -81,13 +82,26 @@ class VoiceMessageService {
       }).select('*, sender:profiles!sender_id(full_name)').single();
 
       try {
-        await _client.functions.invoke(
+        final response = await _client.functions.invoke(
           'voice-message-notify',
           body: {'voice_message_id': messageId},
         );
-      } catch (_) {
-        // Delivery push is best-effort. The message remains available in the
-        // patient's secure voice-message inbox even if FCM is not configured.
+
+        debugPrint(
+          'DawaCare FCM notify: status=${response.status}, data=${response.data}',
+        );
+
+        if (response.status < 200 || response.status >= 300) {
+          throw VoiceMessageException(
+            'تم حفظ الرسالة، لكن فشل إرسال الإشعار (HTTP ${response.status}).',
+          );
+        }
+      } catch (error, stackTrace) {
+        debugPrint('DawaCare FCM notify failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        // The voice message is already stored safely. Do not delete it just
+        // because push delivery failed; the patient can still receive it from
+        // the in-app voice-message inbox.
       }
 
       return VoiceMessage.fromMap(row);

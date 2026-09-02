@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../features/doses/data/dose_repository.dart';
 import '../../models/dose_instance.dart';
 import '../../models/reminder_policy.dart';
 
@@ -27,6 +28,8 @@ class NotificationService {
   static const String _channelId = 'dose_reminders';
   static const String _caregiverChannelId = 'caregiver_alerts';
   static const String _imageBucket = 'medication-images';
+  static const String _actionTaken = 'DOSE_TAKEN';
+  static const String _actionSnooze = 'DOSE_SNOOZE';
 
   Future<void> init() async {
     if (_initialized) return;
@@ -41,7 +44,10 @@ class NotificationService {
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
-    await _plugin.initialize(initSettings);
+    await _plugin.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _onNotificationResponse,
+    );
 
     const channel = AndroidNotificationChannel(
       _channelId,
@@ -70,14 +76,107 @@ class NotificationService {
     _initialized = true;
   }
 
-  Future<bool> requestPermissions() async {
+  Future<void> requestPermissions() async {
     final androidImpl = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    final notifGranted =
-        await androidImpl?.requestNotificationsPermission() ?? true;
-    final exactAlarmGranted =
-        await androidImpl?.requestExactAlarmsPermission() ?? true;
-    return notifGranted && exactAlarmGranted;
+    await androidImpl?.requestNotificationsPermission();
+    await androidImpl?.requestExactAlarmsPermission();
+  }
+
+  Future<void> _onNotificationResponse(NotificationResponse response) async {
+    final doseId = response.payload;
+    if (doseId == null || doseId.isEmpty) return;
+
+    final action = response.actionId;
+    if (action == _actionTaken) {
+      await _handleDoseAction(doseId, DoseStatus.taken);
+    } else if (action == _actionSnooze) {
+      await _handleSnooze(doseId);
+    }
+  }
+
+  Future<void> _handleDoseAction(String doseId, DoseStatus status) async {
+    try {
+      final rows = await _client
+          .from('dose_instances')
+          .select('*, medications(name)')
+          .eq('id', doseId)
+          .maybeSingle();
+      if (rows == null) return;
+
+      final dose = DoseInstance.fromMap(rows);
+      await DoseRepository().updateStatus(dose, status, source: 'NOTIFICATION');
+      await cancelDoseReminders(doseId);
+    } catch (_) {
+      // The repository is offline-first; failures here must never crash the
+      // notification callback isolate.
+    }
+  }
+
+  Future<void> _handleSnooze(String doseId) async {
+    try {
+      final rows = await _client
+          .from('dose_instances')
+          .select('*, medications(name)')
+          .eq('id', doseId)
+          .maybeSingle();
+      if (rows == null) return;
+
+      final dose = DoseInstance.fromMap(rows);
+      await DoseRepository().updateStatus(
+        dose,
+        DoseStatus.snoozed,
+        source: 'NOTIFICATION',
+      );
+      await cancelDoseReminders(doseId);
+
+      final snoozeTime = tz.TZDateTime.now(tz.local).add(const Duration(minutes: 10));
+      final imagePath = await _prepareMedicationImage(dose);
+      final androidDetails = AndroidNotificationDetails(
+        _channelId,
+        'تذكير الجرعات',
+        channelDescription: 'إشعارات تذكير بمواعيد الأدوية',
+        importance: Importance.max,
+        priority: Priority.high,
+        largeIcon: imagePath == null ? null : FilePathAndroidBitmap(imagePath),
+        styleInformation: imagePath == null
+            ? null
+            : BigPictureStyleInformation(
+                FilePathAndroidBitmap(imagePath),
+                hideExpandedLargeIcon: false,
+                contentTitle: dose.medicationName,
+                summaryText: dose.doseAmount,
+              ),
+        actions: const [
+          AndroidNotificationAction(
+            _actionTaken,
+            'تم أخذ الدواء',
+            showsUserInterface: false,
+            cancelNotification: true,
+          ),
+          AndroidNotificationAction(
+            _actionSnooze,
+            'تأجيل 10 دقائق',
+            showsUserInterface: false,
+            cancelNotification: true,
+          ),
+        ],
+      );
+
+      await _plugin.zonedSchedule(
+        _notificationId(dose.id, 99),
+        'تذكير: حان وقت الدواء 💊',
+        '${dose.medicationName} — ${dose.doseAmount}',
+        snoozeTime,
+        NotificationDetails(android: androidDetails),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: dose.id,
+      );
+    } catch (_) {
+      // Best effort only.
+    }
   }
 
   Future<void> scheduleDoseReminders({
@@ -91,10 +190,7 @@ class NotificationService {
       return;
     }
 
-    // Best effort only. A missing/expired/private image must never block a
-    // medication reminder.
     final imagePath = await _prepareMedicationImage(dose);
-
     final now = tz.TZDateTime.now(tz.local);
     final baseTime = tz.TZDateTime.from(dose.scheduledAt, tz.local);
 
@@ -110,8 +206,7 @@ class NotificationService {
         importance: Importance.max,
         priority: Priority.high,
         category: AndroidNotificationCategory.reminder,
-        largeIcon:
-            imagePath == null ? null : FilePathAndroidBitmap(imagePath),
+        largeIcon: imagePath == null ? null : FilePathAndroidBitmap(imagePath),
         styleInformation: imagePath == null
             ? null
             : BigPictureStyleInformation(
@@ -120,6 +215,20 @@ class NotificationService {
                 contentTitle: dose.medicationName,
                 summaryText: dose.doseAmount,
               ),
+        actions: const [
+          AndroidNotificationAction(
+            _actionTaken,
+            'تم أخذ الدواء',
+            showsUserInterface: false,
+            cancelNotification: true,
+          ),
+          AndroidNotificationAction(
+            _actionSnooze,
+            'تأجيل 10 دقائق',
+            showsUserInterface: false,
+            cancelNotification: true,
+          ),
+        ],
       );
 
       await _plugin.zonedSchedule(
@@ -152,19 +261,16 @@ class NotificationService {
           : await _client.storage
               .from(_imageBucket)
               .createSignedUrl(storagePath, 3600);
-
       final uri = Uri.tryParse(signedUrl);
       if (uri == null) return null;
 
       final directory = await getTemporaryDirectory();
       final safeId = dose.medicationId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
       final file = File('${directory.path}/medication_$safeId.jpg');
-
       final request = await HttpClient().getUrl(uri);
       final response = await request.close();
       if (response.statusCode < 200 || response.statusCode >= 300) return null;
       await response.pipe(file.openWrite());
-
       return await file.exists() ? file.path : null;
     } catch (_) {
       return null;
@@ -172,7 +278,7 @@ class NotificationService {
   }
 
   Future<void> cancelDoseReminders(String doseId) async {
-    for (int i = 0; i <= 10; i++) {
+    for (int i = 0; i <= 110; i++) {
       await _plugin.cancel(_notificationId(doseId, i));
     }
   }

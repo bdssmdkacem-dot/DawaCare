@@ -20,7 +20,7 @@ class MedicationImageService {
           bytes,
           fileOptions: const FileOptions(
             contentType: 'image/jpeg',
-            upsert: true,
+            upsert: false,
           ),
         );
     return path;
@@ -28,7 +28,6 @@ class MedicationImageService {
 
   Future<String?> signedUrl(String? storagePath) async {
     if (storagePath == null || storagePath.isEmpty) return null;
-    // Backward compatible with any legacy absolute URL already stored.
     if (storagePath.startsWith('http://') || storagePath.startsWith('https://')) {
       return storagePath;
     }

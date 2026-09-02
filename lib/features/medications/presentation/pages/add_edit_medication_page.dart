@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -25,7 +28,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   final _instructionsCtrl = TextEditingController();
   final _doseAmountCtrl = TextEditingController(text: '1');
   final _intervalCtrl = TextEditingController(text: '2');
+  final _imagePicker = ImagePicker();
 
+  Uint8List? _imageBytes;
   String? _dosageForm;
   ScheduleType _scheduleType = ScheduleType.daily;
   TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
@@ -42,6 +47,42 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     _doseAmountCtrl.dispose();
     _intervalCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final file = await _imagePicker.pickImage(
+      source: source,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 82,
+    );
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    setState(() => _imageBytes = bytes);
+  }
+
+  Future<void> _chooseImageSource() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: const Text('تصوير الدواء بالكاميرا'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('اختيار صورة من الهاتف'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source != null) await _pickImage(source);
   }
 
   Future<void> _pickTime() async {
@@ -88,6 +129,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       strength: _strengthCtrl.text.trim().isEmpty ? null : _strengthCtrl.text.trim(),
       dosageForm: _dosageForm,
       instructions: _instructionsCtrl.text.trim().isEmpty ? null : _instructionsCtrl.text.trim(),
+      imageUrl: null,
       startDate: _startDate,
       endDate: _endDate,
       active: true,
@@ -96,25 +138,27 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     );
 
     final schedule = MedicationSchedule(
-  id: uuid.v4(),
-  medicationId: medication.id,
-  type: _scheduleType,
-  time: time,
-  daysOfWeek: _scheduleType == ScheduleType.specificDays
-      ? (_selectedDays.toList()..sort())
-      : const [],
-  intervalDays: _scheduleType == ScheduleType.interval
-      ? int.tryParse(_intervalCtrl.text) ?? 2
-      : null,
-  doseAmount: _doseAmountCtrl.text.trim().isEmpty
-      ? '1'
-      : _doseAmountCtrl.text.trim(),
-  startDate: _startDate,
-  endDate: _endDate,
-  timezone: auth.profile?.timezone ?? 'Africa/Casablanca',
-);
+      id: uuid.v4(),
+      medicationId: medication.id,
+      type: _scheduleType,
+      time: time,
+      daysOfWeek: _scheduleType == ScheduleType.specificDays
+          ? (_selectedDays.toList()..sort())
+          : const [],
+      intervalDays: _scheduleType == ScheduleType.interval
+          ? int.tryParse(_intervalCtrl.text) ?? 2
+          : null,
+      doseAmount: _doseAmountCtrl.text.trim().isEmpty ? '1' : _doseAmountCtrl.text.trim(),
+      startDate: _startDate,
+      endDate: _endDate,
+      timezone: auth.profile?.timezone ?? 'Africa/Casablanca',
+    );
 
-    final ok = await context.read<MedicationProvider>().addMedication(medication: medication, schedule: schedule);
+    final ok = await context.read<MedicationProvider>().addMedication(
+          medication: medication,
+          schedule: schedule,
+          imageBytes: _imageBytes,
+        );
     if (!mounted) return;
     setState(() => _submitting = false);
 
@@ -137,6 +181,12 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              _MedicationImagePicker(
+                bytes: _imageBytes,
+                onTap: _chooseImageSource,
+                onRemove: _imageBytes == null ? null : () => setState(() => _imageBytes = null),
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _nameCtrl,
                 decoration: const InputDecoration(labelText: 'اسم الدواء *'),
@@ -247,6 +297,62 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       label: Text(label),
       selected: _scheduleType == type,
       onSelected: (_) => setState(() => _scheduleType = type),
+    );
+  }
+}
+
+class _MedicationImagePicker extends StatelessWidget {
+  final Uint8List? bytes;
+  final VoidCallback onTap;
+  final VoidCallback? onRemove;
+
+  const _MedicationImagePicker({required this.bytes, required this.onTap, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        height: 190,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: bytes == null
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_a_photo_rounded, size: 52, color: theme.colorScheme.primary),
+                  const SizedBox(height: 10),
+                  const Text('أضف صورة الدواء', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  const Text('صوّر العلبة لتسهيل التعرّف على الدواء'),
+                ],
+              )
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.memory(bytes!, fit: BoxFit.cover),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Row(
+                      children: [
+                        IconButton.filledTonal(onPressed: onTap, icon: const Icon(Icons.edit_rounded)),
+                        if (onRemove != null) ...[
+                          const SizedBox(width: 6),
+                          IconButton.filledTonal(onPressed: onRemove, icon: const Icon(Icons.delete_outline_rounded)),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../../../models/dose_instance.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../doses/presentation/providers/dose_provider.dart';
 import '../widgets/dose_card.dart';
+import 'voice_messages_page.dart';
 
 class PatientHomePage extends StatefulWidget {
   const PatientHomePage({super.key});
@@ -59,10 +60,17 @@ class _PatientHomePageState extends State<PatientHomePage> {
     final today = provider.todayDoses;
 
     if (today.isEmpty) {
-      return const EmptyState(
-        icon: Icons.check_circle_outline_rounded,
-        title: 'لا توجد أدوية مجدولة اليوم',
-        subtitle: 'أضف دواءك الأول من تبويب "أدويتي"',
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _voiceMessagesButton(),
+          const SizedBox(height: 28),
+          const EmptyState(
+            icon: Icons.check_circle_outline_rounded,
+            title: 'لا توجد أدوية مجدولة اليوم',
+            subtitle: 'أضف دواءك الأول من تبويب "أدويتي"',
+          ),
+        ],
       );
     }
 
@@ -75,6 +83,8 @@ class _PatientHomePageState extends State<PatientHomePage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        _voiceMessagesButton(),
+        const SizedBox(height: 16),
         Text(DateTimeUtils.relativeDayLabel(now), style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
         ...today.map(
@@ -94,6 +104,18 @@ class _PatientHomePageState extends State<PatientHomePage> {
         ),
         const SizedBox(height: 24),
       ],
+    );
+  }
+
+  Widget _voiceMessagesButton() {
+    return Card(
+      child: ListTile(
+        leading: const CircleAvatar(child: Icon(Icons.mic_rounded)),
+        title: const Text('رسائل المتابعة', style: TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: const Text('استمع إلى الرسائل الصوتية من متابعيك'),
+        trailing: const Icon(Icons.chevron_left_rounded),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VoiceMessagesPage())),
+      ),
     );
   }
 

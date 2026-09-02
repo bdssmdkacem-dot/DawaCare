@@ -136,6 +136,7 @@ class _VoiceMessagesPageState extends State<VoiceMessagesPage> {
       if (!mounted) return;
       if (result.deleted) {
         await _service.deleteStorageFile(result.storagePath);
+        if (!mounted) return;
         setState(() {
           _messages.removeWhere((m) => m.id == id);
           if (_contextMessageId == id) _contextMessageId = null;

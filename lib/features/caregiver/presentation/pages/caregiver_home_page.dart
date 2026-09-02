@@ -37,22 +37,24 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
     if (userId != null) await context.read<CaregiverProvider>().load(userId);
   }
 
-  // ---- Patient: generate + show an invite code --------------------------------
-
   Future<void> _openGenerateCodeSheet() async {
     final provider = context.read<CaregiverProvider>();
     await provider.generateCode();
     if (!mounted) return;
 
     if (provider.activeCode == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error ?? 'تعذّر إنشاء الرمز')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.error ?? 'تعذّر إنشاء الرمز')),
+      );
       return;
     }
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => LinkCodeSheet(
         initialCode: provider.activeCode!,
         onRegenerate: () async {
@@ -62,8 +64,6 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
       ),
     );
   }
-
-  // ---- Caregiver: submit a code to request access ------------------------------
 
   Future<void> _openRequestLinkDialog() async {
     final codeCtrl = TextEditingController();
@@ -105,7 +105,10 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
     if (result != true || codeCtrl.text.trim().isEmpty || !mounted) return;
 
     final provider = context.read<CaregiverProvider>();
-    final patientName = await provider.submitCode(codeCtrl.text.trim(), relationshipLabel: relationshipCtrl.text.trim());
+    final patientName = await provider.submitCode(
+      codeCtrl.text.trim(),
+      relationshipLabel: relationshipCtrl.text.trim(),
+    );
     if (!mounted) return;
 
     if (patientName != null) {
@@ -114,12 +117,15 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
       );
       await _reload();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error ?? 'تعذّر إرسال الطلب')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.error ?? 'تعذّر إرسال الطلب')),
+      );
     }
   }
 
   Future<void> _respond(FamilyLinkRequest request, bool approve) async {
-    final ok = await context.read<CaregiverProvider>().respondToRequest(request, approve: approve);
+    final provider = context.read<CaregiverProvider>();
+    final ok = await provider.respondToRequest(request, approve: approve);
     if (!mounted) return;
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -154,7 +160,6 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                     ),
                     const SizedBox(height: 20),
                   ],
-
                   Row(
                     children: [
                       Expanded(
@@ -175,29 +180,31 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   if (provider.sentRequests.isNotEmpty) ...[
                     Text('طلباتي المعلّقة', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 10),
-                    ...provider.sentRequests.map((r) => _SentRequestTile(
-                          request: r,
-                          onCancel: () async {
-                            final ok = await context.read<CaregiverProvider>().cancelSentRequest(r);
-                            if (ok && mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إلغاء الطلب')));
-                            }
-                          },
-                        )),
+                    ...provider.sentRequests.map(
+                      (r) => _SentRequestTile(
+                        request: r,
+                        onCancel: () async {
+                          final caregiverProvider = context.read<CaregiverProvider>();
+                          final ok = await caregiverProvider.cancelSentRequest(r);
+                          if (ok && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('تم إلغاء الطلب')),
+                            );
+                          }
+                        },
+                      ),
+                    ),
                     const SizedBox(height: 20),
                   ],
-
                   if (provider.alerts.isNotEmpty) ...[
                     Text('تنبيهات', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 10),
                     ...provider.alerts.take(5).map((a) => _AlertTile(alert: a)),
                     const SizedBox(height: 20),
                   ],
-
                   Text('أفراد العائلة', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 10),
                   if (provider.linkedPatients.isEmpty)
@@ -253,13 +260,9 @@ class _IncomingRequestCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton(onPressed: onReject, child: const Text('رفض')),
-                ),
+                Expanded(child: OutlinedButton(onPressed: onReject, child: const Text('رفض'))),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton(onPressed: onApprove, child: const Text('قبول')),
-                ),
+                Expanded(child: FilledButton(onPressed: onApprove, child: const Text('قبول'))),
               ],
             ),
           ],
@@ -308,7 +311,9 @@ class _PatientLinkTile extends StatelessWidget {
         title: Text(link.patientName, style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_left_rounded),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPage(link: link))),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => PatientDetailPage(link: link)),
+        ),
       ),
     );
   }

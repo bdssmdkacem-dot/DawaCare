@@ -45,13 +45,12 @@ class CaregiverRepository {
 
   // ---- Family link requests (caregiver side) --------------------------------
 
-  /// Submits a code entered by the caregiver. Throws [FamilyLinkException]
-  /// with one of: CODE_INVALID_OR_EXPIRED, CANNOT_LINK_SELF, ALREADY_LINKED,
-  /// REQUEST_ALREADY_PENDING.
+  /// Submits a code entered by the caregiver. The server also normalizes
+  /// pasted formatting and Arabic-Indic digits before validating the code.
   Future<String> requestLink({required String code, String? relationshipLabel}) async {
     try {
       final rows = await _client.rpc('request_family_link', params: {
-        'p_code': code,
+        'p_code': _normalizeLinkCode(code),
         'p_relationship_label': relationshipLabel,
       });
       final row = (rows as List).first as Map<String, dynamic>;
@@ -120,6 +119,18 @@ class CaregiverRepository {
 
   Future<void> markAlertRead(String alertId) async {
     await _client.from('caregiver_alerts').update({'read': true}).eq('id', alertId);
+  }
+
+  String _normalizeLinkCode(String value) {
+    const arabicIndic = '٠١٢٣٤٥٦٧٨٩';
+    const extendedArabicIndic = '۰۱۲۳۴۵۶۷۸۹';
+    const latin = '0123456789';
+    var result = value.trim();
+    for (var i = 0; i < latin.length; i++) {
+      result = result.replaceAll(arabicIndic[i], latin[i]);
+      result = result.replaceAll(extendedArabicIndic[i], latin[i]);
+    }
+    return result.replaceAll(RegExp(r'[^0-9]'), '');
   }
 
   /// Postgres RPC errors arrive wrapped, e.g. `... CODE_INVALID_OR_EXPIRED`.

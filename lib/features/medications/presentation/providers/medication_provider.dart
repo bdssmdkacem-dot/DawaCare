@@ -26,7 +26,7 @@ class MedicationProvider extends ChangeNotifier {
       for (final med in medications) {
         schedulesByMedicationId[med.id] = await _repo.fetchSchedules(med.id);
       }
-    } catch (e) {
+    } catch (_) {
       error = 'تعذّر تحميل الأدوية.';
     } finally {
       isLoading = false;
@@ -46,7 +46,7 @@ class MedicationProvider extends ChangeNotifier {
       schedulesByMedicationId[created.id] = [createdSchedule];
       notifyListeners();
       return true;
-    } catch (e) {
+    } catch (_) {
       error = 'تعذّر إضافة الدواء. حاول مرة أخرى.';
       notifyListeners();
       return false;
@@ -55,25 +55,24 @@ class MedicationProvider extends ChangeNotifier {
 
   Future<bool> updateMedicationImage(Medication medication, Uint8List bytes) async {
     try {
-      await _repo.updateMedicationImage(medication: medication, bytes: bytes);
+      final path = await _repo.updateMedicationImage(medication: medication, bytes: bytes);
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
-        final updated = Medication.fromMap({
-          'id': medication.id,
-          'patient_id': medication.patientId,
-          'name': medication.name,
-          'generic_name': medication.genericName,
-          'strength': medication.strength,
-          'dosage_form': medication.dosageForm,
-          'instructions': medication.instructions,
-          'image_url': 'updated',
-          'start_date': medication.startDate.toIso8601String(),
-          'end_date': medication.endDate?.toIso8601String(),
-          'active': medication.active,
-          'created_by': medication.createdBy,
-          'created_at': medication.createdAt.toIso8601String(),
-        });
-        medications[index] = updated;
+        medications[index] = Medication(
+          id: medication.id,
+          patientId: medication.patientId,
+          name: medication.name,
+          genericName: medication.genericName,
+          strength: medication.strength,
+          dosageForm: medication.dosageForm,
+          instructions: medication.instructions,
+          imageUrl: path,
+          startDate: medication.startDate,
+          endDate: medication.endDate,
+          active: medication.active,
+          createdBy: medication.createdBy,
+          createdAt: medication.createdAt,
+        );
         notifyListeners();
       }
       return true;
@@ -83,6 +82,38 @@ class MedicationProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  Future<bool> removeMedicationImage(Medication medication) async {
+    try {
+      await _repo.removeMedicationImage(medication);
+      final index = medications.indexWhere((m) => m.id == medication.id);
+      if (index >= 0) {
+        medications[index] = Medication(
+          id: medication.id,
+          patientId: medication.patientId,
+          name: medication.name,
+          genericName: medication.genericName,
+          strength: medication.strength,
+          dosageForm: medication.dosageForm,
+          instructions: medication.instructions,
+          imageUrl: null,
+          startDate: medication.startDate,
+          endDate: medication.endDate,
+          active: medication.active,
+          createdBy: medication.createdBy,
+          createdAt: medication.createdAt,
+        );
+        notifyListeners();
+      }
+      return true;
+    } catch (_) {
+      error = 'تعذّر حذف صورة الدواء.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<String?> signedMedicationImageUrl(String? imagePath) => _repo.signedMedicationImageUrl(imagePath);
 
   Future<void> deactivate(Medication medication) async {
     await _repo.deactivateMedication(medication.id);

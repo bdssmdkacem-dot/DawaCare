@@ -1,10 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../models/medication.dart';
 import '../../../models/medication_schedule.dart';
+import 'medication_image_service.dart';
 
 class MedicationRepository {
   final SupabaseClient _client = Supabase.instance.client;
+  final MedicationImageService _imageService = MedicationImageService();
 
   Future<List<Medication>> fetchMedications(String patientId, {bool activeOnly = true}) async {
     var query = _client.from('medications').select().eq('patient_id', patientId);
@@ -18,10 +22,66 @@ class MedicationRepository {
     return rows.map((r) => MedicationSchedule.fromMap(r)).toList();
   }
 
-  Future<Medication> createMedication(Medication medication) async {
+  Future<Medication> createMedication(
+    Medication medication, {
+    Uint8List? imageBytes,
+  }) async {
     final row = await _client.from('medications').insert(medication.toInsertMap()).select().single();
-    return Medication.fromMap(row);
+    var created = Medication.fromMap(row);
+
+    if (imageBytes != null) {
+      try {
+        final path = await _imageService.upload(
+          patientId: medication.patientId,
+          medicationId: medication.id,
+          bytes: imageBytes,
+        );
+        final updated = await _client
+            .from('medications')
+            .update({'image_url': path})
+            .eq('id', medication.id)
+            .select()
+            .single();
+        created = Medication.fromMap(updated);
+      } catch (_) {
+        await _imageService.delete(
+          _imageService.pathFor(
+            patientId: medication.patientId,
+            medicationId: medication.id,
+          ),
+        );
+        await _client.from('medications').delete().eq('id', medication.id);
+        rethrow;
+      }
+    }
+
+    return created;
   }
+
+  Future<void> updateMedicationImage({
+    required Medication medication,
+    required Uint8List bytes,
+  }) async {
+    final path = await _imageService.upload(
+      patientId: medication.patientId,
+      medicationId: medication.id,
+      bytes: bytes,
+    );
+    await _client
+        .from('medications')
+        .update({'image_url': path})
+        .eq('id', medication.id);
+  }
+
+  Future<void> removeMedicationImage(Medication medication) async {
+    await _imageService.delete(medication.imageUrl);
+    await _client
+        .from('medications')
+        .update({'image_url': null})
+        .eq('id', medication.id);
+  }
+
+  Future<String?> signedMedicationImageUrl(String? imagePath) => _imageService.signedUrl(imagePath);
 
   Future<MedicationSchedule> createSchedule(String medicationId, MedicationSchedule schedule) async {
     final row = await _client

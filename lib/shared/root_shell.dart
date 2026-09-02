@@ -47,8 +47,8 @@ class _RootShellState extends State<RootShell> {
           const BottomNavigationBarItem(icon: Icon(Icons.medication_rounded), label: 'أدويتي'),
           BottomNavigationBarItem(
             icon: Badge(
-              isLabelVisible: caregiver.unreadAlertCount > 0,
-              label: Text('${caregiver.unreadAlertCount}'),
+              isLabelVisible: (caregiver.unreadAlertCount + caregiver.pendingApprovalCount) > 0,
+              label: Text('${caregiver.unreadAlertCount + caregiver.pendingApprovalCount}'),
               child: const Icon(Icons.family_restroom_rounded),
             ),
             label: 'العائلة',

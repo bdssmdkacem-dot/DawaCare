@@ -30,6 +30,7 @@ class CaregiverLink {
   final String patientId;
   final String patientName;
   final CaregiverRole role;
+  final String? relationshipLabel;
   final DateTime createdAt;
 
   const CaregiverLink({
@@ -38,6 +39,7 @@ class CaregiverLink {
     required this.patientId,
     required this.patientName,
     required this.role,
+    this.relationshipLabel,
     required this.createdAt,
   });
 
@@ -49,6 +51,7 @@ class CaregiverLink {
       patientId: map['patient_id'] as String,
       patientName: (patient?['full_name'] as String?) ?? 'مريض',
       role: caregiverRoleFromDb(map['role'] as String),
+      relationshipLabel: map['relationship_label'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }

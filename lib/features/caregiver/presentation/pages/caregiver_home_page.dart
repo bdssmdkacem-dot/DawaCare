@@ -12,14 +12,258 @@ import '../providers/caregiver_provider.dart';
 import '../widgets/link_code_sheet.dart';
 import 'patient_detail_page.dart';
 
-class CaregiverHomePage extends StatefulWidget{const CaregiverHomePage({super.key});@override State<CaregiverHomePage> createState()=>_CaregiverHomePageState();}
-class _CaregiverHomePageState extends State<CaregiverHomePage>{bool _loadedOnce=false;@override void didChangeDependencies(){super.didChangeDependencies();if(!_loadedOnce){_loadedOnce=true;final id=context.read<AuthProvider>().profile?.id;if(id!=null)context.read<CaregiverProvider>().load(id);}}Future<void> _reload()async{final id=context.read<AuthProvider>().profile?.id;if(id!=null)await context.read<CaregiverProvider>().load(id);}
- Future<void> _openGenerateCodeSheet()async{final p=context.read<CaregiverProvider>();final l=AppLocalizations.of(context);await p.generateCode();if(!mounted)return;if(p.activeCode==null){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(p.error??l.unexpectedError)));return;}await showModalBottomSheet(context:context,isScrollControlled:true,shape:const RoundedRectangleBorder(borderRadius:BorderRadius.vertical(top:Radius.circular(20))),builder:(_)=>LinkCodeSheet(initialCode:p.activeCode!,onRegenerate:()async{await p.generateCode();return p.activeCode;}));}
- Future<void> _openRequestLinkDialog()async{final l=AppLocalizations.of(context);final codeCtrl=TextEditingController();final relationshipCtrl=TextEditingController();final result=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:Text(l.followSomeone),content:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[Text(_tr(context,'أدخل رمز الربط الذي شاركه معك (صالح 15 دقيقة، استعمال واحد):','Enter the shared link code (valid for 15 minutes, one use):','Saisissez le code de liaison partagé (valable 15 minutes, une utilisation) :')),const SizedBox(height:14),TextField(controller:codeCtrl,autofocus:true,textAlign:TextAlign.center,keyboardType:TextInputType.number,maxLength:6,style:const TextStyle(fontSize:22,fontWeight:FontWeight.w900,letterSpacing:6),decoration:const InputDecoration(counterText:'',hintText:'000000')),const SizedBox(height:4),TextField(controller:relationshipCtrl,decoration:InputDecoration(labelText:_tr(context,'صلتك بهذا الشخص (اختياري)','Your relationship to this person (optional)','Votre lien avec cette personne (facultatif)'),hintText:_tr(context,'مثال: ابنه، ابنته...','e.g. son, daughter...','ex. fils, fille...')))]),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:Text(l.cancel)),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:Text(_tr(context,'إرسال الطلب','Send request','Envoyer la demande')))]));if(result!=true||codeCtrl.text.trim().isEmpty||!mounted)return;final p=context.read<CaregiverProvider>();final name=await p.submitCode(codeCtrl.text.trim(),relationshipLabel:relationshipCtrl.text.trim());if(!mounted)return;if(name!=null){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(_tr(context,'تم إرسال الطلب إلى $name — بانتظار الموافقة','Request sent to $name — awaiting approval','Demande envoyée à $name — en attente d’approbation'))));await _reload();}else{ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(p.error??l.unexpectedError)));}}
- Future<void> _respond(FamilyLinkRequest r,bool approve)async{final p=context.read<CaregiverProvider>();final ok=await p.respondToRequest(r,approve:approve);if(!mounted)return;if(ok){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(approve?_tr(context,'تم قبول ${r.caregiverName}','${r.caregiverName} was accepted','${r.caregiverName} a été accepté'):_tr(context,'تم رفض الطلب','Request rejected','Demande refusée'))));if(approve)await _reload();}}
- @override Widget build(BuildContext context){final l=AppLocalizations.of(context);final p=context.watch<CaregiverProvider>();return Scaffold(appBar:AppBar(title:Text(l.family)),body:p.isLoading&&p.linkedPatients.isEmpty&&p.incomingRequests.isEmpty?const LoadingIndicator():RefreshIndicator(onRefresh:_reload,child:ListView(padding:const EdgeInsets.fromLTRB(16,16,16,32),children:[if(p.incomingRequests.isNotEmpty)...[Text(l.familyRequests,style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:10),...p.incomingRequests.map((r)=>_IncomingRequestCard(request:r,onApprove:()=>_respond(r,true),onReject:()=>_respond(r,false))),const SizedBox(height:20)],Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_openGenerateCodeSheet,icon:const Icon(Icons.qr_code_2_rounded),label:Text(l.inviteToMedicines))),const SizedBox(width:10),Expanded(child:OutlinedButton.icon(onPressed:_openRequestLinkDialog,icon:const Icon(Icons.person_search_rounded),label:Text(l.followSomeone)))]),const SizedBox(height:20),if(p.sentRequests.isNotEmpty)...[Text(l.pendingRequests,style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:10),...p.sentRequests.map((r)=>_SentRequestTile(request:r,onCancel:()async{final ok=await context.read<CaregiverProvider>().cancelSentRequest(r);if(!context.mounted)return;if(ok)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(_tr(context,'تم إلغاء الطلب','Request cancelled','Demande annulée'))));})),const SizedBox(height:20)],if(p.alerts.isNotEmpty)...[Text(l.alerts,style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:10),...p.alerts.take(5).map((a)=>_AlertTile(alert:a)),const SizedBox(height:20)],Text(l.familyMembers,style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:10),if(p.linkedPatients.isEmpty)Padding(padding:const EdgeInsets.symmetric(vertical:24),child:Column(children:[const Icon(Icons.family_restroom_rounded,size:48,color:Colors.grey),const SizedBox(height:12),Text(l.noFamilyLinked,textAlign:TextAlign.center),const SizedBox(height:16),SizedBox(width:220,child:PrimaryButton(label:l.requestFollowNow,onPressed:_openRequestLinkDialog))]))else...p.linkedPatients.map((link)=>_PatientLinkTile(link:link))]))));}}
-String _tr(BuildContext c,String ar,String en,String fr)=>switch(AppLocalizations.of(c).locale.languageCode){'en'=>en,'fr'=>fr,_=>ar};
-class _IncomingRequestCard extends StatelessWidget{final FamilyLinkRequest request;final VoidCallback onApprove,onReject;const _IncomingRequestCard({required this.request,required this.onApprove,required this.onReject});@override Widget build(BuildContext context){final l=AppLocalizations.of(context);final msg=request.relationshipLabel!=null&&request.relationshipLabel!.isNotEmpty?_tr(context,'${request.caregiverName} (${request.relationshipLabel}) يريد متابعة أدويتك','${request.caregiverName} (${request.relationshipLabel}) wants to follow your medicines','${request.caregiverName} (${request.relationshipLabel}) souhaite suivre vos médicaments'):_tr(context,'${request.caregiverName} يريد متابعة أدويتك','${request.caregiverName} wants to follow your medicines','${request.caregiverName} souhaite suivre vos médicaments');return Card(color:Theme.of(context).colorScheme.primary.withValues(alpha:.06),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(msg,style:const TextStyle(fontWeight:FontWeight.w700)),const SizedBox(height:4),Text(DateTimeUtils.relativeDayLabel(request.requestedAt),style:Theme.of(context).textTheme.bodySmall),const SizedBox(height:12),Row(children:[Expanded(child:OutlinedButton(onPressed:onReject,child:Text(l.reject))),const SizedBox(width:10),Expanded(child:FilledButton(onPressed:onApprove,child:Text(l.accept)))])])));}}
-class _SentRequestTile extends StatelessWidget{final FamilyLinkRequest request;final VoidCallback onCancel;const _SentRequestTile({required this.request,required this.onCancel});@override Widget build(BuildContext context){final l=AppLocalizations.of(context);return Card(child:ListTile(leading:const Icon(Icons.hourglass_top_rounded,color:Colors.orange),title:Text(request.patientName),subtitle:Text(l.waitingApproval),trailing:TextButton(onPressed:onCancel,child:Text(l.cancel))));}}
-class _PatientLinkTile extends StatelessWidget{final CaregiverLink link;const _PatientLinkTile({required this.link});@override Widget build(BuildContext context){final subtitle=[if(link.relationshipLabel!=null&&link.relationshipLabel!.isNotEmpty)link.relationshipLabel!,link.role==CaregiverRole.primary?_tr(context,'مرافق رئيسي','Primary caregiver','Accompagnant principal'):_tr(context,'مرافق','Caregiver','Accompagnant')].join(' · ');return Card(child:ListTile(leading:CircleAvatar(backgroundColor:Theme.of(context).colorScheme.primary.withValues(alpha:.12),child:const Icon(Icons.person_rounded)),title:Text(link.patientName,style:const TextStyle(fontWeight:FontWeight.w700)),subtitle:Text(subtitle),trailing:const Icon(Icons.chevron_right_rounded),onTap:()=>Navigator.of(context).push(MaterialPageRoute(builder:(_)=>PatientDetailPage(link:link)))));}}
-class _AlertTile extends StatelessWidget{final CaregiverAlert alert;const _AlertTile({required this.alert});@override Widget build(BuildContext context){return Card(color:alert.read?null:Colors.red.withValues(alpha:.06),child:ListTile(leading:const Icon(Icons.error_outline_rounded,color:Colors.redAccent),title:Text(alert.message),subtitle:Text(alert.patientName),onTap:()=>context.read<CaregiverProvider>().markAlertRead(alert)));}}
+class CaregiverHomePage extends StatefulWidget {
+  const CaregiverHomePage({super.key});
+  @override
+  State<CaregiverHomePage> createState() => _CaregiverHomePageState();
+}
+
+class _CaregiverHomePageState extends State<CaregiverHomePage> {
+  bool _loadedOnce = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedOnce) {
+      _loadedOnce = true;
+      final id = context.read<AuthProvider>().profile?.id;
+      if (id != null) context.read<CaregiverProvider>().load(id);
+    }
+  }
+
+  Future<void> _reload() async {
+    final id = context.read<AuthProvider>().profile?.id;
+    if (id != null) await context.read<CaregiverProvider>().load(id);
+  }
+
+  Future<void> _openGenerateCodeSheet() async {
+    final p = context.read<CaregiverProvider>();
+    final l = AppLocalizations.of(context);
+    await p.generateCode();
+    if (!mounted) return;
+    if (p.activeCode == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(p.error ?? l.unexpectedError)),
+      );
+      return;
+    }
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => LinkCodeSheet(
+        initialCode: p.activeCode!,
+        onRegenerate: () async {
+          await p.generateCode();
+          return p.activeCode;
+        },
+      ),
+    );
+  }
+
+  Future<void> _openRequestLinkDialog() async {
+    final l = AppLocalizations.of(context);
+    final codeCtrl = TextEditingController();
+    final relationshipCtrl = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.followSomeone),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_tr(
+              context,
+              'أدخل رمز الربط الذي شاركه معك (صالح 15 دقيقة، استعمال واحد):',
+              'Enter the shared link code (valid for 15 minutes, one use):',
+              'Saisissez le code de liaison partagé (valable 15 minutes, une utilisation) :',
+            )),
+            const SizedBox(height: 14),
+            TextField(
+              controller: codeCtrl,
+              autofocus: true,
+              textAlign: TextAlign.center,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 6),
+              decoration: const InputDecoration(counterText: '', hintText: '000000'),
+            ),
+            const SizedBox(height: 4),
+            TextField(
+              controller: relationshipCtrl,
+              decoration: InputDecoration(
+                labelText: _tr(context, 'صلتك بهذا الشخص (اختياري)', 'Your relationship to this person (optional)', 'Votre lien avec cette personne (facultatif)'),
+                hintText: _tr(context, 'مثال: ابنه، ابنته...', 'e.g. son, daughter...', 'ex. fils, fille...'),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(_tr(context, 'إرسال الطلب', 'Send request', 'Envoyer la demande'))),
+        ],
+      ),
+    );
+    if (result != true || codeCtrl.text.trim().isEmpty || !mounted) return;
+    final p = context.read<CaregiverProvider>();
+    final name = await p.submitCode(codeCtrl.text.trim(), relationshipLabel: relationshipCtrl.text.trim());
+    if (!mounted) return;
+    if (name != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_tr(context, 'تم إرسال الطلب إلى $name — بانتظار الموافقة', 'Request sent to $name — awaiting approval', 'Demande envoyée à $name — en attente d’approbation'))),
+      );
+      await _reload();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(p.error ?? l.unexpectedError)));
+    }
+  }
+
+  Future<void> _respond(FamilyLinkRequest r, bool approve) async {
+    final p = context.read<CaregiverProvider>();
+    final ok = await p.respondToRequest(r, approve: approve);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(approve ? _tr(context, 'تم قبول ${r.caregiverName}', '${r.caregiverName} was accepted', '${r.caregiverName} a été accepté') : _tr(context, 'تم رفض الطلب', 'Request rejected', 'Demande refusée'))),
+      );
+      if (approve) await _reload();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final p = context.watch<CaregiverProvider>();
+    final children = <Widget>[
+      if (p.incomingRequests.isNotEmpty) ...[
+        Text(l.familyRequests, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
+        ...p.incomingRequests.map((r) => _IncomingRequestCard(request: r, onApprove: () => _respond(r, true), onReject: () => _respond(r, false))),
+        const SizedBox(height: 20),
+      ],
+      Row(
+        children: [
+          Expanded(child: OutlinedButton.icon(onPressed: _openGenerateCodeSheet, icon: const Icon(Icons.qr_code_2_rounded), label: Text(l.inviteToMedicines))),
+          const SizedBox(width: 10),
+          Expanded(child: OutlinedButton.icon(onPressed: _openRequestLinkDialog, icon: const Icon(Icons.person_search_rounded), label: Text(l.followSomeone))),
+        ],
+      ),
+      const SizedBox(height: 20),
+      if (p.sentRequests.isNotEmpty) ...[
+        Text(l.pendingRequests, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
+        ...p.sentRequests.map((r) => _SentRequestTile(request: r, onCancel: () async {
+          final ok = await context.read<CaregiverProvider>().cancelSentRequest(r);
+          if (!context.mounted) return;
+          if (ok) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_tr(context, 'تم إلغاء الطلب', 'Request cancelled', 'Demande annulée'))));
+        })),
+        const SizedBox(height: 20),
+      ],
+      if (p.alerts.isNotEmpty) ...[
+        Text(l.alerts, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
+        ...p.alerts.take(5).map((a) => _AlertTile(alert: a)),
+        const SizedBox(height: 20),
+      ],
+      Text(l.familyMembers, style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 10),
+      if (p.linkedPatients.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            children: [
+              const Icon(Icons.family_restroom_rounded, size: 48, color: Colors.grey),
+              const SizedBox(height: 12),
+              Text(l.noFamilyLinked, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              SizedBox(width: 220, child: PrimaryButton(label: l.requestFollowNow, onPressed: _openRequestLinkDialog)),
+            ],
+          ),
+        )
+      else
+        ...p.linkedPatients.map((link) => _PatientLinkTile(link: link)),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(title: Text(l.family)),
+      body: p.isLoading && p.linkedPatients.isEmpty && p.incomingRequests.isEmpty
+          ? const LoadingIndicator()
+          : RefreshIndicator(onRefresh: _reload, child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: children)),
+    );
+  }
+}
+
+String _tr(BuildContext c, String ar, String en, String fr) {
+  switch (Localizations.localeOf(c).languageCode) {
+    case 'en': return en;
+    case 'fr': return fr;
+    default: return ar;
+  }
+}
+
+class _IncomingRequestCard extends StatelessWidget {
+  final FamilyLinkRequest request;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+  const _IncomingRequestCard({required this.request, required this.onApprove, required this.onReject});
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final msg = request.relationshipLabel != null && request.relationshipLabel!.isNotEmpty
+        ? _tr(context, '${request.caregiverName} (${request.relationshipLabel}) يريد متابعة أدويتك', '${request.caregiverName} (${request.relationshipLabel}) wants to follow your medicines', '${request.caregiverName} (${request.relationshipLabel}) souhaite suivre vos médicaments')
+        : _tr(context, '${request.caregiverName} يريد متابعة أدويتك', '${request.caregiverName} wants to follow your medicines', '${request.caregiverName} souhaite suivre vos médicaments');
+    return Card(
+      color: Theme.of(context).colorScheme.primary.withValues(alpha: .06),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(msg, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(DateTimeUtils.relativeDayLabel(request.requestedAt), style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: OutlinedButton(onPressed: onReject, child: Text(l.reject))),
+            const SizedBox(width: 10),
+            Expanded(child: FilledButton(onPressed: onApprove, child: Text(l.accept))),
+          ]),
+        ]),
+      ),
+    );
+  }
+}
+
+class _SentRequestTile extends StatelessWidget {
+  final FamilyLinkRequest request;
+  final VoidCallback onCancel;
+  const _SentRequestTile({required this.request, required this.onCancel});
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Card(child: ListTile(leading: const Icon(Icons.hourglass_top_rounded, color: Colors.orange), title: Text(request.patientName), subtitle: Text(l.waitingApproval), trailing: TextButton(onPressed: onCancel, child: Text(l.cancel))));
+  }
+}
+
+class _PatientLinkTile extends StatelessWidget {
+  final CaregiverLink link;
+  const _PatientLinkTile({required this.link});
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = [
+      if (link.relationshipLabel != null && link.relationshipLabel!.isNotEmpty) link.relationshipLabel!,
+      link.role == CaregiverRole.primary ? _tr(context, 'مرافق رئيسي', 'Primary caregiver', 'Accompagnant principal') : _tr(context, 'مرافق', 'Caregiver', 'Accompagnant'),
+    ].join(' · ');
+    return Card(child: ListTile(leading: CircleAvatar(backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: .12), child: const Icon(Icons.person_rounded)), title: Text(link.patientName, style: const TextStyle(fontWeight: FontWeight.w700)), subtitle: Text(subtitle), trailing: const Icon(Icons.chevron_right_rounded), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPage(link: link)))));
+  }
+}
+
+class _AlertTile extends StatelessWidget {
+  final CaregiverAlert alert;
+  const _AlertTile({required this.alert});
+  @override
+  Widget build(BuildContext context) {
+    return Card(color: alert.read ? null : Colors.red.withValues(alpha: .06), child: ListTile(leading: const Icon(Icons.error_outline_rounded, color: Colors.redAccent), title: Text(alert.message), subtitle: Text(alert.patientName), onTap: () => context.read<CaregiverProvider>().markAlertRead(alert)));
+  }
+}

@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import '../core/localization/app_localizations.dart';
+import '../core/localization/locale_controller.dart';
 import '../core/notifications/push_notification_service.dart';
 import '../core/widgets/loading_indicator.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
+import '../features/onboarding/presentation/pages/language_selection_page.dart';
 import '../features/patient/presentation/pages/voice_messages_page.dart';
 import '../shared/root_shell.dart';
 import 'theme/app_theme.dart';
@@ -62,20 +65,29 @@ class _DawaCareAppState extends State<DawaCareApp> {
 
   @override
   Widget build(BuildContext context) {
+    final localeController = context.watch<LocaleController>();
+    final locale = Locale(localeController.languageCode ?? 'ar');
+
     return MaterialApp(
-      title: 'دواء كير',
+      title: 'DawaCare',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
-      locale: const Locale('ar'),
-      supportedLocales: const [Locale('ar'), Locale('en')],
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
+      builder: (context, child) {
+        final direction = Localizations.localeOf(context).languageCode == 'ar'
+            ? TextDirection.rtl
+            : TextDirection.ltr;
+        return Directionality(textDirection: direction, child: child!);
+      },
       home: _AuthGate(onReady: _tryOpenVoiceMessage),
     );
   }
@@ -87,6 +99,10 @@ class _AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = context.watch<LocaleController>();
+    if (!locale.isLoaded) return const Scaffold(body: LoadingIndicator());
+    if (locale.languageCode == null) return const LanguageSelectionPage();
+
     final auth = context.watch<AuthProvider>();
     WidgetsBinding.instance.addPostFrameCallback((_) => onReady());
 

@@ -41,8 +41,10 @@ class NotificationService {
     try {
       final String tzName = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(tzName));
-    } catch (_) {
+      debugPrint('DawaCare timezone initialized: $tzName');
+    } catch (e) {
       tz.setLocalLocation(tz.getLocation('Africa/Casablanca'));
+      debugPrint('DawaCare timezone fallback: Africa/Casablanca ($e)');
     }
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -72,6 +74,7 @@ class NotificationService {
     await android?.createNotificationChannel(caregiverChannel);
 
     _initialized = true;
+    await logDiagnostics('init');
   }
 
   Future<void> requestPermissions() async {
@@ -89,9 +92,10 @@ class NotificationService {
       final exactAlarmGranted = await android.requestExactAlarmsPermission();
       debugPrint('DawaCare exact alarm permission request: $exactAlarmGranted');
     } catch (e) {
-      // Exact alarms are optional. Reminders must still work with inexact alarms.
       debugPrint('DawaCare exact alarm permission unavailable: $e');
     }
+
+    await logDiagnostics('requestPermissions');
   }
 
   Future<bool> _canScheduleExactAlarms() async {
@@ -117,6 +121,11 @@ class NotificationService {
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle;
 
+    debugPrint(
+      'DawaCare scheduling: id=$id at=$scheduledDate timezone=${tz.local.name} '
+      'mode=$mode exactAllowed=$exactAllowed payload=$payload',
+    );
+
     try {
       await _plugin.zonedSchedule(
         id,
@@ -128,10 +137,8 @@ class NotificationService {
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload,
       );
-      debugPrint('DawaCare notification scheduled: id=$id at=$scheduledDate mode=$mode');
+      debugPrint('DawaCare notification scheduled successfully: id=$id');
     } catch (e) {
-      // A device/ROM can reject exact alarms even after the permission check.
-      // Retry once with an inexact alarm so the reminder is not silently lost.
       if (mode == AndroidScheduleMode.exactAllowWhileIdle) {
         try {
           await _plugin.zonedSchedule(
@@ -147,13 +154,59 @@ class NotificationService {
           debugPrint('DawaCare notification scheduled with fallback inexact alarm: id=$id');
           return;
         } catch (fallbackError) {
-          debugPrint('DawaCare notification scheduling failed: $fallbackError');
+          debugPrint('DawaCare notification fallback scheduling failed: $fallbackError');
         }
       } else {
         debugPrint('DawaCare notification scheduling failed: $e');
       }
       rethrow;
     }
+
+    await logDiagnostics('schedule id=$id');
+  }
+
+  /// Returns the notifications Android currently has queued for DawaCare.
+  /// This is the decisive diagnostic for distinguishing Flutter scheduling
+  /// failures from Android delivery/battery/ROM restrictions.
+  Future<List<PendingNotificationRequest>> pendingNotifications() async {
+    final pending = await _plugin.pendingNotificationRequests();
+    debugPrint('DawaCare pending notifications: count=${pending.length}');
+    for (final item in pending) {
+      debugPrint(
+        'DawaCare pending notification: id=${item.id} title=${item.title} '
+        'body=${item.body} payload=${item.payload}',
+      );
+    }
+    return pending;
+  }
+
+  Future<void> logDiagnostics([String reason = 'manual']) async {
+    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) {
+      debugPrint('DawaCare notification diagnostics [$reason]: Android implementation unavailable');
+      return;
+    }
+
+    bool? notificationsEnabled;
+    bool? exactAlarmEnabled;
+    try {
+      notificationsEnabled = await android.areNotificationsEnabled();
+    } catch (e) {
+      debugPrint('DawaCare notification permission status failed: $e');
+    }
+    try {
+      exactAlarmEnabled = await android.canScheduleExactNotifications();
+    } catch (e) {
+      debugPrint('DawaCare exact alarm status failed: $e');
+    }
+
+    debugPrint(
+      'DawaCare notification diagnostics [$reason]: '
+      'initialized=$_initialized, notificationsEnabled=$notificationsEnabled, '
+      'exactAlarmEnabled=$exactAlarmEnabled, timezone=${tz.local.name}',
+    );
+
+    await pendingNotifications();
   }
 
   Future<void> _onNotificationResponse(NotificationResponse response) async {
@@ -239,6 +292,12 @@ class NotificationService {
     final now = tz.TZDateTime.now(tz.local);
     final baseTime = tz.TZDateTime.from(dose.scheduledAt, tz.local);
 
+    debugPrint(
+      'DawaCare dose reminder: doseId=${dose.id} medication=${dose.medicationName} '
+      'scheduledAt=${dose.scheduledAt} localBase=$baseTime now=$now policyRepeats=${policy.maxRepeats} '
+      'intervalMin=${policy.repeatIntervalMin}',
+    );
+
     for (int i = 0; i <= policy.maxRepeats; i++) {
       final fireTime = baseTime.add(Duration(minutes: policy.repeatIntervalMin * i));
       if (fireTime.isBefore(now)) continue;
@@ -306,5 +365,9 @@ class NotificationService {
     );
   }
 
-  int _notificationId(String doseId, int index) => ((doseId.hashCode & 0x7fffffff) ~/ 100) * 100 + index;
+  int _notificationId(String doseId, int index) {
+    final hex = doseId.replaceAll('-', '');
+    final seed = hex.length >= 8 ? int.tryParse(hex.substring(0, 8), radix: 16) ?? doseId.hashCode.abs() : doseId.hashCode.abs();
+    return ((seed & 0x01ffffff) * 100 + index).clamp(0, 2147483647);
+  }
 }

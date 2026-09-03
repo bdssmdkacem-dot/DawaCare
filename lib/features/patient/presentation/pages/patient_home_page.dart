@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../app/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/date_time_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
@@ -35,9 +36,31 @@ class _PatientHomePageState extends State<PatientHomePage> {
     final doseProvider = context.watch<DoseProvider>();
     final userId = auth.profile?.id;
     return Scaffold(
-      appBar: AppBar(title: Text(l.today)),
+      appBar: AppBar(
+        titleSpacing: 20,
+        title: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Image.asset('assets/icon/app_icon.png'),
+            ),
+            const SizedBox(width: 10),
+            Text(l.today),
+          ],
+        ),
+      ),
       body: RefreshIndicator(
-        onRefresh: () async { if (userId != null) await context.read<DoseProvider>().load(userId); },
+        onRefresh: () async {
+          if (userId != null) {
+            await context.read<DoseProvider>().load(userId);
+          }
+        },
         child: _buildBody(doseProvider, l),
       ),
     );
@@ -51,8 +74,10 @@ class _PatientHomePageState extends State<PatientHomePage> {
     final today = provider.todayDoses;
     if (today.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         children: [
+          _dayHeader(l),
+          const SizedBox(height: 16),
           _voiceMessagesButton(l),
           const SizedBox(height: 28),
           EmptyState(icon: Icons.check_circle_outline_rounded, title: l.noScheduledMedicines, subtitle: l.addFirstMedicine),
@@ -65,12 +90,12 @@ class _PatientHomePageState extends State<PatientHomePage> {
       orElse: () => today.first,
     );
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
       children: [
+        _dayHeader(l, now: now),
+        const SizedBox(height: 16),
         _voiceMessagesButton(l),
         const SizedBox(height: 16),
-        Text(DateTimeUtils.relativeDayLabel(now), style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
         ...today.map((dose) => Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: DoseCard(
@@ -81,17 +106,63 @@ class _PatientHomePageState extends State<PatientHomePage> {
             onSkip: () => _confirmSkip(dose),
           ),
         )),
-        const SizedBox(height: 24),
       ],
     );
   }
 
+  Widget _dayHeader(AppLocalizations l, {DateTime? now}) {
+    final date = now ?? DateTime.now();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: AppColors.primary.withValues(alpha: .16), blurRadius: 16, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.calendar_today_rounded, color: Colors.white),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l.today, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(DateTimeUtils.relativeDayLabel(date), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+          const Icon(Icons.medication_rounded, color: Colors.white, size: 28),
+        ],
+      ),
+    );
+  }
+
   Widget _voiceMessagesButton(AppLocalizations l) => Card(
+    elevation: 0,
     child: ListTile(
-      leading: const CircleAvatar(child: Icon(Icons.mic_rounded)),
-      title: Text(l.followUpMessages, style: const TextStyle(fontWeight: FontWeight.w700)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: .16), borderRadius: BorderRadius.circular(14)),
+        child: const Icon(Icons.mic_rounded, color: AppColors.accentDark),
+      ),
+      title: Text(l.followUpMessages, style: const TextStyle(fontWeight: FontWeight.w800)),
       subtitle: Text(l.followUpMessagesSubtitle),
-      trailing: const Icon(Icons.chevron_left_rounded),
+      trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VoiceMessagesPage())),
     ),
   );

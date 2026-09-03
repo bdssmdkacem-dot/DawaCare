@@ -41,6 +41,15 @@ class DoseProvider extends ChangeNotifier {
   /// doses — a caregiver viewing a family member's doses shouldn't have
   /// alarms fire on their own phone for someone else's medication.
   Future<void> load(String forPatientId, {bool scheduleReminders = true}) async {
+    final switchingPatient = patientId != null && patientId != forPatientId;
+
+    // DoseProvider is shared by the patient and caregiver flows. Never keep
+    // the previous patient's doses visible while loading a different patient.
+    if (switchingPatient) {
+      _doses = [];
+      policy = const ReminderPolicy(patientId: '');
+    }
+
     patientId = forPatientId;
     isLoading = true;
     error = null;

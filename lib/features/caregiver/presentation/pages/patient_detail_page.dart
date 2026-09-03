@@ -22,6 +22,8 @@ class PatientDetailPage extends StatefulWidget {
 }
 
 class _PatientDetailPageState extends State<PatientDetailPage> {
+  bool get _canManageDoses => widget.link.role == CaregiverRole.primary || widget.link.role == CaregiverRole.caregiver;
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +53,7 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
   );
 
   Widget _patientHero(BuildContext context) {
-    final role = widget.link.role == CaregiverRole.primary ? _tr(context, 'مرافق رئيسي', 'Primary caregiver', 'Accompagnant principal') : _tr(context, 'مرافق', 'Caregiver', 'Accompagnant');
+    final role = widget.link.role == CaregiverRole.primary ? _tr(context, 'مرافق رئيسي', 'Primary caregiver', 'Accompagnant principal') : widget.link.role == CaregiverRole.viewer ? _tr(context, 'فرد العائلة', 'Family member', 'Membre de la famille') : _tr(context, 'مرافق', 'Caregiver', 'Accompagnant');
     final relationship = widget.link.relationshipLabel;
     return Container(
       padding: const EdgeInsets.all(20),
@@ -77,9 +79,9 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     child: DoseCard(
       dose: dose,
       onTap: () => _openVoiceRecorder(dose: dose),
-      onConfirm: () => context.read<DoseProvider>().confirm(dose, source: 'CAREGIVER'),
-      onSnooze: () => context.read<DoseProvider>().snooze(dose, source: 'CAREGIVER'),
-      onSkip: () => context.read<DoseProvider>().skip(dose, source: 'CAREGIVER'),
+      onConfirm: _canManageDoses ? () => context.read<DoseProvider>().confirm(dose, source: 'CAREGIVER') : null,
+      onSnooze: _canManageDoses ? () => context.read<DoseProvider>().snooze(dose, source: 'CAREGIVER') : null,
+      onSkip: _canManageDoses ? () => context.read<DoseProvider>().skip(dose, source: 'CAREGIVER') : null,
     ),
   );
 

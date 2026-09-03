@@ -14,7 +14,8 @@ import 'voice_recorder_page.dart';
 
 class PatientDetailPage extends StatefulWidget {
   final CaregiverLink link;
-  const PatientDetailPage({super.key, required this.link});
+  final String? initialDoseId;
+  const PatientDetailPage({super.key, required this.link, this.initialDoseId});
 
   @override
   State<PatientDetailPage> createState() => _PatientDetailPageState();
@@ -131,10 +132,27 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     );
   }
 
+  Widget _doseCard(DoseInstance dose) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: DoseCard(
+        dose: dose,
+        onTap: () => _openVoiceRecorder(dose: dose),
+        onConfirm: () => context.read<DoseProvider>().confirm(dose, source: 'CAREGIVER'),
+        onSnooze: () => context.read<DoseProvider>().snooze(dose, source: 'CAREGIVER'),
+        onSkip: () => context.read<DoseProvider>().skip(dose, source: 'CAREGIVER'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final p = context.watch<DoseProvider>();
+    final highlightedDose = widget.initialDoseId == null
+        ? null
+        : p.all.cast<DoseInstance?>().firstWhere((d) => d?.id == widget.initialDoseId, orElse: () => null);
+    final todayIds = p.todayDoses.map((d) => d.id).toSet();
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.link.patientName)),
@@ -150,6 +168,27 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
                 children: [
                   _patientHero(context),
                   const SizedBox(height: 20),
+                  if (highlightedDose != null) ...[
+                    _sectionHeader(context, _tr(context, 'الجرعة التي فاتت', 'Missed dose', 'Dose manquée'), icon: Icons.warning_amber_rounded),
+                    Card(
+                      color: AppColors.danger.withValues(alpha: .055),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 2),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _tr(context, 'هذه هي الجرعة المرتبطة بهذا التنبيه.', 'This is the dose linked to this alert.', 'Voici la dose liée à cette alerte.'),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 8),
+                            _doseCard(highlightedDose),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   _sectionHeader(context, _tr(context, 'نسبة الالتزام', 'Medication adherence', 'Observance du traitement'), icon: Icons.insights_rounded),
                   Card(
                     child: Padding(
@@ -224,18 +263,7 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
                       ),
                     )
                   else
-                    ...p.todayDoses.map(
-                      (dose) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: DoseCard(
-                          dose: dose,
-                          onTap: () => _openVoiceRecorder(dose: dose),
-                          onConfirm: () => context.read<DoseProvider>().confirm(dose, source: 'CAREGIVER'),
-                          onSnooze: () => context.read<DoseProvider>().snooze(dose, source: 'CAREGIVER'),
-                          onSkip: () => context.read<DoseProvider>().skip(dose, source: 'CAREGIVER'),
-                        ),
-                      ),
-                    ),
+                    ...p.todayDoses.where((dose) => !todayIds.contains(dose.id) || highlightedDose?.id != dose.id).map(_doseCard),
                   const SizedBox(height: 10),
                   Center(
                     child: TextButton.icon(

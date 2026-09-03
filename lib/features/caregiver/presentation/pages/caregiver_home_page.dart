@@ -14,13 +14,15 @@ import '../widgets/link_code_sheet.dart';
 import 'patient_detail_page.dart';
 
 class CaregiverHomePage extends StatefulWidget {
-  const CaregiverHomePage({super.key});
+  final String? initialAlertId;
+  const CaregiverHomePage({super.key, this.initialAlertId});
   @override
   State<CaregiverHomePage> createState() => _CaregiverHomePageState();
 }
 
 class _CaregiverHomePageState extends State<CaregiverHomePage> {
   bool _loadedOnce = false;
+  bool _openedInitialAlert = false;
 
   @override
   void didChangeDependencies() {
@@ -28,13 +30,39 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
     if (!_loadedOnce) {
       _loadedOnce = true;
       final id = context.read<AuthProvider>().profile?.id;
-      if (id != null) context.read<CaregiverProvider>().load(id);
+      if (id != null) {
+        context.read<CaregiverProvider>().load(id).then((_) => _openInitialAlert());
+      }
     }
   }
 
   Future<void> _reload() async {
     final id = context.read<AuthProvider>().profile?.id;
     if (id != null) await context.read<CaregiverProvider>().load(id);
+  }
+
+  void _openInitialAlert() {
+    if (!mounted || _openedInitialAlert || widget.initialAlertId == null) return;
+    final p = context.read<CaregiverProvider>();
+    final alert = p.alerts.cast<CaregiverAlert?>().firstWhere((a) => a?.id == widget.initialAlertId, orElse: () => null);
+    if (alert == null) return;
+    _openedInitialAlert = true;
+    final link = p.linkedPatients.cast<CaregiverLink?>().firstWhere((l) => l?.patientId == alert.patientId, orElse: () => null);
+    p.markAlertRead(alert);
+    if (link == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPage(link: link, initialDoseId: alert.doseId)));
+    });
+  }
+
+  Future<void> _openAlert(CaregiverAlert alert) async {
+    final p = context.read<CaregiverProvider>();
+    await p.markAlertRead(alert);
+    if (!mounted) return;
+    final link = p.linkedPatients.cast<CaregiverLink?>().firstWhere((l) => l?.patientId == alert.patientId, orElse: () => null);
+    if (link == null) return;
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPage(link: link, initialDoseId: alert.doseId)));
   }
 
   Future<void> _openGenerateCodeSheet() async {
@@ -168,7 +196,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
       if (p.alerts.isNotEmpty) ...[
         const SizedBox(height: 18),
         _sectionHeader(context, l.alerts, icon: Icons.warning_amber_rounded),
-        ...p.alerts.take(5).map((a) => _AlertTile(alert: a)),
+        ...p.alerts.take(5).map((a) => _AlertTile(alert: a, onTap: () => _openAlert(a))),
       ],
       const SizedBox(height: 18),
       _sectionHeader(context, l.familyMembers, icon: Icons.groups_rounded),
@@ -245,9 +273,10 @@ class _PatientLinkTile extends StatelessWidget {
 
 class _AlertTile extends StatelessWidget {
   final CaregiverAlert alert;
-  const _AlertTile({required this.alert});
+  final VoidCallback onTap;
+  const _AlertTile({required this.alert, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    return Card(color: alert.read ? null : AppColors.danger.withValues(alpha: .06), child: ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: .10), shape: BoxShape.circle), child: const Icon(Icons.error_outline_rounded, color: AppColors.danger)), title: Text(alert.message, style: const TextStyle(fontWeight: FontWeight.w700)), subtitle: Text(alert.patientName), onTap: () => context.read<CaregiverProvider>().markAlertRead(alert)));
+    return Card(color: alert.read ? null : AppColors.danger.withValues(alpha: .06), child: ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: .10), shape: BoxShape.circle), child: const Icon(Icons.error_outline_rounded, color: AppColors.danger)), title: Text(alert.message, style: const TextStyle(fontWeight: FontWeight.w700)), subtitle: Text(alert.patientName), trailing: const Icon(Icons.chevron_right_rounded), onTap: onTap));
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/localization/auth_error_localizer.dart';
@@ -14,6 +15,8 @@ class SignupPage extends StatefulWidget {
 }
 
 class _SignupPageState extends State<SignupPage> {
+  static const _pendingEmailConfirmationKey = 'dawacare_pending_email_confirmation';
+
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
@@ -38,6 +41,9 @@ class _SignupPageState extends State<SignupPage> {
     );
     if (!mounted) return;
     if (ok) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_pendingEmailConfirmationKey, true);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.accountCreated)),
       );

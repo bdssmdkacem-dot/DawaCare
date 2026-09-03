@@ -6,6 +6,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/localization/locale_controller.dart';
 import '../../../../core/notifications/notification_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import 'profile_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -102,62 +103,69 @@ class SettingsPage extends StatelessWidget {
         ? '?'
         : profile.fullName.trim().split(RegExp(r'\s+')).map((e) => e[0]).take(2).join().toUpperCase();
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.78),
-          ],
-        ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(22),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 34,
-            backgroundColor: Colors.white.withValues(alpha: 0.18),
-            backgroundImage: profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty
-                ? NetworkImage(profile.avatarUrl!)
-                : null,
-            child: profile.avatarUrl == null || profile.avatarUrl!.isEmpty
-                ? Text(
-                    initials,
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  profile.fullName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _tr(context, 'DawaCare profile', 'DawaCare profile', 'Profil DawaCare'),
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.86)),
-                ),
-                if (profile.phone != null && profile.phone!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    profile.phone!,
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.82)),
-                  ),
-                ],
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfilePage())),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary,
+                AppColors.primary.withValues(alpha: 0.78),
               ],
             ),
+            borderRadius: BorderRadius.circular(22),
           ),
-          Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.9)),
-        ],
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 34,
+                backgroundColor: Colors.white.withValues(alpha: 0.18),
+                backgroundImage: profile.avatarUrl != null && profile.avatarUrl!.isNotEmpty
+                    ? NetworkImage(profile.avatarUrl!)
+                    : null,
+                child: profile.avatarUrl == null || profile.avatarUrl!.isEmpty
+                    ? Text(
+                        initials,
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profile.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _tr(context, 'DawaCare profile', 'DawaCare profile', 'Profil DawaCare'),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.86)),
+                    ),
+                    if (profile.phone != null && profile.phone!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        profile.phone!,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.82)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.9)),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -22,27 +22,17 @@ class VoiceMessageService {
   Future<bool> hasPermission() => _recorder.hasPermission();
 
   Future<void> startRecording() async {
-    if (!await _recorder.hasPermission()) {
-      throw const VoiceMessageException('لا يمكن التسجيل بدون إذن الميكروفون.');
-    }
+    if (!await _recorder.hasPermission()) throw const VoiceMessageException('لا يمكن التسجيل بدون إذن الميكروفون.');
     final dir = await getTemporaryDirectory();
     final path = '${dir.path}/dawacare_${_uuid.v4()}.m4a';
-    await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc, sampleRate: 44100, numChannels: 1, bitRate: 64000),
-      path: path,
-    );
+    await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, sampleRate: 44100, numChannels: 1, bitRate: 64000), path: path);
   }
 
   Future<String?> stopRecording() => _recorder.stop();
   Future<void> cancelRecording() => _recorder.cancel();
   Future<bool> isRecording() => _recorder.isRecording();
 
-  Future<VoiceMessage> sendRecording({
-    required String patientId,
-    String? doseId,
-    required String localPath,
-    required int durationMs,
-  }) async {
+  Future<VoiceMessage> sendRecording({required String patientId, String? doseId, required String localPath, required int durationMs}) async {
     final senderId = _client.auth.currentUser?.id;
     if (senderId == null) throw const VoiceMessageException('يجب تسجيل الدخول أولاً.');
     if (durationMs <= 0) throw const VoiceMessageException('التسجيل فارغ.');
@@ -54,20 +44,10 @@ class VoiceMessageService {
     final storagePath = '$patientId/$senderId/$messageId.m4a';
     try {
       await _client.storage.from(bucket).upload(storagePath, file, fileOptions: const FileOptions(contentType: 'audio/mp4', upsert: false));
-      final row = await _client.from('voice_messages').insert({
-        'id': messageId,
-        'sender_id': senderId,
-        'patient_id': patientId,
-        'dose_id': doseId,
-        'storage_path': storagePath,
-        'duration_ms': durationMs,
-      }).select('*, sender:profiles!sender_id(full_name)').single();
+      final row = await _client.from('voice_messages').insert({'id': messageId, 'sender_id': senderId, 'patient_id': patientId, 'dose_id': doseId, 'storage_path': storagePath, 'duration_ms': durationMs}).select('*, sender:profiles!sender_id(full_name, avatar_url)').single();
       try {
         final response = await _client.functions.invoke('voice-message-notify', body: {'voice_message_id': messageId});
         debugPrint('DawaCare FCM notify: status=${response.status}, data=${response.data}');
-        if (response.status < 200 || response.status >= 300) {
-          throw VoiceMessageException('تم حفظ الرسالة، لكن فشل إرسال الإشعار (HTTP ${response.status}).');
-        }
       } catch (error, stackTrace) {
         debugPrint('DawaCare FCM notify failed: $error');
         debugPrintStack(stackTrace: stackTrace);
@@ -82,12 +62,12 @@ class VoiceMessageService {
   }
 
   Future<List<VoiceMessage>> fetchForPatient(String patientId) async {
-    final rows = await _client.from('voice_messages').select('*, sender:profiles!sender_id(full_name)').eq('patient_id', patientId).order('created_at', ascending: false).limit(50);
+    final rows = await _client.from('voice_messages').select('*, sender:profiles!sender_id(full_name, avatar_url)').eq('patient_id', patientId).order('created_at', ascending: false).limit(50);
     return rows.map((row) => VoiceMessage.fromMap(row)).toList();
   }
 
   Future<VoiceMessage?> fetchById(String messageId) async {
-    final row = await _client.from('voice_messages').select('*, sender:profiles!sender_id(full_name)').eq('id', messageId).maybeSingle();
+    final row = await _client.from('voice_messages').select('*, sender:profiles!sender_id(full_name, avatar_url)').eq('id', messageId).maybeSingle();
     return row == null ? null : VoiceMessage.fromMap(row);
   }
 
@@ -100,28 +80,17 @@ class VoiceMessageService {
 
   Future<String> signedUrl(String storagePath) async => _client.storage.from(bucket).createSignedUrl(storagePath, 3600);
 
-  Future<void> markRead(String messageId) async {
-    await _client.from('voice_messages').update({'read_at': DateTime.now().toUtc().toIso8601String()}).eq('id', messageId);
-  }
+  Future<void> markRead(String messageId) async => _client.from('voice_messages').update({'read_at': DateTime.now().toUtc().toIso8601String()}).eq('id', messageId);
 
-  /// Called only after the audio player reports a genuine full completion.
-  /// The RPC atomically increments the count and deletes the row at 2.
   Future<ListenCompletionResult> completeListen(String messageId) async {
     final response = await _client.rpc('complete_voice_message_listen', params: {'p_message_id': messageId});
     final row = response is List && response.isNotEmpty ? response.first as Map<String, dynamic> : null;
     if (row == null) throw const VoiceMessageException('تعذّر تسجيل اكتمال الاستماع.');
     final count = (row['completed_listens'] as num).toInt();
-    return ListenCompletionResult(
-      completedListens: count,
-      deleted: row['deleted'] == true,
-      storagePath: row['storage_path'] as String,
-    );
+    return ListenCompletionResult(completedListens: count, deleted: row['deleted'] == true, storagePath: row['storage_path'] as String);
   }
 
-  Future<void> deleteStorageFile(String storagePath) async {
-    await _client.storage.from(bucket).remove([storagePath]);
-  }
-
+  Future<void> deleteStorageFile(String storagePath) async => _client.storage.from(bucket).remove([storagePath]);
   void dispose() => _recorder.dispose();
 }
 
@@ -135,6 +104,5 @@ class ListenCompletionResult {
 class VoiceMessageException implements Exception {
   final String message;
   const VoiceMessageException(this.message);
-  @override
-  String toString() => message;
+  @override String toString() => message;
 }

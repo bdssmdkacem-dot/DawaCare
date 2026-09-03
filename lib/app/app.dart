@@ -10,6 +10,7 @@ import '../core/notifications/push_notification_service.dart';
 import '../core/widgets/loading_indicator.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
+import '../features/caregiver/presentation/pages/caregiver_home_page.dart';
 import '../features/onboarding/presentation/pages/language_selection_page.dart';
 import '../features/patient/presentation/pages/voice_messages_page.dart';
 import '../shared/root_shell.dart';
@@ -17,30 +18,41 @@ import 'theme/app_theme.dart';
 
 class DawaCareApp extends StatefulWidget {
   const DawaCareApp({super.key});
-
   @override
   State<DawaCareApp> createState() => _DawaCareAppState();
 }
 
 class _DawaCareAppState extends State<DawaCareApp> {
   StreamSubscription<String>? _voiceSubscription;
+  StreamSubscription<String>? _notificationSubscription;
   String? _pendingVoiceMessageId;
+  String? _pendingCaregiverAlertId;
   String? _lastOpenedVoiceMessageId;
+  String? _lastOpenedCaregiverAlertId;
 
   @override
   void initState() {
     super.initState();
     _pendingVoiceMessageId = PushNotificationService.instance.takePendingVoiceMessageId();
+    _pendingCaregiverAlertId = PushNotificationService.instance.takePendingCaregiverAlertId();
     _voiceSubscription = PushNotificationService.instance.voiceMessageOpened.listen((id) {
       _pendingVoiceMessageId = id;
       _tryOpenVoiceMessage();
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _tryOpenVoiceMessage());
+    _notificationSubscription = PushNotificationService.instance.notificationOpened.listen((id) {
+      _pendingCaregiverAlertId = id;
+      _tryOpenCaregiverAlert();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tryOpenVoiceMessage();
+      _tryOpenCaregiverAlert();
+    });
   }
 
   @override
   void dispose() {
     _voiceSubscription?.cancel();
+    _notificationSubscription?.cancel();
     super.dispose();
   }
 
@@ -57,9 +69,24 @@ class _DawaCareAppState extends State<DawaCareApp> {
     _pendingVoiceMessageId = null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => VoiceMessagesPage(initialMessageId: messageId),
-      ));
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceMessagesPage(initialMessageId: messageId)));
+    });
+  }
+
+  void _tryOpenCaregiverAlert() {
+    if (!mounted || _pendingCaregiverAlertId == null) return;
+    final auth = context.read<AuthProvider>();
+    if (auth.status != AuthStatus.signedIn || auth.profile == null) return;
+    final alertId = _pendingCaregiverAlertId!;
+    if (_lastOpenedCaregiverAlertId == alertId) {
+      _pendingCaregiverAlertId = null;
+      return;
+    }
+    _lastOpenedCaregiverAlertId = alertId;
+    _pendingCaregiverAlertId = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CaregiverHomePage()));
     });
   }
 
@@ -67,7 +94,6 @@ class _DawaCareAppState extends State<DawaCareApp> {
   Widget build(BuildContext context) {
     final localeController = context.watch<LocaleController>();
     final locale = Locale(localeController.languageCode ?? 'ar');
-
     return MaterialApp(
       title: 'DawaCare',
       debugShowCheckedModeBanner: false,
@@ -76,19 +102,15 @@ class _DawaCareAppState extends State<DawaCareApp> {
       themeMode: ThemeMode.system,
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
+      localizationsDelegates: const [AppLocalizations.delegate, GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
       builder: (context, child) {
-        final direction = Localizations.localeOf(context).languageCode == 'ar'
-            ? TextDirection.rtl
-            : TextDirection.ltr;
+        final direction = Localizations.localeOf(context).languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr;
         return Directionality(textDirection: direction, child: child!);
       },
-      home: _AuthGate(onReady: _tryOpenVoiceMessage),
+      home: _AuthGate(onReady: () {
+        _tryOpenVoiceMessage();
+        _tryOpenCaregiverAlert();
+      }),
     );
   }
 }
@@ -102,10 +124,8 @@ class _AuthGate extends StatelessWidget {
     final locale = context.watch<LocaleController>();
     if (!locale.isLoaded) return const Scaffold(body: LoadingIndicator());
     if (locale.languageCode == null) return const LanguageSelectionPage();
-
     final auth = context.watch<AuthProvider>();
     WidgetsBinding.instance.addPostFrameCallback((_) => onReady());
-
     switch (auth.status) {
       case AuthStatus.unknown:
         return const Scaffold(body: LoadingIndicator());

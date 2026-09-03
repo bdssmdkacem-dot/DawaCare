@@ -19,27 +19,18 @@ import 'firebase_options.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Supabase must be ready before the Flutter tree is created because the
+  // auth gate subscribes to Supabase immediately during app startup.
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,
   );
 
-  await NotificationService.instance.init();
-  await NotificationService.instance.requestPermissions();
-
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  FirebaseMessaging.onBackgroundMessage(
-    dawacareFirebaseMessagingBackgroundHandler,
-  );
-  await PushNotificationService.instance.init();
-
-  SyncEngine.instance.start();
-
   final localeController = LocaleController();
-  await localeController.load();
 
+  // Render the Flutter UI immediately. Android keeps the native DawaCare
+  // launch screen until Flutter draws its first frame, so no long-running
+  // service initialization should block runApp().
   runApp(
     MultiProvider(
       providers: [
@@ -52,4 +43,42 @@ Future<void> main() async {
       child: const DawaCareApp(),
     ),
   );
+
+  // Continue non-critical startup work after the first Flutter frame.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _initializeServices(localeController);
+  });
+}
+
+Future<void> _initializeServices(LocaleController localeController) async {
+  try {
+    await localeController.load();
+  } catch (e) {
+    debugPrint('DawaCare startup: locale initialization failed: $e');
+  }
+
+  try {
+    await NotificationService.instance.init();
+    await NotificationService.instance.requestPermissions();
+  } catch (e) {
+    debugPrint('DawaCare startup: notification initialization failed: $e');
+  }
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    FirebaseMessaging.onBackgroundMessage(
+      dawacareFirebaseMessagingBackgroundHandler,
+    );
+    await PushNotificationService.instance.init();
+  } catch (e) {
+    debugPrint('DawaCare startup: Firebase initialization failed: $e');
+  }
+
+  try {
+    SyncEngine.instance.start();
+  } catch (e) {
+    debugPrint('DawaCare startup: sync engine failed to start: $e');
+  }
 }

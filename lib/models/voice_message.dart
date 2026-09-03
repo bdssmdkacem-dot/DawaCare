@@ -9,6 +9,7 @@ class VoiceMessage {
   final DateTime? readAt;
   final int completedListens;
   final String senderName;
+  final String? senderAvatarUrl;
 
   const VoiceMessage({
     required this.id,
@@ -21,6 +22,7 @@ class VoiceMessage {
     this.readAt,
     this.completedListens = 0,
     this.senderName = 'المتابع',
+    this.senderAvatarUrl,
   });
 
   factory VoiceMessage.fromMap(Map<String, dynamic> map) {
@@ -35,9 +37,8 @@ class VoiceMessage {
       createdAt: DateTime.parse(map['created_at'] as String).toLocal(),
       readAt: map['read_at'] == null ? null : DateTime.parse(map['read_at'] as String).toLocal(),
       completedListens: (map['completed_listens'] as num?)?.toInt() ?? 0,
-      senderName: (sender?['full_name'] as String?)?.trim().isNotEmpty == true
-          ? sender!['full_name'] as String
-          : 'المتابع',
+      senderName: (sender?['full_name'] as String?)?.trim().isNotEmpty == true ? sender!['full_name'] as String : 'المتابع',
+      senderAvatarUrl: (sender?['avatar_url'] as String?)?.trim().isNotEmpty == true ? sender!['avatar_url'] as String : null,
     );
   }
 }

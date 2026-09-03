@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/localization/app_localizations.dart';
 import '../core/localization/locale_controller.dart';
@@ -23,8 +25,11 @@ class DawaCareApp extends StatefulWidget {
 }
 
 class _DawaCareAppState extends State<DawaCareApp> {
+  static const _pendingEmailConfirmationKey = 'dawacare_pending_email_confirmation';
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
   StreamSubscription<String>? _voiceSubscription;
   StreamSubscription<String>? _notificationSubscription;
+  StreamSubscription<AuthState>? _authSubscription;
   String? _pendingVoiceMessageId;
   String? _pendingCaregiverAlertId;
   String? _lastOpenedVoiceMessageId;
@@ -43,6 +48,19 @@ class _DawaCareAppState extends State<DawaCareApp> {
       _pendingCaregiverAlertId = id;
       _tryOpenCaregiverAlert();
     });
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((state) async {
+      if (state.event != AuthChangeEvent.signedIn || state.session == null) return;
+      final prefs = await SharedPreferences.getInstance();
+      final pending = prefs.getBool(_pendingEmailConfirmationKey) ?? false;
+      if (!pending) return;
+      await prefs.remove(_pendingEmailConfirmationKey);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _messengerKey.currentState?.showSnackBar(
+          const SnackBar(content: Text('تم تأكيد البريد الإلكتروني بنجاح وإضافة حسابك في دواء كير.')),
+        );
+      });
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryOpenVoiceMessage();
       _tryOpenCaregiverAlert();
@@ -53,6 +71,7 @@ class _DawaCareAppState extends State<DawaCareApp> {
   void dispose() {
     _voiceSubscription?.cancel();
     _notificationSubscription?.cancel();
+    _authSubscription?.cancel();
     super.dispose();
   }
 
@@ -97,6 +116,7 @@ class _DawaCareAppState extends State<DawaCareApp> {
     return MaterialApp(
       title: 'DawaCare',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: _messengerKey,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,

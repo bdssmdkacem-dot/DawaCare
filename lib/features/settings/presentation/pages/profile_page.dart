@@ -44,7 +44,14 @@ class _ProfilePageState extends State<ProfilePage> {
     if (profile == null) {
       return Scaffold(
         appBar: AppBar(title: Text(_tr(context, 'الملف الشخصي', 'Profile', 'Profil'))),
-        body: Center(child: Text(_tr(context, 'لا توجد بيانات الملف الشخصي.', 'Profile data is unavailable.', 'Les données du profil sont indisponibles.'))),
+        body: Center(
+          child: Text(_tr(
+            context,
+            'لا توجد بيانات الملف الشخصي.',
+            'Profile data is unavailable.',
+            'Les données du profil sont indisponibles.',
+          )),
+        ),
       );
     }
 
@@ -130,7 +137,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.done,
                       decoration: InputDecoration(
-                        labelText: l.phone,
+                        labelText: _tr(context, 'رقم الهاتف', 'Phone', 'Téléphone'),
                         prefixIcon: const Icon(Icons.phone_outlined),
                       ),
                     ),
@@ -163,7 +170,11 @@ class _ProfilePageState extends State<ProfilePage> {
               icon: _saving
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.save_rounded),
-              label: Text(_saving ? _tr(context, 'جارٍ الحفظ...', 'Saving...', 'Enregistrement...') : l.save),
+              label: Text(
+                _saving
+                    ? _tr(context, 'جارٍ الحفظ...', 'Saving...', 'Enregistrement...')
+                    : _tr(context, 'حفظ', 'Save', 'Enregistrer'),
+              ),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(54),
                 backgroundColor: AppColors.primary,

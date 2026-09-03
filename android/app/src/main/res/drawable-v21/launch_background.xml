@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- DawaCare branded launch screen for pre-Flutter startup. -->
+<!-- DawaCare branded native launch screen. Uses the existing DawaCare icon asset. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/dawacare_teal" />
     <item>
         <bitmap
             android:gravity="center"
-            android:src="@mipmap/ic_launcher" />
+            android:src="@drawable/dawacare_splash_logo" />
     </item>
 </layer-list>

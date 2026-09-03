@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:path_provider/path_provider.dart';
@@ -58,7 +59,8 @@ class NotificationService {
       importance: Importance.max,
       enableVibration: true,
     );
-    await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(channel);
+    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await android?.createNotificationChannel(channel);
 
     const caregiverChannel = AndroidNotificationChannel(
       _caregiverChannelId,
@@ -67,15 +69,91 @@ class NotificationService {
       importance: Importance.high,
       enableVibration: true,
     );
-    await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(caregiverChannel);
+    await android?.createNotificationChannel(caregiverChannel);
 
     _initialized = true;
   }
 
   Future<void> requestPermissions() async {
-    final androidImpl = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    await androidImpl?.requestNotificationsPermission();
-    await androidImpl?.requestExactAlarmsPermission();
+    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return;
+
+    try {
+      final notificationsGranted = await android.requestNotificationsPermission();
+      debugPrint('DawaCare notifications permission: $notificationsGranted');
+    } catch (e) {
+      debugPrint('DawaCare notification permission request failed: $e');
+    }
+
+    try {
+      final exactAlarmGranted = await android.requestExactAlarmsPermission();
+      debugPrint('DawaCare exact alarm permission request: $exactAlarmGranted');
+    } catch (e) {
+      // Exact alarms are optional. Reminders must still work with inexact alarms.
+      debugPrint('DawaCare exact alarm permission unavailable: $e');
+    }
+  }
+
+  Future<bool> _canScheduleExactAlarms() async {
+    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return false;
+    try {
+      return await android.canScheduleExactNotifications() ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _schedule(
+    int id,
+    String title,
+    String body,
+    tz.TZDateTime scheduledDate,
+    NotificationDetails details, {
+    String? payload,
+  }) async {
+    final exactAllowed = await _canScheduleExactAlarms();
+    final mode = exactAllowed
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
+
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        details,
+        androidScheduleMode: mode,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payload,
+      );
+      debugPrint('DawaCare notification scheduled: id=$id at=$scheduledDate mode=$mode');
+    } catch (e) {
+      // A device/ROM can reject exact alarms even after the permission check.
+      // Retry once with an inexact alarm so the reminder is not silently lost.
+      if (mode == AndroidScheduleMode.exactAllowWhileIdle) {
+        try {
+          await _plugin.zonedSchedule(
+            id,
+            title,
+            body,
+            scheduledDate,
+            details,
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+            payload: payload,
+          );
+          debugPrint('DawaCare notification scheduled with fallback inexact alarm: id=$id');
+          return;
+        } catch (fallbackError) {
+          debugPrint('DawaCare notification scheduling failed: $fallbackError');
+        }
+      } else {
+        debugPrint('DawaCare notification scheduling failed: $e');
+      }
+      rethrow;
+    }
   }
 
   Future<void> _onNotificationResponse(NotificationResponse response) async {
@@ -114,7 +192,9 @@ class NotificationService {
       final dose = DoseInstance.fromMap(rows);
       await DoseRepository().updateStatus(dose, status, source: 'NOTIFICATION');
       await cancelDoseReminders(doseId);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('DawaCare notification action failed: $e');
+    }
   }
 
   Future<void> _handleSnooze(String doseId) async {
@@ -139,8 +219,17 @@ class NotificationService {
           AndroidNotificationAction(_actionSnooze, 'تأجيل 10 دقائق', showsUserInterface: false, cancelNotification: true),
         ],
       );
-      await _plugin.zonedSchedule(_notificationId(dose.id, 99), 'تذكير: حان وقت الدواء 💊', '${dose.medicationName} — ${dose.doseAmount}', snoozeTime, NotificationDetails(android: androidDetails), androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime, payload: dose.id);
-    } catch (_) {}
+      await _schedule(
+        _notificationId(dose.id, 99),
+        'تذكير: حان وقت الدواء 💊',
+        '${dose.medicationName} — ${dose.doseAmount}',
+        snoozeTime,
+        NotificationDetails(android: androidDetails),
+        payload: dose.id,
+      );
+    } catch (e) {
+      debugPrint('DawaCare snooze scheduling failed: $e');
+    }
   }
 
   Future<void> scheduleDoseReminders({required DoseInstance dose, required ReminderPolicy policy}) async {
@@ -149,9 +238,11 @@ class NotificationService {
     final imagePath = await _prepareMedicationImage(dose);
     final now = tz.TZDateTime.now(tz.local);
     final baseTime = tz.TZDateTime.from(dose.scheduledAt, tz.local);
+
     for (int i = 0; i <= policy.maxRepeats; i++) {
       final fireTime = baseTime.add(Duration(minutes: policy.repeatIntervalMin * i));
       if (fireTime.isBefore(now)) continue;
+
       final androidDetails = AndroidNotificationDetails(
         _channelId,
         'تذكير الجرعات',
@@ -166,7 +257,15 @@ class NotificationService {
           AndroidNotificationAction(_actionSnooze, 'تأجيل 10 دقائق', showsUserInterface: false, cancelNotification: true),
         ],
       );
-      await _plugin.zonedSchedule(_notificationId(dose.id, i), i == 0 ? 'حان موعد الدواء 💊' : 'تذكير: الجرعة لم تُؤكَّد بعد', '${dose.medicationName} — ${dose.doseAmount}', fireTime, NotificationDetails(android: androidDetails), androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime, payload: dose.id);
+
+      await _schedule(
+        _notificationId(dose.id, i),
+        i == 0 ? 'حان موعد الدواء 💊' : 'تذكير: الجرعة لم تُؤكَّد بعد',
+        '${dose.medicationName} — ${dose.doseAmount}',
+        fireTime,
+        NotificationDetails(android: androidDetails),
+        payload: dose.id,
+      );
     }
   }
 

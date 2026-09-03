@@ -1,4 +1,4 @@
-import '../models/caregiver_link.dart';
+import 'caregiver_link.dart';
 
 enum FamilyLinkRequestStatus { pending, approved, rejected, cancelled }
 

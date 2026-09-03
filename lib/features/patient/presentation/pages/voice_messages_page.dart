@@ -54,14 +54,22 @@ class _VoiceMessagesPageState extends State<VoiceMessagesPage> {
 
   Future<void> _load() async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null) {
+      return;
+    }
     try {
       final messages = await _service.fetchForPatient(userId);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() { _messages = messages; _loading = false; });
-      if (widget.initialMessageId != null && _contextMessageId == null) await _selectMessage(widget.initialMessageId!);
+      if (widget.initialMessageId != null && _contextMessageId == null) {
+        await _selectMessage(widget.initialMessageId!);
+      }
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -69,7 +77,9 @@ class _VoiceMessagesPageState extends State<VoiceMessagesPage> {
     final message = _messages.where((m) => m.id == id).cast<VoiceMessage?>().firstWhere((m) => m != null, orElse: () => null);
     if (message == null) {
       final fetched = await _service.fetchById(id);
-      if (fetched == null || !mounted) return;
+      if (fetched == null || !mounted) {
+        return;
+      }
       if (!_messages.any((m) => m.id == fetched.id)) {
         setState(() => _messages = [fetched, ..._messages]);
       }
@@ -81,13 +91,15 @@ class _VoiceMessagesPageState extends State<VoiceMessagesPage> {
       final context = await _service.fetchDoseContext(message.doseId!);
       final medication = context?['medication'] as Map<String, dynamic>?;
       final dose = context?['dose'] as Map<String, dynamic>?;
-      if (mounted) setState(() {
-        _contextMedicationName = medication?['name'] as String?;
-        _contextStrength = medication?['strength'] as String?;
-        _contextDoseAmount = dose?['dose_amount']?.toString();
-        _contextScheduledAt = dose?['scheduled_at'] == null ? null : DateTime.parse(dose!['scheduled_at'] as String).toLocal().toString();
-        _contextImageUrl = medication?['image_url'] as String?;
-      });
+      if (mounted) {
+        setState(() {
+          _contextMedicationName = medication?['name'] as String?;
+          _contextStrength = medication?['strength'] as String?;
+          _contextDoseAmount = dose?['dose_amount']?.toString();
+          _contextScheduledAt = dose?['scheduled_at'] == null ? null : DateTime.parse(dose!['scheduled_at'] as String).toLocal().toString();
+          _contextImageUrl = medication?['image_url'] as String?;
+        });
+      }
     } else if (mounted) {
       setState(() { _contextMedicationName = null; _contextStrength = null; _contextDoseAmount = null; _contextScheduledAt = null; _contextImageUrl = null; });
     }
@@ -95,28 +107,51 @@ class _VoiceMessagesPageState extends State<VoiceMessagesPage> {
 
   Future<void> _play(VoiceMessage message) async {
     try {
-      if (_playingId == message.id) { await _player.pause(); if (mounted) setState(() => _playingId = null); return; }
+      if (_playingId == message.id) {
+        await _player.pause();
+        if (mounted) {
+          setState(() => _playingId = null);
+        }
+        return;
+      }
       await _selectMessage(message.id);
       final url = await _service.signedUrl(message.storagePath);
       await _player.play(UrlSource(url));
       await _service.markRead(message.id);
-      if (mounted) setState(() => _playingId = message.id);
+      if (mounted) {
+        setState(() => _playingId = message.id);
+      }
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).voicePlaybackError)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).voicePlaybackError)));
+      }
     }
   }
 
   Future<void> _onPlaybackComplete() async {
     final id = _playingId;
-    if (id == null) return;
-    if (mounted) setState(() => _playingId = null);
+    if (id == null) {
+      return;
+    }
+    if (mounted) {
+      setState(() => _playingId = null);
+    }
     try {
       final result = await _service.completeListen(id);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       if (result.deleted) {
         await _service.deleteStorageFile(result.storagePath);
-        if (!mounted) return;
-        setState(() { _messages.removeWhere((m) => m.id == id); if (_contextMessageId == id) _contextMessageId = null; });
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _messages.removeWhere((m) => m.id == id);
+          if (_contextMessageId == id) {
+            _contextMessageId = null;
+          }
+        });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).voiceDeletedAfterTwoListens)));
       } else {
         setState(() {
@@ -128,7 +163,9 @@ class _VoiceMessagesPageState extends State<VoiceMessagesPage> {
         });
       }
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).voiceListenUpdateError)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).voiceListenUpdateError)));
+      }
     }
   }
 

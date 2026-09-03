@@ -105,7 +105,7 @@ class _DawaCareAppState extends State<DawaCareApp> {
     _pendingCaregiverAlertId = null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CaregiverHomePage()));
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => CaregiverHomePage(initialAlertId: alertId)));
     });
   }
 

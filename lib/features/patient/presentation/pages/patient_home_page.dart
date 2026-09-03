@@ -18,15 +18,34 @@ class PatientHomePage extends StatefulWidget {
 
 class _PatientHomePageState extends State<PatientHomePage> {
   bool _loadedOnce = false;
+  String? _loadingPatientId;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_loadedOnce) {
-      _loadedOnce = true;
-      final userId = context.read<AuthProvider>().profile?.id;
-      if (userId != null) context.read<DoseProvider>().load(userId);
-    }
+    _ensureOwnDosesLoaded();
+  }
+
+  void _ensureOwnDosesLoaded() {
+    final userId = context.read<AuthProvider>().profile?.id;
+    if (userId == null) return;
+
+    final provider = context.read<DoseProvider>();
+    final alreadyLoaded = provider.patientId == userId;
+    if ((_loadedOnce && alreadyLoaded) || _loadingPatientId == userId) return;
+
+    _loadedOnce = true;
+    _loadingPatientId = userId;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      try {
+        await context.read<DoseProvider>().load(userId);
+      } finally {
+        if (mounted && _loadingPatientId == userId) {
+          _loadingPatientId = null;
+        }
+      }
+    });
   }
 
   @override
@@ -35,6 +54,16 @@ class _PatientHomePageState extends State<PatientHomePage> {
     final auth = context.watch<AuthProvider>();
     final doseProvider = context.watch<DoseProvider>();
     final userId = auth.profile?.id;
+
+    // DoseProvider is shared with caregiver pages. If it was last loaded for
+    // a family member, schedule an immediate reload for the signed-in user
+    // and do not render the other patient's doses.
+    if (userId != null && doseProvider.patientId != userId) {
+      _ensureOwnDosesLoaded();
+    }
+
+    final showingOwnDoses = userId != null && doseProvider.patientId == userId;
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 20,
@@ -61,7 +90,9 @@ class _PatientHomePageState extends State<PatientHomePage> {
             await context.read<DoseProvider>().load(userId);
           }
         },
-        child: _buildBody(doseProvider, l),
+        child: !showingOwnDoses || doseProvider.isLoading
+            ? const LoadingIndicator()
+            : _buildBody(doseProvider, l),
       ),
     );
   }

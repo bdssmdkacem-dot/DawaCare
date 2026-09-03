@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- DawaCare branded native launch screen. Uses the existing DawaCare icon asset. -->
+<!-- DawaCare branded native launch screen. The generated launcher resource is sourced from assets/images/branding/dawacare_icon_1024.png. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/dawacare_teal" />
     <item>
         <bitmap
             android:gravity="center"
-            android:src="@drawable/dawacare_splash_logo" />
+            android:src="@mipmap/dawacare_launcher" />
     </item>
 </layer-list>

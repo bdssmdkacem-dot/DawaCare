@@ -2,10 +2,15 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
+import '../../../doses/data/dose_repository.dart';
+import '../../../reminders/data/reminder_policy_repository.dart';
+import '../../../reminders/domain/reminder_engine.dart';
 import '../../data/medication_repository.dart';
 
 class MedicationProvider extends ChangeNotifier {
   final MedicationRepository _repo = MedicationRepository();
+  final DoseRepository _doseRepo = DoseRepository();
+  final ReminderPolicyRepository _policyRepo = ReminderPolicyRepository();
 
   String? patientId;
   List<Medication> medications = [];
@@ -40,6 +45,26 @@ class MedicationProvider extends ChangeNotifier {
     try {
       final created = await _repo.createMedication(medication, imageBytes: imageBytes);
       final createdSchedule = await _repo.createSchedule(created.id, schedule);
+
+      // Generate dose instances immediately so a newly-created reminder can
+      // be scheduled without requiring Today to be opened or refreshed.
+      await _doseRepo.ensureDosesGenerated(created.patientId);
+
+      final now = DateTime.now();
+      final from = DateTime(now.year, now.month, now.day);
+      final to = from.add(const Duration(days: 2, hours: 23));
+      final generatedDoses = await _doseRepo.fetchDosesForRange(
+        created.patientId,
+        from: from,
+        to: to,
+      );
+      final medicationDoses = generatedDoses
+          .where((dose) => dose.medicationId == created.id)
+          .toList();
+
+      final policy = await _policyRepo.fetch(created.patientId);
+      await ReminderEngine.syncUpcoming(medicationDoses, policy);
+
       medications.insert(0, created);
       schedulesByMedicationId[created.id] = [createdSchedule];
       notifyListeners();

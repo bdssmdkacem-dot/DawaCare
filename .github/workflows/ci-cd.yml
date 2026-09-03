@@ -32,7 +32,7 @@ jobs:
 
       - name: Static analysis
         run: flutter analyze
-        continue-on-error: true # surfaces lints without blocking early CI runs
+        continue-on-error: true
 
       - name: Unit tests
         run: flutter test
@@ -41,8 +41,6 @@ jobs:
     name: Build signed AAB
     needs: analyze_and_test
     runs-on: ubuntu-latest
-    # Only build/sign on pushes to main or an explicit manual run — PRs get
-    # analyze+test only, so a fork PR never needs access to signing secrets.
     if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v4
@@ -60,10 +58,14 @@ jobs:
 
       - run: flutter pub get
 
-      # ---- Android signing -------------------------------------------------
-      # KEYSTORE_BASE64 = `base64 -i upload-keystore.jks | pbcopy` (or -w0 on Linux)
-      # See README.md → "Android signing" for how to generate the keystore
-      # and where each of these secrets is set in GitHub → Settings → Secrets.
+      - name: Generate DawaCare launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Verify generated launcher resources
+        run: |
+          test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
       - name: Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
@@ -77,8 +79,6 @@ jobs:
           storeFile=upload-keystore.jks
           EOF
 
-      # google-services.json is only needed if you wired up FCM push (see
-      # supabase/README.md §5). Skips harmlessly if the secret isn't set.
       - name: Write google-services.json
         if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
@@ -103,12 +103,6 @@ jobs:
             build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
-      # ---- Optional: publish straight to Play Console -----------------------
-      # Requires a Play Console service-account JSON with API access
-      # (Play Console → Setup → API access) stored as the
-      # PLAY_SERVICE_ACCOUNT_JSON secret, and at least one manual upload to
-      # the app already done (Play Console won't accept the very first
-      # upload of a new app via API).
       - name: Publish to Play Store (internal track)
         if: ${{ github.event.inputs.publish_to_play_store == 'true' }}
         uses: r0adkll/upload-google-play@v1

@@ -1,3 +1,5 @@
+import '../models/caregiver_link.dart';
+
 enum FamilyLinkRequestStatus { pending, approved, rejected, cancelled }
 
 FamilyLinkRequestStatus _statusFromDb(String value) {
@@ -14,9 +16,6 @@ FamilyLinkRequestStatus _statusFromDb(String value) {
 }
 
 /// A pending (or resolved) request to link a caregiver to a patient.
-/// [patientName]/[caregiverName] are both populated when available so the
-/// same model serves both the patient's "incoming requests" list and the
-/// caregiver's "requests I've sent" list without needing two classes.
 class FamilyLinkRequest {
   final String id;
   final String patientId;
@@ -24,6 +23,7 @@ class FamilyLinkRequest {
   final String caregiverId;
   final String caregiverName;
   final String? relationshipLabel;
+  final CaregiverRole role;
   final FamilyLinkRequestStatus status;
   final DateTime requestedAt;
 
@@ -34,6 +34,7 @@ class FamilyLinkRequest {
     required this.caregiverId,
     required this.caregiverName,
     this.relationshipLabel,
+    required this.role,
     required this.status,
     required this.requestedAt,
   });
@@ -48,6 +49,7 @@ class FamilyLinkRequest {
       caregiverId: map['caregiver_id'] as String,
       caregiverName: (caregiver?['full_name'] as String?) ?? 'مستخدم',
       relationshipLabel: map['relationship_label'] as String?,
+      role: caregiverRoleFromDb((map['role'] as String?) ?? 'CAREGIVER'),
       status: _statusFromDb(map['status'] as String),
       requestedAt: DateTime.parse(map['requested_at'] as String).toLocal(),
     );

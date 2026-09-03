@@ -1,0 +1,1 @@
+Splash source: use the existing DawaCare branding artwork from the project assets for the native Android launch screen. This marker file documents the intended source while the native launch resources are wired to the existing DawaCare branding asset.

@@ -16,9 +16,7 @@ class AuthRepository {
       email: email,
       password: password,
       data: {'full_name': fullName},
-      options: AuthSignUpOptions(
-        emailRedirectTo: kIsWeb ? null : emailConfirmationRedirect,
-      ),
+      emailRedirectTo: kIsWeb ? null : emailConfirmationRedirect,
     );
   }
 

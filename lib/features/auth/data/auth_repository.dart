@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../models/user_profile.dart';
 
 class AuthRepository {
   final SupabaseClient _client = Supabase.instance.client;
+
+  static const String emailConfirmationRedirect = 'dawacare://login-callback/';
 
   User? get currentUser => _client.auth.currentUser;
   Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
@@ -13,6 +16,9 @@ class AuthRepository {
       email: email,
       password: password,
       data: {'full_name': fullName},
+      options: AuthSignUpOptions(
+        emailRedirectTo: kIsWeb ? null : emailConfirmationRedirect,
+      ),
     );
   }
 

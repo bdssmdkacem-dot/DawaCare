@@ -61,11 +61,12 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon/
+    - assets/images/branding/
 
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/icon/app_icon.png"
+  image_path: "assets/images/branding/dawacare_icon_1024.png"
   adaptive_icon_background: "#0D6E6E"
-  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  adaptive_icon_foreground: "assets/images/branding/dawacare_icon_1024.png"
   min_sdk_android: 21

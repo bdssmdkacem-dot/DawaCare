@@ -70,7 +70,9 @@ class _VoiceMessagesPageState extends State<VoiceMessagesPage> {
     if (message == null) {
       final fetched = await _service.fetchById(id);
       if (fetched == null || !mounted) return;
-      if (!_messages.any((m) => m.id == fetched.id)) setState(() => _messages = [fetched, ..._messages]);
+      if (!_messages.any((m) => m.id == fetched.id)) {
+        setState(() => _messages = [fetched, ..._messages]);
+      }
       await _selectMessage(fetched.id);
       return;
     }

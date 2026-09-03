@@ -179,7 +179,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
           Text(l.noFamilyLinked, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
           const SizedBox(height: 16),
           SizedBox(width: 220, child: PrimaryButton(label: l.requestFollowNow, onPressed: _openRequestLinkDialog, icon: Icons.person_add_alt_1_rounded)),
-        ]))
+        ])))
       else
         ...p.linkedPatients.map((link) => _PatientLinkTile(link: link)),
     ];

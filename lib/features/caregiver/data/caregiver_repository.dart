@@ -1,1 +1,1 @@
-// recovery pending
+// restore from historical commit

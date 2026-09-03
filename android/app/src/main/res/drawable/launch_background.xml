@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- DawaCare branded launch screen for pre-Flutter startup. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="#0D6E6E" />
+    <item android:drawable="@color/dawacare_teal" />
     <item>
         <bitmap
             android:gravity="center"

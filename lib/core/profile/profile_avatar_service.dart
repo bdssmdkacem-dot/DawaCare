@@ -24,6 +24,10 @@ class ProfileAvatarService {
     if (image == null) return null;
 
     final bytes = await image.readAsBytes();
+    if (bytes.isEmpty) {
+      throw StateError('Selected image is empty.');
+    }
+
     final contentType = _contentType(image.mimeType, image.path);
     final extension = _extension(contentType);
     final path = '${user.id}/avatar.$extension';
@@ -31,21 +35,38 @@ class ProfileAvatarService {
     await _client.storage.from(bucket).uploadBinary(
       path,
       Uint8List.fromList(bytes),
-      fileOptions: FileOptions(contentType: contentType, upsert: true),
+      fileOptions: FileOptions(
+        contentType: contentType,
+        upsert: true,
+        cacheControl: '3600',
+      ),
     );
 
-    final url = _client.storage.from(bucket).getPublicUrl(path);
-    await _client.from('profiles').update({'avatar_url': url}).eq('id', user.id);
-    return url;
+    final publicUrl = _client.storage.from(bucket).getPublicUrl(path);
+    final saved = await _client
+        .from('profiles')
+        .update({'avatar_url': publicUrl})
+        .eq('id', user.id)
+        .select('avatar_url')
+        .maybeSingle();
+
+    final savedUrl = saved?['avatar_url'] as String?;
+    if (savedUrl == null || savedUrl.isEmpty) {
+      throw StateError('Profile avatar URL was not saved.');
+    }
+
+    return '$savedUrl?v=${DateTime.now().millisecondsSinceEpoch}';
   }
 
   Future<void> remove() async {
     final user = _client.auth.currentUser;
     if (user == null) return;
-    final path = '${user.id}/avatar.jpg';
-    final pngPath = '${user.id}/avatar.png';
-    final webpPath = '${user.id}/avatar.webp';
-    await _client.storage.from(bucket).remove([path, pngPath, webpPath]);
+    final paths = [
+      '${user.id}/avatar.jpg',
+      '${user.id}/avatar.png',
+      '${user.id}/avatar.webp',
+    ];
+    await _client.storage.from(bucket).remove(paths);
     await _client.from('profiles').update({'avatar_url': null}).eq('id', user.id);
   }
 

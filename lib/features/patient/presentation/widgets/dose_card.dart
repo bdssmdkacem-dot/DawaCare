@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
-import '../../../../theme/app_colors.dart';
 
 class DoseCard extends StatelessWidget {
   final DoseInstance dose;
@@ -131,13 +130,13 @@ class _MedicationImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = compact ? 54.0 : 64.0;
     if (future == null) {
-      return _placeholder(size);
+      return _placeholder(context, size);
     }
     return FutureBuilder<String?>(
       future: future,
       builder: (context, snapshot) {
         final url = snapshot.data;
-        if (url == null || url.isEmpty) return _placeholder(size);
+        if (url == null || url.isEmpty) return _placeholder(context, size);
         return ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Image.network(
@@ -147,14 +146,14 @@ class _MedicationImage extends StatelessWidget {
             fit: BoxFit.cover,
             cacheWidth: compact ? 162 : 192,
             cacheHeight: compact ? 162 : 192,
-            errorBuilder: (_, __, ___) => _placeholder(size),
+            errorBuilder: (_, __, ___) => _placeholder(context, size),
           ),
         );
       },
     );
   }
 
-  Widget _placeholder(double size) => Container(
+  Widget _placeholder(BuildContext context, double size) => Container(
         width: size,
         height: size,
         decoration: BoxDecoration(

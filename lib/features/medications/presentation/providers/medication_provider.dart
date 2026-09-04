@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
 import '../../../doses/data/dose_repository.dart';

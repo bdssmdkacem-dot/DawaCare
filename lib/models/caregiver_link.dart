@@ -23,12 +23,13 @@ String caregiverRoleToDb(CaregiverRole role) {
 }
 
 /// A link between a caregiver and a patient, enriched at query time with the
-/// linked patient's display info (name / id) for the Family tab.
+/// linked patient's display info (name / avatar / id) for the Family tab.
 class CaregiverLink {
   final String id;
   final String caregiverId;
   final String patientId;
   final String patientName;
+  final String? patientAvatarUrl;
   final CaregiverRole role;
   final String? relationshipLabel;
   final DateTime createdAt;
@@ -38,6 +39,7 @@ class CaregiverLink {
     required this.caregiverId,
     required this.patientId,
     required this.patientName,
+    this.patientAvatarUrl,
     required this.role,
     this.relationshipLabel,
     required this.createdAt,
@@ -50,6 +52,7 @@ class CaregiverLink {
       caregiverId: map['caregiver_id'] as String,
       patientId: map['patient_id'] as String,
       patientName: (patient?['full_name'] as String?) ?? 'مريض',
+      patientAvatarUrl: patient?['avatar_url'] as String?,
       role: caregiverRoleFromDb(map['role'] as String),
       relationshipLabel: map['relationship_label'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),

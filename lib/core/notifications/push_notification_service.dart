@@ -21,6 +21,10 @@ class PushNotificationService {
   String? _pendingCaregiverAlertId;
   StreamSubscription<String>? _localVoiceSubscription;
   StreamSubscription<String>? _localNotificationSubscription;
+  StreamSubscription<RemoteMessage>? _foregroundSubscription;
+  StreamSubscription<RemoteMessage>? _openedSubscription;
+  StreamSubscription<String>? _tokenSubscription;
+  StreamSubscription<AuthState>? _authSubscription;
   final StreamController<String> _voiceMessageController = StreamController<String>.broadcast();
   final StreamController<String> _notificationController = StreamController<String>.broadcast();
 
@@ -30,13 +34,25 @@ class PushNotificationService {
   Future<void> init() async {
     if (_initialized || !Platform.isAndroid) return;
 
-    await _messaging.requestPermission(alert: true, badge: true, sound: true);
+    // Ensure the local notification channels exist before any FCM message can
+    // arrive. This is especially important for a freshly installed app.
+    await NotificationService.instance.init();
+    await _messaging.setAutoInitEnabled(true);
+
+    final settings = await _messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+    debugPrint('DawaCare FCM permission: ${settings.authorizationStatus}');
+
     _localVoiceSubscription = NotificationService.instance.voiceMessageOpened.listen(_queueVoiceMessageId);
     _localNotificationSubscription = NotificationService.instance.notificationOpened.listen(_queueCaregiverAlertId);
 
-    FirebaseMessaging.onMessage.listen((message) async {
+    _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) async {
+      debugPrint('DawaCare FCM foreground received: id=${message.messageId} type=${message.data['type']}');
       final notification = message.notification;
-      if (notification == null) return;
       final type = message.data['type'];
       final messageId = message.data['voice_message_id'];
       final alertId = message.data['alert_id'];
@@ -45,28 +61,41 @@ class PushNotificationService {
           : type == 'CAREGIVER_ALERT' && alertId is String && alertId.isNotEmpty
               ? 'CAREGIVER_ALERT:$alertId'
               : null;
-      await NotificationService.instance.showCaregiverAlert(
-        title: notification.title ?? 'دواء كير — تنبيه',
-        body: notification.body ?? 'لديك تنبيه جديد من أحد أفراد العائلة.',
-        payload: payload,
-      );
+
+      // FCM notification messages normally contain notification.title/body.
+      // Keep a data fallback so a server-side data-only message is also
+      // visible while the app is in the foreground.
+      if (type == 'VOICE_MESSAGE' || type == 'CAREGIVER_ALERT') {
+        await NotificationService.instance.showCaregiverAlert(
+          title: notification?.title ?? (type == 'VOICE_MESSAGE' ? 'رسالة صوتية جديدة 🎙️' : 'تنبيه جديد'),
+          body: notification?.body ?? (type == 'VOICE_MESSAGE' ? 'لديك رسالة صوتية جديدة من أحد المتابعين.' : 'لديك تنبيه جديد من أحد أفراد العائلة.'),
+          payload: payload,
+        );
+      }
     });
 
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleOpenedMessage);
+    _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      debugPrint('DawaCare FCM notification opened: id=${message.messageId} type=${message.data['type']}');
+      _queueOpenedMessage(message);
+    });
+
     final initialMessage = await _messaging.getInitialMessage();
-    if (initialMessage != null) _queueOpenedMessage(initialMessage);
+    if (initialMessage != null) {
+      debugPrint('DawaCare FCM initial message: id=${initialMessage.messageId} type=${initialMessage.data['type']}');
+      _queueOpenedMessage(initialMessage);
+    }
 
     _latestToken = await _messaging.getToken();
+    debugPrint('DawaCare FCM token available: ${_latestToken == null ? 'NO' : 'YES'}');
     await _registerCurrentToken();
-    _messaging.onTokenRefresh.listen((token) async {
+    _tokenSubscription = _messaging.onTokenRefresh.listen((token) async {
+      debugPrint('DawaCare FCM token refreshed');
       _latestToken = token;
       await _registerCurrentToken();
     });
-    _client.auth.onAuthStateChange.listen((_) async => _registerCurrentToken());
+    _authSubscription = _client.auth.onAuthStateChange.listen((_) async => _registerCurrentToken());
     _initialized = true;
   }
-
-  void _handleOpenedMessage(RemoteMessage message) => _queueOpenedMessage(message);
 
   void _queueOpenedMessage(RemoteMessage message) {
     final type = message.data['type'];
@@ -114,18 +143,35 @@ class PushNotificationService {
     if (user == null) return;
     try {
       final existing = await _client.from('devices').select('id').eq('user_id', user.id).eq('push_token', token).maybeSingle();
-      final values = {'user_id': user.id, 'platform': 'android', 'push_token': token, 'timezone': 'Africa/Casablanca', 'last_seen': DateTime.now().toUtc().toIso8601String()};
+      final values = {
+        'user_id': user.id,
+        'platform': 'android',
+        'push_token': token,
+        'timezone': 'Africa/Casablanca',
+        'last_seen': DateTime.now().toUtc().toIso8601String(),
+      };
       if (existing != null) {
         await _client.from('devices').update(values).eq('id', existing['id']);
       } else {
         await _client.from('devices').insert(values);
       }
-    } catch (_) {}
+      debugPrint('DawaCare FCM token registered for user=${user.id}');
+    } catch (e) {
+      debugPrint('DawaCare FCM token registration failed: $e');
+    }
   }
 
   void dispose() {
+    _foregroundSubscription?.cancel();
+    _openedSubscription?.cancel();
+    _tokenSubscription?.cancel();
+    _authSubscription?.cancel();
     _localVoiceSubscription?.cancel();
     _localNotificationSubscription?.cancel();
+    _foregroundSubscription = null;
+    _openedSubscription = null;
+    _tokenSubscription = null;
+    _authSubscription = null;
     _localVoiceSubscription = null;
     _localNotificationSubscription = null;
   }
@@ -134,4 +180,8 @@ class PushNotificationService {
 @pragma('vm:entry-point')
 Future<void> dawacareFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+  debugPrint('DawaCare FCM background received: id=${message.messageId} type=${message.data['type']}');
+  // Notification messages are displayed by Android/FCM automatically when
+  // the app is backgrounded or terminated. We intentionally do not show a
+  // second local notification here, which would create duplicates.
 }

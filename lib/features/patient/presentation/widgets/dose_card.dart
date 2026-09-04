@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../l10n/app_localizations.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
 
@@ -77,7 +77,10 @@ class DoseCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                _StatusChip(status: dose.status, label: l.doseStatus(doseStatusToDb(dose.status))),
+                _StatusChip(
+                  status: dose.status,
+                  label: l.doseStatus(doseStatusToDb(dose.status)),
+                ),
               ],
             ),
             if (actionable && (onConfirm != null || onSnooze != null || onSkip != null)) ...[
@@ -129,9 +132,8 @@ class _MedicationImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = compact ? 54.0 : 64.0;
-    if (future == null) {
-      return _placeholder(context, size);
-    }
+    if (future == null) return _placeholder(context, size);
+
     return FutureBuilder<String?>(
       future: future,
       builder: (context, snapshot) {

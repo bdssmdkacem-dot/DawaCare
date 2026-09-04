@@ -16,7 +16,11 @@ class CaregiverRepository {
   final SupabaseClient _client = Supabase.instance.client;
 
   Future<List<CaregiverLink>> fetchLinkedPatients(String caregiverId) async {
-    final rows = await _client.from('caregiver_patient').select('*, patient:profiles!patient_id(full_name)').eq('caregiver_id', caregiverId).order('created_at');
+    final rows = await _client
+        .from('caregiver_patient')
+        .select('*, patient:profiles!patient_id(full_name, avatar_url)')
+        .eq('caregiver_id', caregiverId)
+        .order('created_at');
     return rows.map((r) => CaregiverLink.fromMap(r)).toList();
   }
 

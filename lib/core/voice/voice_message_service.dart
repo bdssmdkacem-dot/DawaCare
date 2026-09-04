@@ -45,12 +45,34 @@ class VoiceMessageService {
     try {
       await _client.storage.from(bucket).upload(storagePath, file, fileOptions: const FileOptions(contentType: 'audio/mp4', upsert: false));
       final row = await _client.from('voice_messages').insert({'id': messageId, 'sender_id': senderId, 'patient_id': patientId, 'dose_id': doseId, 'storage_path': storagePath, 'duration_ms': durationMs}).select('*, sender:profiles!sender_id(full_name, avatar_url)').single();
-      try {
-        final response = await _client.functions.invoke('voice-message-notify', body: {'voice_message_id': messageId});
-        debugPrint('DawaCare FCM notify: status=${response.status}, data=${response.data}');
-      } catch (error, stackTrace) {
-        debugPrint('DawaCare FCM notify failed: $error');
-        debugPrintStack(stackTrace: stackTrace);
+
+      // FCM delivery is intentionally retried: the message itself is already
+      // safely stored, so a transient network/function failure must not make
+      // the user lose the notification.
+      var notified = false;
+      Object? lastError;
+      for (var attempt = 1; attempt <= 3 && !notified; attempt++) {
+        try {
+          final response = await _client.functions.invoke(
+            'voice-message-notify',
+            body: {'voice_message_id': messageId},
+          );
+          debugPrint('DawaCare FCM notify attempt=$attempt status=${response.status} data=${response.data}');
+          notified = response.status >= 200 && response.status < 300 &&
+              response.data is Map && ((response.data as Map)['sent'] ?? 0) is num &&
+              (((response.data as Map)['sent'] as num) > 0);
+          if (!notified && attempt < 3) {
+            await Future<void>.delayed(Duration(seconds: attempt));
+          }
+        } catch (error, stackTrace) {
+          lastError = error;
+          debugPrint('DawaCare FCM notify attempt=$attempt failed: $error');
+          if (attempt < 3) await Future<void>.delayed(Duration(seconds: attempt));
+          if (attempt == 3) debugPrintStack(stackTrace: stackTrace);
+        }
+      }
+      if (!notified) {
+        debugPrint('DawaCare FCM notify exhausted retries for voice_message_id=$messageId error=$lastError');
       }
       return VoiceMessage.fromMap(row);
     } catch (_) {

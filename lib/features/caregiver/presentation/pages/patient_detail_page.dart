@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/widgets/loading_indicator.dart';
@@ -12,6 +13,7 @@ import '../../../patient/presentation/widgets/dose_card.dart';
 import '../../data/caregiver_repository.dart';
 import '../../domain/adherence_calculator.dart';
 import '../widgets/adherence_chart.dart';
+import 'caregiver_medication_detail_page.dart';
 import 'voice_recorder_page.dart';
 
 class PatientDetailPage extends StatefulWidget {
@@ -38,8 +40,7 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     _patientDoseProvider = DoseProvider();
     _patientMedicationProvider = MedicationProvider();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _loadPatientData();
+      if (mounted) _loadPatientData();
     });
   }
 
@@ -58,18 +59,26 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
   }
 
   void _openVoiceRecorder({DoseInstance? dose}) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VoiceRecorderPage(
-          patientId: widget.link.patientId,
-          patientName: widget.link.patientName,
-          doseId: dose?.id,
-          medicationName: dose?.medicationName,
-          doseAmount: dose?.doseAmount,
-          scheduledAt: dose?.scheduledAt,
-        ),
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => VoiceRecorderPage(
+        patientId: widget.link.patientId,
+        patientName: widget.link.patientName,
+        doseId: dose?.id,
+        medicationName: dose?.medicationName,
+        doseAmount: dose?.doseAmount,
+        scheduledAt: dose?.scheduledAt,
       ),
-    );
+    ));
+  }
+
+  void _openMedication(Medication medication) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => CaregiverMedicationDetailPage(
+        medication: medication,
+        patientName: widget.link.patientName,
+        canManageDoses: _canManageDoses,
+      ),
+    ));
   }
 
   Medication? _medicationFor(DoseInstance dose) {
@@ -79,36 +88,22 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     return null;
   }
 
-  Widget _sectionHeader(
-    BuildContext context,
-    String title, {
-    required IconData icon,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: .10),
-            borderRadius: BorderRadius.circular(11),
+  Widget _sectionHeader(BuildContext context, String title, {required IconData icon}) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: .10),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, size: 19, color: AppColors.primary),
           ),
-          child: Icon(icon, size: 19, color: AppColors.primary),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w800),
-          ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(width: 10),
+          Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+        ]),
+      );
 
   Widget _patientHero(BuildContext context) {
     final role = widget.link.role == CaregiverRole.primary
@@ -117,63 +112,62 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
             ? _tr(context, 'فرد العائلة', 'Family member', 'Membre de la famille')
             : _tr(context, 'مرافق', 'Caregiver', 'Accompagnant');
     final relationship = widget.link.relationshipLabel;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryDark],
-        ),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.primary, AppColors.primaryDark]),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: .16),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .14),
-              shape: BoxShape.circle,
+      child: Row(children: [
+        const CircleAvatar(radius: 32, backgroundColor: Color(0x33FFFFFF), child: Icon(Icons.person_rounded, color: Colors.white, size: 34)),
+        const SizedBox(width: 15),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(widget.link.patientName, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 5),
+          Text(relationship != null && relationship.isNotEmpty ? '$relationship · $role' : role, style: TextStyle(color: Colors.white.withValues(alpha: .88), fontWeight: FontWeight.w600)),
+        ])),
+      ]),
+    );
+  }
+
+  Widget _medicationTile(Medication medication) {
+    final imageFuture = _patientMedicationProvider.signedMedicationImageUrl(medication.imageUrl);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 9),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _openMedication(medication),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(children: [
+            FutureBuilder<String?>(
+              future: imageFuture,
+              builder: (context, snapshot) {
+                final url = snapshot.data;
+                return Container(
+                  width: 64,
+                  height: 64,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), borderRadius: BorderRadius.circular(14)),
+                  child: url == null || url.isEmpty
+                      ? const Icon(Icons.medication_rounded, color: AppColors.primary)
+                      : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.medication_rounded, color: AppColors.primary)),
+                );
+              },
             ),
-            child: const Icon(Icons.person_rounded, color: Colors.white, size: 34),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.link.patientName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  relationship != null && relationship.isNotEmpty
-                      ? '$relationship · $role'
-                      : role,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: .88),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(medication.name, style: const TextStyle(fontWeight: FontWeight.w900)),
+              if ((medication.genericName ?? '').trim().isNotEmpty) Text(medication.genericName!.trim(), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 4),
+              Text([
+                if ((medication.strength ?? '').trim().isNotEmpty) medication.strength!.trim(),
+                if ((medication.dosageForm ?? '').trim().isNotEmpty) medication.dosageForm!.trim(),
+              ].join(' • ')),
+            ])),
+            const Icon(Icons.chevron_right_rounded),
+          ]),
+        ),
       ),
     );
   }
@@ -185,19 +179,11 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
       child: DoseCard(
         dose: dose,
         medication: medication,
-        imageUrlFuture: medication == null
-            ? null
-            : _patientMedicationProvider.signedMedicationImageUrl(medication.imageUrl),
-        onTap: () => _openVoiceRecorder(dose: dose),
-        onConfirm: _canManageDoses
-            ? () => _patientDoseProvider.confirm(dose, source: 'CAREGIVER')
-            : null,
-        onSnooze: _canManageDoses
-            ? () => _patientDoseProvider.snooze(dose, source: 'CAREGIVER')
-            : null,
-        onSkip: _canManageDoses
-            ? () => _patientDoseProvider.skip(dose, source: 'CAREGIVER')
-            : null,
+        imageUrlFuture: medication == null ? null : _patientMedicationProvider.signedMedicationImageUrl(medication.imageUrl),
+        onTap: medication == null ? () => _openVoiceRecorder(dose: dose) : () => _openMedication(medication),
+        onConfirm: _canManageDoses ? () => _patientDoseProvider.confirm(dose, source: 'CAREGIVER') : null,
+        onSnooze: _canManageDoses ? () => _patientDoseProvider.snooze(dose, source: 'CAREGIVER') : null,
+        onSkip: _canManageDoses ? () => _patientDoseProvider.skip(dose, source: 'CAREGIVER') : null,
       ),
     );
   }
@@ -213,16 +199,8 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
       child: Consumer2<DoseProvider, MedicationProvider>(
         builder: (context, p, medications, _) {
           final loading = p.isLoading || medications.isLoading;
-          final highlightedDose = widget.initialDoseId == null
-              ? null
-              : p.all.cast<DoseInstance?>().firstWhere(
-                    (d) => d?.id == widget.initialDoseId,
-                    orElse: () => null,
-                  );
-          final todayDoses = p.todayDoses
-              .where((dose) => dose.id != widget.initialDoseId)
-              .toList();
-
+          final highlightedDose = widget.initialDoseId == null ? null : p.all.cast<DoseInstance?>().firstWhere((d) => d?.id == widget.initialDoseId, orElse: () => null);
+          final todayDoses = p.todayDoses.where((d) => d.id != widget.initialDoseId).toList();
           return Scaffold(
             appBar: AppBar(title: Text(widget.link.patientName)),
             body: loading && p.all.isEmpty && medications.medications.isEmpty
@@ -230,106 +208,44 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
                 : RefreshIndicator(
                     onRefresh: _loadPatientData,
                     child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
                       children: [
                         _patientHero(context),
-                        const SizedBox(height: 20),
-                        if (highlightedDose != null) ...[
-                          _sectionHeader(
-                            context,
-                            _tr(context, 'الجرعة المرتبطة بالتنبيه', 'Dose linked to alert', 'Dose liée à l’alerte'),
-                            icon: Icons.warning_amber_rounded,
-                          ),
-                          Card(
-                            color: AppColors.danger.withValues(alpha: .055),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 2),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _tr(context, 'هذه هي الجرعة المرتبطة بهذا التنبيه.', 'This is the dose linked to this alert.', 'Voici la dose liée à cette alerte.'),
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  _doseCard(highlightedDose),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                        ],
-                        _sectionHeader(context, _tr(context, 'نسبة الالتزام', 'Medication adherence', 'Observance du traitement'), icon: Icons.insights_rounded),
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: AdherenceChart(stats: AdherenceCalculator.compute(p.all)),
-                          ),
-                        ),
                         const SizedBox(height: 18),
-                        Card(
-                          color: AppColors.primary.withValues(alpha: .055),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () => _openVoiceRecorder(),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .12), shape: BoxShape.circle),
-                                    child: const Icon(Icons.mic_rounded, color: AppColors.primary),
-                                  ),
-                                  const SizedBox(width: 13),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(l.sendGeneralVoice, style: const TextStyle(fontWeight: FontWeight.w800)),
-                                        const SizedBox(height: 3),
-                                        Text(_tr(context, 'أرسل رسالة صوتية عامة لهذا الشخص.', 'Send a general voice message to this person.', 'Envoyez un message vocal général à cette personne.'), style: Theme.of(context).textTheme.bodySmall),
-                                      ],
-                                    ),
-                                  ),
-                                  const Icon(Icons.chevron_right_rounded),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
+                        _sectionHeader(context, _tr(context, 'أدوية المريض', 'Patient medications', 'Médicaments du patient'), icon: Icons.medication_rounded),
+                        if (medications.medications.isEmpty)
+                          Card(child: Padding(padding: const EdgeInsets.all(18), child: Text(l.noScheduledMedicines, textAlign: TextAlign.center)))
+                        else
+                          ...medications.medications.map(_medicationTile),
+                        const SizedBox(height: 10),
+                        _sectionHeader(context, _tr(context, 'نسبة الالتزام', 'Medication adherence', 'Observance du traitement'), icon: Icons.insights_rounded),
+                        Card(child: Padding(padding: const EdgeInsets.all(16), child: AdherenceChart(stats: AdherenceCalculator.compute(p.all)))),
+                        const SizedBox(height: 18),
                         _sectionHeader(context, l.today, icon: Icons.today_rounded),
-                        if (todayDoses.isEmpty)
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                              child: Column(
-                                children: [
-                                  Container(
-                                    width: 58,
-                                    height: 58,
-                                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), shape: BoxShape.circle),
-                                    child: const Icon(Icons.medication_outlined, color: AppColors.primary, size: 29),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(l.noScheduledMedicines, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
-                                ],
-                              ),
-                            ),
-                          )
+                        if (highlightedDose != null) _doseCard(highlightedDose),
+                        if (todayDoses.isEmpty && highlightedDose == null)
+                          Card(child: Padding(padding: const EdgeInsets.all(22), child: Text(l.noScheduledMedicines, textAlign: TextAlign.center)))
                         else
                           ...todayDoses.map(_doseCard),
-                        if (_canManageDoses) ...[
-                          const SizedBox(height: 10),
-                          Center(
-                            child: TextButton.icon(
-                              onPressed: () => _confirmUnlink(context),
-                              icon: const Icon(Icons.link_off_rounded, color: AppColors.danger),
-                              label: Text(l.removeLink, style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700)),
-                            ),
+                        const SizedBox(height: 12),
+                        Card(
+                          color: AppColors.primary.withValues(alpha: .055),
+                          child: ListTile(
+                            leading: const CircleAvatar(child: Icon(Icons.mic_rounded)),
+                            title: Text(l.sendGeneralVoice, style: const TextStyle(fontWeight: FontWeight.w800)),
+                            subtitle: Text(_tr(context, 'أرسل رسالة صوتية عامة للمريض.', 'Send a general voice message to the patient.', 'Envoyer un message vocal général au patient.')),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => _openVoiceRecorder(),
                           ),
+                        ),
+                        if (_canManageDoses) ...[
+                          const SizedBox(height: 8),
+                          Center(child: TextButton.icon(
+                            onPressed: () => _confirmUnlink(context),
+                            icon: const Icon(Icons.link_off_rounded, color: AppColors.danger),
+                            label: Text(l.removeLink, style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700)),
+                          )),
                         ],
                       ],
                     ),

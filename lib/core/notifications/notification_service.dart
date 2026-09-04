@@ -30,6 +30,7 @@ class NotificationService {
   static const String _caregiverAlertPayloadPrefix = 'CAREGIVER_ALERT:';
   static const String _actionTaken = 'DOSE_TAKEN';
   static const String _actionSnooze = 'DOSE_SNOOZE';
+  static const int _beforeDoseMinutes = 5;
 
   Stream<String> get voiceMessageOpened => _voiceMessageController.stream;
   Stream<String> get notificationOpened => _notificationController.stream;
@@ -49,10 +50,7 @@ class NotificationService {
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
-    await _plugin.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: _onNotificationResponse,
-    );
+    await _plugin.initialize(initSettings, onDidReceiveNotificationResponse: _onNotificationResponse);
 
     const channel = AndroidNotificationChannel(
       _channelId,
@@ -80,21 +78,18 @@ class NotificationService {
   Future<void> requestPermissions() async {
     final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return;
-
     try {
       final notificationsGranted = await android.requestNotificationsPermission();
       debugPrint('DawaCare notifications permission: $notificationsGranted');
     } catch (e) {
       debugPrint('DawaCare notification permission request failed: $e');
     }
-
     try {
       final exactAlarmGranted = await android.requestExactAlarmsPermission();
       debugPrint('DawaCare exact alarm permission request: $exactAlarmGranted');
     } catch (e) {
       debugPrint('DawaCare exact alarm permission unavailable: $e');
     }
-
     await logDiagnostics('requestPermissions');
   }
 
@@ -117,15 +112,8 @@ class NotificationService {
     String? payload,
   }) async {
     final exactAllowed = await _canScheduleExactAlarms();
-    final mode = exactAllowed
-        ? AndroidScheduleMode.exactAllowWhileIdle
-        : AndroidScheduleMode.inexactAllowWhileIdle;
-
-    debugPrint(
-      'DawaCare scheduling: id=$id at=$scheduledDate timezone=${tz.local.name} '
-      'mode=$mode exactAllowed=$exactAllowed payload=$payload',
-    );
-
+    final mode = exactAllowed ? AndroidScheduleMode.exactAllowWhileIdle : AndroidScheduleMode.inexactAllowWhileIdle;
+    debugPrint('DawaCare scheduling: id=$id at=$scheduledDate timezone=${tz.local.name} mode=$mode exactAllowed=$exactAllowed payload=$payload');
     try {
       await _plugin.zonedSchedule(
         id,
@@ -161,21 +149,14 @@ class NotificationService {
       }
       rethrow;
     }
-
     await logDiagnostics('schedule id=$id');
   }
 
-  /// Returns the notifications Android currently has queued for DawaCare.
-  /// This is the decisive diagnostic for distinguishing Flutter scheduling
-  /// failures from Android delivery/battery/ROM restrictions.
   Future<List<PendingNotificationRequest>> pendingNotifications() async {
     final pending = await _plugin.pendingNotificationRequests();
     debugPrint('DawaCare pending notifications: count=${pending.length}');
     for (final item in pending) {
-      debugPrint(
-        'DawaCare pending notification: id=${item.id} title=${item.title} '
-        'body=${item.body} payload=${item.payload}',
-      );
+      debugPrint('DawaCare pending notification: id=${item.id} title=${item.title} body=${item.body} payload=${item.payload}');
     }
     return pending;
   }
@@ -186,7 +167,6 @@ class NotificationService {
       debugPrint('DawaCare notification diagnostics [$reason]: Android implementation unavailable');
       return;
     }
-
     bool? notificationsEnabled;
     bool? exactAlarmEnabled;
     try {
@@ -199,36 +179,23 @@ class NotificationService {
     } catch (e) {
       debugPrint('DawaCare exact alarm status failed: $e');
     }
-
-    debugPrint(
-      'DawaCare notification diagnostics [$reason]: '
-      'initialized=$_initialized, notificationsEnabled=$notificationsEnabled, '
-      'exactAlarmEnabled=$exactAlarmEnabled, timezone=${tz.local.name}',
-    );
-
+    debugPrint('DawaCare notification diagnostics [$reason]: initialized=$_initialized, notificationsEnabled=$notificationsEnabled, exactAlarmEnabled=$exactAlarmEnabled, timezone=${tz.local.name}');
     await pendingNotifications();
   }
 
   Future<void> _onNotificationResponse(NotificationResponse response) async {
     final payload = response.payload;
     if (payload == null || payload.isEmpty) return;
-
     if (payload.startsWith(_voicePayloadPrefix)) {
       final messageId = payload.substring(_voicePayloadPrefix.length);
-      if (messageId.isNotEmpty && !_voiceMessageController.isClosed) {
-        _voiceMessageController.add(messageId);
-      }
+      if (messageId.isNotEmpty && !_voiceMessageController.isClosed) _voiceMessageController.add(messageId);
       return;
     }
-
     if (payload.startsWith(_caregiverAlertPayloadPrefix)) {
       final alertId = payload.substring(_caregiverAlertPayloadPrefix.length);
-      if (alertId.isNotEmpty && !_notificationController.isClosed) {
-        _notificationController.add(alertId);
-      }
+      if (alertId.isNotEmpty && !_notificationController.isClosed) _notificationController.add(alertId);
       return;
     }
-
     final doseId = payload;
     final action = response.actionId;
     if (action == _actionTaken) {
@@ -272,14 +239,7 @@ class NotificationService {
           AndroidNotificationAction(_actionSnooze, 'تأجيل 10 دقائق', showsUserInterface: false, cancelNotification: true),
         ],
       );
-      await _schedule(
-        _notificationId(dose.id, 99),
-        'تذكير: حان وقت الدواء 💊',
-        '${dose.medicationName} — ${dose.doseAmount}',
-        snoozeTime,
-        NotificationDetails(android: androidDetails),
-        payload: dose.id,
-      );
+      await _schedule(_notificationId(dose.id, 99), 'تذكير: حان وقت الدواء 💊', '${dose.medicationName} — ${dose.doseAmount}', snoozeTime, NotificationDetails(android: androidDetails), payload: dose.id);
     } catch (e) {
       debugPrint('DawaCare snooze scheduling failed: $e');
     }
@@ -291,34 +251,43 @@ class NotificationService {
     final imagePath = await _prepareMedicationImage(dose);
     final now = tz.TZDateTime.now(tz.local);
     final baseTime = tz.TZDateTime.from(dose.scheduledAt, tz.local);
+    final beforeTime = baseTime.subtract(const Duration(minutes: _beforeDoseMinutes));
 
-    debugPrint(
-      'DawaCare dose reminder: doseId=${dose.id} medication=${dose.medicationName} '
-      'scheduledAt=${dose.scheduledAt} localBase=$baseTime now=$now policyRepeats=${policy.maxRepeats} '
-      'intervalMin=${policy.repeatIntervalMin}',
+    debugPrint('DawaCare dose reminder: doseId=${dose.id} medication=${dose.medicationName} scheduledAt=${dose.scheduledAt} localBase=$baseTime beforeTime=$beforeTime now=$now policyRepeats=${policy.maxRepeats} intervalMin=${policy.repeatIntervalMin} beforeMin=$_beforeDoseMinutes');
+
+    final androidDetails = AndroidNotificationDetails(
+      _channelId,
+      'تذكير الجرعات',
+      channelDescription: 'إشعارات تذكير بمواعيد الأدوية',
+      importance: Importance.max,
+      priority: Priority.high,
+      category: AndroidNotificationCategory.reminder,
+      largeIcon: imagePath == null ? null : FilePathAndroidBitmap(imagePath),
+      styleInformation: imagePath == null ? null : BigPictureStyleInformation(FilePathAndroidBitmap(imagePath), hideExpandedLargeIcon: false, contentTitle: dose.medicationName, summaryText: dose.doseAmount),
+      actions: const [
+        AndroidNotificationAction(_actionTaken, 'تم أخذ الدواء', showsUserInterface: false, cancelNotification: true),
+        AndroidNotificationAction(_actionSnooze, 'تأجيل 10 دقائق', showsUserInterface: false, cancelNotification: true),
+      ],
     );
+
+    // The pre-dose reminder has its own notification id, so the five-minute
+    // reminder and the exact-time reminder can coexist.
+    if (!beforeTime.isBefore(now)) {
+      await _schedule(
+        _notificationId(dose.id, 0),
+        'اقترب موعد الدواء 💊',
+        'بعد 5 دقائق: ${dose.medicationName} — ${dose.doseAmount}',
+        beforeTime,
+        NotificationDetails(android: androidDetails),
+        payload: dose.id,
+      );
+    }
 
     for (int i = 0; i <= policy.maxRepeats; i++) {
       final fireTime = baseTime.add(Duration(minutes: policy.repeatIntervalMin * i));
       if (fireTime.isBefore(now)) continue;
-
-      final androidDetails = AndroidNotificationDetails(
-        _channelId,
-        'تذكير الجرعات',
-        channelDescription: 'إشعارات تذكير بمواعيد الأدوية',
-        importance: Importance.max,
-        priority: Priority.high,
-        category: AndroidNotificationCategory.reminder,
-        largeIcon: imagePath == null ? null : FilePathAndroidBitmap(imagePath),
-        styleInformation: imagePath == null ? null : BigPictureStyleInformation(FilePathAndroidBitmap(imagePath), hideExpandedLargeIcon: false, contentTitle: dose.medicationName, summaryText: dose.doseAmount),
-        actions: const [
-          AndroidNotificationAction(_actionTaken, 'تم أخذ الدواء', showsUserInterface: false, cancelNotification: true),
-          AndroidNotificationAction(_actionSnooze, 'تأجيل 10 دقائق', showsUserInterface: false, cancelNotification: true),
-        ],
-      );
-
       await _schedule(
-        _notificationId(dose.id, i),
+        _notificationId(dose.id, i + 1),
         i == 0 ? 'حان موعد الدواء 💊' : 'تذكير: الجرعة لم تُؤكَّد بعد',
         '${dose.medicationName} — ${dose.doseAmount}',
         fireTime,
@@ -360,7 +329,15 @@ class NotificationService {
       DateTime.now().millisecondsSinceEpoch.remainder(100000),
       title,
       body,
-      const NotificationDetails(android: AndroidNotificationDetails(_caregiverChannelId, 'تنبيهات العائلة', channelDescription: 'تنبيه عند تفويت أحد أفراد العائلة لجرعة دواء', importance: Importance.high, priority: Priority.high)),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _caregiverChannelId,
+          'تنبيهات العائلة',
+          channelDescription: 'تنبيه عند تفويت أحد أفراد العائلة لجرعة دواء',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+      ),
       payload: payload,
     );
   }

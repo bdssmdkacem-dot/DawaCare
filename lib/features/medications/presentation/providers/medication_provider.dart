@@ -17,9 +17,6 @@ class MedicationProvider extends ChangeNotifier {
   final Map<String, List<MedicationSchedule>> schedulesByMedicationId = {};
   bool isLoading = false;
   String? error;
-
-  // Signed URLs are short-lived and the list rebuilds frequently. Keeping the
-  // Future stable prevents a new signed-URL request on every widget rebuild.
   final Map<String, Future<String?>> _imageUrlFutures = {};
 
   Future<void> load(String forPatientId) async {
@@ -55,15 +52,8 @@ class MedicationProvider extends ChangeNotifier {
       final now = DateTime.now();
       final from = DateTime(now.year, now.month, now.day);
       final to = from.add(const Duration(days: 2, hours: 23));
-      final generatedDoses = await _doseRepo.fetchDosesForRange(
-        created.patientId,
-        from: from,
-        to: to,
-      );
-      final medicationDoses = generatedDoses
-          .where((dose) => dose.medicationId == created.id)
-          .toList();
-
+      final generatedDoses = await _doseRepo.fetchDosesForRange(created.patientId, from: from, to: to);
+      final medicationDoses = generatedDoses.where((dose) => dose.medicationId == created.id).toList();
       final policy = await _policyRepo.fetch(created.patientId);
       await ReminderEngine.syncUpcoming(medicationDoses, policy);
 
@@ -98,6 +88,7 @@ class MedicationProvider extends ChangeNotifier {
           createdBy: medication.createdBy,
           createdAt: medication.createdAt,
         );
+        _imageUrlFutures.remove(medication.imageUrl);
         notifyListeners();
       }
       return true;
@@ -128,6 +119,7 @@ class MedicationProvider extends ChangeNotifier {
           createdBy: medication.createdBy,
           createdAt: medication.createdAt,
         );
+        _imageUrlFutures.remove(medication.imageUrl);
         notifyListeners();
       }
       return true;
@@ -138,18 +130,17 @@ class MedicationProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateSchedule(MedicationSchedule schedule, {
+  Future<bool> updateSchedule(
+    MedicationSchedule schedule, {
+    required String patientId,
     required String time,
     required String doseAmount,
   }) async {
     try {
       final now = DateTime.now();
       final from = DateTime(now.year, now.month, now.day);
-      final oldDoses = await _doseRepo.fetchDosesForRange(
-        schedule.medicationId,
-        from: from,
-        to: from.add(const Duration(days: 2, hours: 23)),
-      );
+      final to = from.add(const Duration(days: 2, hours: 23));
+      final oldDoses = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
       for (final dose in oldDoses.where((d) => d.scheduleId == schedule.id && !isResolvedStatus(d.status))) {
         await ReminderEngine.cancelFor(dose.id);
       }
@@ -170,14 +161,10 @@ class MedicationProvider extends ChangeNotifier {
       );
 
       await _repo.deleteFuturePendingDoses(schedule.id, from);
-      await _doseRepo.ensureDosesGenerated(schedule.patientIdForUpdate(medications));
+      await _doseRepo.ensureDosesGenerated(patientId);
 
-      final refreshed = await _doseRepo.fetchDosesForRange(
-        schedule.patientIdForUpdate(medications),
-        from: from,
-        to: from.add(const Duration(days: 2, hours: 23)),
-      );
-      final policy = await _policyRepo.fetch(schedule.patientIdForUpdate(medications));
+      final refreshed = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
+      final policy = await _policyRepo.fetch(patientId);
       await ReminderEngine.syncUpcoming(
         refreshed.where((d) => d.scheduleId == schedule.id).toList(),
         policy,
@@ -199,21 +186,12 @@ class MedicationProvider extends ChangeNotifier {
 
   Future<String?> signedMedicationImageUrl(String? imagePath) {
     if (imagePath == null || imagePath.isEmpty) return Future.value(null);
-    return _imageUrlFutures.putIfAbsent(
-      imagePath,
-      () => _repo.signedMedicationImageUrl(imagePath),
-    );
+    return _imageUrlFutures.putIfAbsent(imagePath, () => _repo.signedMedicationImageUrl(imagePath));
   }
 
   Future<void> deactivate(Medication medication) async {
     await _repo.deactivateMedication(medication.id);
     medications.removeWhere((m) => m.id == medication.id);
     notifyListeners();
-  }
-}
-
-extension on MedicationSchedule {
-  String patientIdForUpdate(List<Medication> medications) {
-    return medications.firstWhere((m) => m.id == medicationId).patientId;
   }
 }

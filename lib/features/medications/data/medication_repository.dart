@@ -85,6 +85,26 @@ class MedicationRepository {
     return MedicationSchedule.fromMap(row);
   }
 
+  Future<MedicationSchedule> updateSchedule(MedicationSchedule schedule) async {
+    final data = schedule.toInsertMap(schedule.medicationId)..remove('medication_id');
+    final row = await _client
+        .from('medication_schedules')
+        .update(data)
+        .eq('id', schedule.id)
+        .select()
+        .single();
+    return MedicationSchedule.fromMap(row);
+  }
+
+  Future<void> deleteFuturePendingDoses(String scheduleId, DateTime from) async {
+    await _client
+        .from('dose_instances')
+        .delete()
+        .eq('schedule_id', scheduleId)
+        .eq('status', 'PENDING')
+        .gte('scheduled_at', from.toUtc().toIso8601String());
+  }
+
   Future<void> deactivateMedication(String medicationId) async {
     await _client.from('medications').update({'active': false}).eq('id', medicationId);
   }

@@ -93,13 +93,13 @@ class DoseCard extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: onConfirm,
                       icon: const Icon(Icons.check_rounded),
-                      label: Text(l.taken),
+                      label: Text(l.doseStatus('TAKEN')),
                     ),
                   if (onSnooze != null)
                     OutlinedButton.icon(
                       onPressed: onSnooze,
                       icon: const Icon(Icons.schedule_rounded),
-                      label: Text(l.snooze),
+                      label: Text(l.doseStatus('SNOOZED')),
                     ),
                   if (onSkip != null)
                     TextButton.icon(

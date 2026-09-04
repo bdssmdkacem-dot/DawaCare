@@ -6,6 +6,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/date_time_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/dose_instance.dart';
+import '../../../../models/medication.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../doses/presentation/providers/dose_provider.dart';
 import '../../../medications/presentation/providers/medication_provider.dart';
@@ -57,9 +58,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
         try {
           await context.read<MedicationProvider>().load(userId);
         } finally {
-          if (mounted && _loadingMedicationPatientId == userId) {
-            _loadingMedicationPatientId = null;
-          }
+          if (mounted && _loadingMedicationPatientId == userId) _loadingMedicationPatientId = null;
         }
       });
     }
@@ -83,13 +82,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
       appBar: AppBar(
         titleSpacing: 20,
         title: Row(children: [
-          Container(
-            width: 34,
-            height: 34,
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(10)),
-            child: Image.asset('assets/icon/app_icon.png'),
-          ),
+          Container(width: 34, height: 34, padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(10)), child: Image.asset('assets/icon/app_icon.png')),
           const SizedBox(width: 10),
           Text(l.today),
         ]),
@@ -112,27 +105,25 @@ class _PatientHomePageState extends State<PatientHomePage> {
 
   Widget _buildBody(DoseProvider provider, MedicationProvider medicationProvider, AppLocalizations l) {
     if ((provider.isLoading || medicationProvider.isLoading) && provider.all.isEmpty) return const LoadingIndicator();
-    if (provider.error != null && provider.all.isEmpty) {
-      return EmptyState(icon: Icons.wifi_off_rounded, title: provider.error!, subtitle: l.pullToRetry);
-    }
+    if (provider.error != null && provider.all.isEmpty) return EmptyState(icon: Icons.wifi_off_rounded, title: provider.error!, subtitle: l.pullToRetry);
+
     final today = provider.todayDoses;
     if (today.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-        children: [
-          _dayHeader(l),
-          const SizedBox(height: 16),
-          _voiceMessagesButton(l),
-          const SizedBox(height: 28),
-          EmptyState(icon: Icons.check_circle_outline_rounded, title: l.noScheduledMedicines, subtitle: l.addFirstMedicine),
-        ],
-      );
+      return ListView(padding: const EdgeInsets.fromLTRB(16, 20, 16, 32), children: [
+        _dayHeader(l),
+        const SizedBox(height: 16),
+        _voiceMessagesButton(l),
+        const SizedBox(height: 28),
+        EmptyState(icon: Icons.check_circle_outline_rounded, title: l.noScheduledMedicines, subtitle: l.addFirstMedicine),
+      ]);
     }
+
     final now = DateTime.now();
     final next = today.firstWhere(
       (d) => d.status == DoseStatus.pending || d.status == DoseStatus.reminderSent || d.status == DoseStatus.snoozed,
       orElse: () => today.first,
     );
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
       children: [
@@ -141,7 +132,13 @@ class _PatientHomePageState extends State<PatientHomePage> {
         _voiceMessagesButton(l),
         const SizedBox(height: 16),
         ...today.map((dose) {
-          final medication = medicationProvider.medications.cast<dynamic>().where((m) => m.id == dose.medicationId).cast().firstOrNull;
+          Medication? medication;
+          for (final item in medicationProvider.medications) {
+            if (item.id == dose.medicationId) {
+              medication = item;
+              break;
+            }
+          }
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: DoseCard(
@@ -163,19 +160,11 @@ class _PatientHomePageState extends State<PatientHomePage> {
     final date = now ?? DateTime.now();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: .16), blurRadius: 16, offset: const Offset(0, 6))],
-      ),
+      decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: .16), blurRadius: 16, offset: const Offset(0, 6))]),
       child: Row(children: [
         Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.calendar_today_rounded, color: Colors.white)),
         const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(l.today, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 2),
-          Text(DateTimeUtils.relativeDayLabel(date), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-        ])),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l.today, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)), const SizedBox(height: 2), Text(DateTimeUtils.relativeDayLabel(date), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800))])),
         const Icon(Icons.medication_rounded, color: Colors.white, size: 28),
       ]),
     );
@@ -195,17 +184,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
 
   Future<void> _confirmSkip(DoseInstance dose) async {
     final l = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.skipDoseTitle),
-        content: Text(l.skippedDose(dose.medicationName)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l.skip)),
-        ],
-      ),
-    );
+    final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: Text(l.skipDoseTitle), content: Text(l.skippedDose(dose.medicationName)), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)), TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l.skip))]));
     if (confirmed == true && mounted) await context.read<DoseProvider>().skip(dose);
   }
 }

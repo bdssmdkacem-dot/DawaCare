@@ -40,6 +40,9 @@ class MedicationProvider extends ChangeNotifier {
     }
   }
 
+  Future<List<MedicationSchedule>> fetchSchedules(String medicationId) =>
+      _repo.fetchSchedules(medicationId);
+
   Future<bool> addMedication({
     required Medication medication,
     required MedicationSchedule schedule,
@@ -49,7 +52,6 @@ class MedicationProvider extends ChangeNotifier {
       final created = await _repo.createMedication(medication, imageBytes: imageBytes);
       final createdSchedule = await _repo.createSchedule(created.id, schedule);
       await _doseRepo.ensureDosesGenerated(created.patientId);
-
       final now = DateTime.now();
       final from = DateTime(now.year, now.month, now.day);
       final to = from.add(const Duration(days: 2, hours: 23));
@@ -57,7 +59,6 @@ class MedicationProvider extends ChangeNotifier {
       final medicationDoses = generatedDoses.where((dose) => dose.medicationId == created.id).toList();
       final policy = await _policyRepo.fetch(created.patientId);
       await ReminderEngine.syncUpcoming(medicationDoses, policy);
-
       medications.insert(0, created);
       schedulesByMedicationId[created.id] = [createdSchedule];
       notifyListeners();
@@ -74,21 +75,7 @@ class MedicationProvider extends ChangeNotifier {
       final path = await _repo.updateMedicationImage(medication: medication, bytes: bytes);
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
-        medications[index] = Medication(
-          id: medication.id,
-          patientId: medication.patientId,
-          name: medication.name,
-          genericName: medication.genericName,
-          strength: medication.strength,
-          dosageForm: medication.dosageForm,
-          instructions: medication.instructions,
-          imageUrl: path,
-          startDate: medication.startDate,
-          endDate: medication.endDate,
-          active: medication.active,
-          createdBy: medication.createdBy,
-          createdAt: medication.createdAt,
-        );
+        medications[index] = Medication(id: medication.id, patientId: medication.patientId, name: medication.name, genericName: medication.genericName, strength: medication.strength, dosageForm: medication.dosageForm, instructions: medication.instructions, imageUrl: path, startDate: medication.startDate, endDate: medication.endDate, active: medication.active, createdBy: medication.createdBy, createdAt: medication.createdAt);
         _imageUrlFutures.remove(medication.imageUrl);
         notifyListeners();
       }
@@ -105,21 +92,7 @@ class MedicationProvider extends ChangeNotifier {
       await _repo.removeMedicationImage(medication);
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
-        medications[index] = Medication(
-          id: medication.id,
-          patientId: medication.patientId,
-          name: medication.name,
-          genericName: medication.genericName,
-          strength: medication.strength,
-          dosageForm: medication.dosageForm,
-          instructions: medication.instructions,
-          imageUrl: null,
-          startDate: medication.startDate,
-          endDate: medication.endDate,
-          active: medication.active,
-          createdBy: medication.createdBy,
-          createdAt: medication.createdAt,
-        );
+        medications[index] = Medication(id: medication.id, patientId: medication.patientId, name: medication.name, genericName: medication.genericName, strength: medication.strength, dosageForm: medication.dosageForm, instructions: medication.instructions, imageUrl: null, startDate: medication.startDate, endDate: medication.endDate, active: medication.active, createdBy: medication.createdBy, createdAt: medication.createdAt);
         _imageUrlFutures.remove(medication.imageUrl);
         notifyListeners();
       }
@@ -131,12 +104,7 @@ class MedicationProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateSchedule(
-    MedicationSchedule schedule, {
-    required String patientId,
-    required String time,
-    required String doseAmount,
-  }) async {
+  Future<bool> updateSchedule(MedicationSchedule schedule, {required String patientId, required String time, required String doseAmount}) async {
     try {
       final now = DateTime.now();
       final from = DateTime(now.year, now.month, now.day);
@@ -145,32 +113,12 @@ class MedicationProvider extends ChangeNotifier {
       for (final dose in oldDoses.where((d) => d.scheduleId == schedule.id && !isResolvedStatus(d.status))) {
         await ReminderEngine.cancelFor(dose.id);
       }
-
-      final updated = await _repo.updateSchedule(
-        MedicationSchedule(
-          id: schedule.id,
-          medicationId: schedule.medicationId,
-          type: schedule.type,
-          time: time,
-          daysOfWeek: schedule.daysOfWeek,
-          intervalDays: schedule.intervalDays,
-          doseAmount: doseAmount,
-          startDate: schedule.startDate,
-          endDate: schedule.endDate,
-          timezone: schedule.timezone,
-        ),
-      );
-
+      final updated = await _repo.updateSchedule(MedicationSchedule(id: schedule.id, medicationId: schedule.medicationId, type: schedule.type, time: time, daysOfWeek: schedule.daysOfWeek, intervalDays: schedule.intervalDays, doseAmount: doseAmount, startDate: schedule.startDate, endDate: schedule.endDate, timezone: schedule.timezone));
       await _repo.deleteFuturePendingDoses(schedule.id, from);
       await _doseRepo.ensureDosesGenerated(patientId);
-
       final refreshed = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
       final policy = await _policyRepo.fetch(patientId);
-      await ReminderEngine.syncUpcoming(
-        refreshed.where((d) => d.scheduleId == schedule.id).toList(),
-        policy,
-      );
-
+      await ReminderEngine.syncUpcoming(refreshed.where((d) => d.scheduleId == schedule.id).toList(), policy);
       final list = schedulesByMedicationId[schedule.medicationId];
       if (list != null) {
         final index = list.indexWhere((s) => s.id == schedule.id);

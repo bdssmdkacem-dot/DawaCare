@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
-import '../../../../app/theme/app_colors.dart';
-import '../../../../core/localization/app_localizations.dart';
-import '../../../../core/utils/date_time_utils.dart';
+
+import '../../../../l10n/app_localizations.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
+import '../../../../theme/app_colors.dart';
 
 class DoseCard extends StatelessWidget {
   final DoseInstance dose;
   final Medication? medication;
   final Future<String?>? imageUrlFuture;
-  final VoidCallback? onConfirm, onSnooze, onSkip, onTap;
+  final VoidCallback? onConfirm;
+  final VoidCallback? onSnooze;
+  final VoidCallback? onSkip;
+  final VoidCallback? onTap;
   final bool compact;
 
   const DoseCard({
@@ -28,7 +31,6 @@ class DoseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final statusColor = AppColors.statusColor(_dbStatus);
     final actionable = dose.status == DoseStatus.pending ||
         dose.status == DoseStatus.reminderSent ||
         dose.status == DoseStatus.snoozed;
@@ -42,10 +44,7 @@ class DoseCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _MedicationImage(
-                  imageUrlFuture: imageUrlFuture,
-                  size: compact ? 54 : 64,
-                ),
+                _MedicationImage(future: imageUrlFuture, compact: compact),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -53,52 +52,60 @@ class DoseCard extends StatelessWidget {
                     children: [
                       Text(
                         dose.medicationName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('${dose.doseAmount} • ${_time(dose.scheduledAt)}'),
+                      if (medication != null) ...[
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            if ((medication!.genericName ?? '').isNotEmpty)
+                              Text(medication!.genericName!, style: theme.textTheme.bodySmall),
+                            if ((medication!.strength ?? '').isNotEmpty)
+                              Text(medication!.strength!, style: theme.textTheme.bodySmall),
+                            if ((medication!.dosageForm ?? '').isNotEmpty)
+                              Text(medication!.dosageForm!, style: theme.textTheme.bodySmall),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${l.doseAmount}: ${dose.doseAmount} · ${DateTimeUtils.formatTime(dose.scheduledAt)}',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      if (!compact && medication != null) ...[
-                        const SizedBox(height: 7),
-                        _MedicationDetails(medication: medication!),
+                        if ((medication!.instructions ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(medication!.instructions!, style: theme.textTheme.bodySmall),
+                        ],
                       ],
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                _StatusChip(status: dose.status),
+                _StatusChip(status: dose.status, label: l.doseStatus(doseStatusToDb(dose.status))),
               ],
             ),
-            if (actionable && !compact) ...[
-              const SizedBox(height: 14),
-              Row(
+            if (actionable && (onConfirm != null || onSnooze != null || onSkip != null)) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton.icon(
+                  if (onConfirm != null)
+                    FilledButton.icon(
                       onPressed: onConfirm,
-                      icon: const Icon(Icons.check_circle_rounded, size: 20),
-                      label: Text(_tr(context, 'أخذت الدواء', 'I took it', 'J’ai pris le médicament')),
+                      icon: const Icon(Icons.check_rounded),
+                      label: Text(l.taken),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
+                  if (onSnooze != null)
+                    OutlinedButton.icon(
                       onPressed: onSnooze,
-                      child: Text(_tr(context, 'لاحقًا', 'Later', 'Plus tard')),
+                      icon: const Icon(Icons.schedule_rounded),
+                      label: Text(l.snooze),
                     ),
-                  ),
+                  if (onSkip != null)
+                    TextButton.icon(
+                      onPressed: onSkip,
+                      icon: const Icon(Icons.close_rounded),
+                      label: Text(l.skip),
+                    ),
                 ],
-              ),
-              TextButton(
-                onPressed: onSkip,
-                child: Text(l.skip),
               ),
             ],
           ],
@@ -107,152 +114,88 @@ class DoseCard extends StatelessWidget {
     );
 
     if (onTap == null) return card;
-    return Semantics(
-      button: true,
-      label: _tr(context, 'فتح ${dose.medicationName}', 'Open ${dose.medicationName}', 'Ouvrir ${dose.medicationName}'),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: card,
-      ),
-    );
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(16), child: card);
   }
 
-  String get _dbStatus => switch (dose.status) {
-        DoseStatus.pending => 'PENDING',
-        DoseStatus.reminderSent => 'REMINDER_SENT',
-        DoseStatus.snoozed => 'SNOOZED',
-        DoseStatus.taken => 'TAKEN',
-        DoseStatus.missed => 'MISSED',
-        DoseStatus.skipped => 'SKIPPED',
-        DoseStatus.cancelled => 'CANCELLED',
-      };
+  String _time(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 }
 
 class _MedicationImage extends StatelessWidget {
-  final Future<String?>? imageUrlFuture;
-  final double size;
+  final Future<String?>? future;
+  final bool compact;
 
-  const _MedicationImage({required this.imageUrlFuture, required this.size});
+  const _MedicationImage({required this.future, required this.compact});
 
   @override
   Widget build(BuildContext context) {
-    final placeholder = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: .09),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: size * .48),
-    );
-
-    if (imageUrlFuture == null) return placeholder;
-
+    final size = compact ? 54.0 : 64.0;
+    if (future == null) {
+      return _placeholder(size);
+    }
     return FutureBuilder<String?>(
-      future: imageUrlFuture,
+      future: future,
       builder: (context, snapshot) {
         final url = snapshot.data;
-        if (url == null || url.isEmpty) return placeholder;
-        return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: .09),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          clipBehavior: Clip.antiAlias,
+        if (url == null || url.isEmpty) return _placeholder(size);
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
           child: Image.network(
             url,
+            width: size,
+            height: size,
             fit: BoxFit.cover,
-            cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-            cacheHeight: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-            errorBuilder: (_, __, ___) => placeholder,
+            cacheWidth: compact ? 162 : 192,
+            cacheHeight: compact ? 162 : 192,
+            errorBuilder: (_, __, ___) => _placeholder(size),
           ),
         );
       },
     );
   }
+
+  Widget _placeholder(double size) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.medication_rounded),
+      );
 }
-
-class _MedicationDetails extends StatelessWidget {
-  final Medication medication;
-  const _MedicationDetails({required this.medication});
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final details = <String>[];
-    if (medication.strength?.trim().isNotEmpty == true) details.add(medication.strength!.trim());
-    if (medication.dosageForm?.trim().isNotEmpty == true) details.add(l.dosageFormLabel(medication.dosageForm!.trim()));
-    if (medication.genericName?.trim().isNotEmpty == true) details.add(medication.genericName!.trim());
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (details.isNotEmpty)
-          Text(
-            details.join(' · '),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        if (medication.instructions?.trim().isNotEmpty == true) ...[
-          const SizedBox(height: 3),
-          Text(
-            medication.instructions!.trim(),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-String _tr(BuildContext c, String ar, String en, String fr) =>
-    switch (AppLocalizations.of(c).locale.languageCode) {
-      'en' => en,
-      'fr' => fr,
-      _ => ar,
-    };
 
 class _StatusChip extends StatelessWidget {
   final DoseStatus status;
-  const _StatusChip({required this.status});
+  final String label;
+
+  const _StatusChip({required this.status, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final color = switch (status) {
-      DoseStatus.taken => AppColors.success,
-      DoseStatus.missed => AppColors.danger,
-      DoseStatus.snoozed => AppColors.warning,
-      DoseStatus.reminderSent => AppColors.warning,
-      DoseStatus.skipped => AppColors.neutral,
-      DoseStatus.cancelled => AppColors.neutral,
-      DoseStatus.pending => AppColors.primary,
-    };
-    final label = switch (status) {
-      DoseStatus.taken => 'TAKEN',
-      DoseStatus.missed => 'MISSED',
-      DoseStatus.snoozed => 'SNOOZED',
-      DoseStatus.reminderSent => 'REMINDER_SENT',
-      DoseStatus.skipped => 'SKIPPED',
-      DoseStatus.cancelled => 'CANCELLED',
-      DoseStatus.pending => 'PENDING',
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        l.doseStatus(label),
-        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w800),
-      ),
+    return Chip(
+      avatar: Icon(_icon, size: 16),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
     );
+  }
+
+  IconData get _icon {
+    switch (status) {
+      case DoseStatus.taken:
+        return Icons.check_circle_rounded;
+      case DoseStatus.missed:
+        return Icons.warning_rounded;
+      case DoseStatus.snoozed:
+        return Icons.schedule_rounded;
+      case DoseStatus.skipped:
+        return Icons.remove_circle_outline_rounded;
+      case DoseStatus.cancelled:
+        return Icons.cancel_outlined;
+      case DoseStatus.reminderSent:
+        return Icons.notifications_active_rounded;
+      case DoseStatus.pending:
+        return Icons.access_time_rounded;
+    }
   }
 }

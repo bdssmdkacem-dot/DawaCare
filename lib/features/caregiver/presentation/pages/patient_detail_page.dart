@@ -10,6 +10,7 @@ import '../../../../models/medication.dart';
 import '../../../doses/presentation/providers/dose_provider.dart';
 import '../../../medications/presentation/providers/medication_provider.dart';
 import '../../../patient/presentation/widgets/dose_card.dart';
+import '../../data/caregiver_repository.dart';
 import '../../domain/adherence_calculator.dart';
 import '../widgets/adherence_chart.dart';
 import 'caregiver_medication_detail_page.dart';
@@ -216,6 +217,7 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
 
   Future<void> _confirmUnlink(BuildContext context) async {
     final l = AppLocalizations.of(context);
+    final repository = context.read<CaregiverRepository>();
     final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
       title: Text(l.removeLink),
       content: Text(_tr(context, 'هل تريد إزالة هذا الارتباط؟', 'Remove this connection?', 'Supprimer cette liaison ?')),
@@ -223,9 +225,10 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     ));
     if (confirmed != true || !mounted) return;
     try {
-      await context.read<CaregiverRepository>().unlink(widget.link.id);
+      await repository.unlink(widget.link.id);
     } catch (_) {}
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return;
+    Navigator.pop(this.context);
   }
 }
 

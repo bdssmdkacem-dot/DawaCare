@@ -221,8 +221,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
         const SizedBox(height: 10),
         if (today.isEmpty)
           _emptySection('لا توجد جرعات مجدولة لك اليوم.')
-        else
-          _buildOwnDoses(today, medicationProvider),
+        else ..._buildOwnDoses(today, medicationProvider),
         if (_loadingFollowed || hasFollowedPatients) ...[
           const SizedBox(height: 22),
           _sectionTitle('أدوية الأشخاص الذين أتابعهم', Icons.groups_rounded),
@@ -234,8 +233,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
             )
           else if (_followedError != null && !hasFollowedDoses)
             _emptySection(_followedError!)
-          else
-            _buildFollowedPatients(),
+          else ..._buildFollowedPatients(),
         ],
       ],
     );

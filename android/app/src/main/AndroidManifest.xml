@@ -8,6 +8,11 @@
         android:label="DawaCare"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Fallback channel for FCM notifications when Android handles the
+             notification directly while the app is in background/closed. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="caregiver_alerts" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

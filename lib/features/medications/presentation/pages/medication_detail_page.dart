@@ -178,7 +178,7 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
         child: Column(
           children: [
             Row(children: [
-              Expanded(child: _metric(context, Icons.today_rounded, AppLocalizations.of(context).today, '$todayDoses.length')),
+              Expanded(child: _metric(context, Icons.today_rounded, AppLocalizations.of(context).today, '${todayDoses.length}')),
               Expanded(child: _metric(context, Icons.check_circle_outline_rounded, _tr('تم أخذها', 'Taken', 'Prises'), '$taken')),
               Expanded(child: _metric(context, Icons.warning_amber_rounded, _tr('فاتت', 'Missed', 'Manquées'), '$missed')),
             ]),

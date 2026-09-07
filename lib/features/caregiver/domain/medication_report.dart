@@ -1,4 +1,4 @@
-import '../../../../models/dose_instance.dart';
+import '../../../models/dose_instance.dart';
 
 class MedicationReport {
   final String medicationId;
@@ -20,11 +20,7 @@ class MedicationReport {
   });
 
   int get resolved => taken + missed + skipped;
-
-  double get adherence {
-    if (resolved == 0) return 0;
-    return taken / resolved;
-  }
+  double get adherence => resolved == 0 ? 0 : taken / resolved;
 
   factory MedicationReport.fromDoses(String medicationId, String name, List<DoseInstance> doses) {
     return MedicationReport(
@@ -58,7 +54,6 @@ class AdherenceReport {
   int get skipped => doses.where((d) => d.status == DoseStatus.skipped).length;
   int get pending => doses.where((d) => !isResolvedStatus(d.status)).length;
   int get resolved => taken + missed + skipped;
-
   double get adherence => resolved == 0 ? 0 : taken / resolved;
 
   Map<DateTime, int> get takenByDay {
@@ -78,8 +73,7 @@ class AdherenceReport {
     final medicationReports = grouped.entries.map((entry) {
       final name = entry.value.first.medicationName;
       return MedicationReport.fromDoses(entry.key, name, entry.value);
-    }).toList()
-      ..sort((a, b) => a.medicationName.compareTo(b.medicationName));
+    }).toList()..sort((a, b) => a.medicationName.compareTo(b.medicationName));
     return AdherenceReport(from: from, to: to, doses: doses, medications: medicationReports);
   }
 }

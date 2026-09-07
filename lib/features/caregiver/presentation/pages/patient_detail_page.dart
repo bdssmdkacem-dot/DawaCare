@@ -14,6 +14,7 @@ import '../../domain/adherence_calculator.dart';
 import '../providers/caregiver_provider.dart';
 import '../widgets/adherence_chart.dart';
 import 'caregiver_medication_detail_page.dart';
+import 'medication_reports_page.dart';
 import 'voice_recorder_page.dart';
 
 class PatientDetailPage extends StatefulWidget {
@@ -84,6 +85,13 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     )));
   }
 
+  void _openReports() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => MedicationReportsPage(
+      patientId: widget.link.patientId,
+      patientName: widget.link.patientName,
+    )));
+  }
+
   void _openMedication(Medication medication) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => CaregiverMedicationDetailPage(
       medication: medication,
@@ -150,6 +158,27 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     );
   }
 
+  Widget _reportsCard(BuildContext context) => Card(
+    margin: const EdgeInsets.only(bottom: 4),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: _openReports,
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Row(children: [
+          Container(width: 52, height: 52, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.analytics_rounded, color: AppColors.primary, size: 27)),
+          const SizedBox(width: 13),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_tr(context, 'تقارير الالتزام', 'Adherence reports', 'Rapports d’observance'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            const SizedBox(height: 3),
+            Text(_tr(context, 'اليوم والأسبوع والشهر ونسبة الالتزام حسب الدواء.', 'Today, week, month and adherence by medication.', 'Jour, semaine, mois et observance par médicament.')),
+          ])),
+          const Icon(Icons.chevron_right_rounded),
+        ]),
+      ),
+    ),
+  );
+
   Widget _medicationTile(Medication medication) {
     final imageFuture = _patientMedicationProvider.signedMedicationImageUrl(medication.imageUrl);
     return Card(
@@ -197,6 +226,8 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
           appBar: AppBar(title: Text(widget.link.patientName)),
           body: loading && p.all.isEmpty && medications.medications.isEmpty ? const LoadingIndicator() : RefreshIndicator(onRefresh: _loadPatientData, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 14, 16, 32), children: [
             _patientHero(context),
+            const SizedBox(height: 14),
+            _reportsCard(context),
             const SizedBox(height: 18),
             _sectionHeader(context, _tr(context, 'أدوية المريض', 'Patient medications', 'Médicaments du patient'), icon: Icons.medication_rounded),
             if (medications.medications.isEmpty) Card(child: Padding(padding: const EdgeInsets.all(18), child: Text(l.noScheduledMedicines, textAlign: TextAlign.center))) else ...medications.medications.map(_medicationTile),

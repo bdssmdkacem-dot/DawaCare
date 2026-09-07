@@ -2,8 +2,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../models/caregiver_alert.dart';
 import '../../../models/caregiver_link.dart';
+import '../../../models/dose_instance.dart';
 import '../../../models/family_link_code.dart';
 import '../../../models/family_link_request.dart';
+import '../../../models/family_member_summary.dart';
 
 class FamilyLinkException implements Exception {
   final String code;
@@ -22,6 +24,31 @@ class CaregiverRepository {
         .eq('caregiver_id', caregiverId)
         .order('created_at');
     return rows.map((r) => CaregiverLink.fromMap(r)).toList();
+  }
+
+  Future<FamilyMemberSummary> fetchMemberSummary(String patientId) async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+    final results = await Future.wait([
+      _client.from('medications').select('id').eq('patient_id', patientId).eq('active', true),
+      _client
+          .from('dose_instances')
+          .select('*')
+          .eq('patient_id', patientId)
+          .gte('scheduled_at', start.toUtc().toIso8601String())
+          .lt('scheduled_at', end.toUtc().toIso8601String())
+          .order('scheduled_at'),
+    ]);
+    final medicationRows = results[0] as List;
+    final doseRows = results[1] as List;
+    final doses = doseRows
+        .map((row) => DoseInstance.fromMap(Map<String, dynamic>.from(row as Map)))
+        .toList();
+    return FamilyMemberSummary.fromDoses(
+      activeMedicationCount: medicationRows.length,
+      todayDoses: doses,
+    );
   }
 
   Future<void> unlink(String linkId) async {

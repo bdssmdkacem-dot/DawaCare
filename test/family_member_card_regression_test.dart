@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dawacare/app/theme/app_colors.dart';
 import 'package:dawacare/models/caregiver_link.dart';
+import 'package:dawacare/models/family_member_summary.dart';
 import 'package:dawacare/features/caregiver/presentation/widgets/family_member_card.dart';
 
 CaregiverLink _link({
@@ -81,5 +82,27 @@ void main() {
     expect(avatar.backgroundImage, isNull);
     expect(find.text('مأ'), findsOneWidget);
     expect(AppColors.primary, isNotNull);
+  });
+
+  testWidgets('family member card renders medication and adherence metrics', (tester) async {
+    const summary = FamilyMemberSummary(
+      activeMedicationCount: 4,
+      todayDoseCount: 6,
+      takenDoseCount: 5,
+      missedDoseCount: 1,
+      lastActivityAt: null,
+    );
+
+    await tester.pumpWidget(_app(FamilyMemberCard(
+      link: _link(),
+      summary: summary,
+      onOpen: () {},
+      onProfile: () {},
+    )));
+
+    expect(find.text('4'), findsOneWidget);
+    expect(find.text('6'), findsOneWidget);
+    expect(find.text('83%'), findsOneWidget);
+    expect(find.textContaining('1 جرعات فائتة اليوم'), findsOneWidget);
   });
 }

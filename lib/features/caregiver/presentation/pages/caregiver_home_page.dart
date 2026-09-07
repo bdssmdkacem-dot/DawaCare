@@ -11,6 +11,7 @@ import '../../../../models/caregiver_link.dart';
 import '../../../../models/family_link_request.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/caregiver_provider.dart';
+import '../widgets/family_member_card.dart';
 import '../widgets/link_code_sheet.dart';
 import 'patient_detail_page.dart';
 
@@ -241,6 +242,37 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
     );
   }
 
+  void _openFamilyMemberProfile(CaregiverLink link) {
+    final hasAvatar = link.patientAvatarUrl?.trim().isNotEmpty == true;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            CircleAvatar(
+              radius: 72,
+              backgroundImage: hasAvatar ? NetworkImage(link.patientAvatarUrl!.trim()) : null,
+              onBackgroundImageError: hasAvatar ? (_, __) {} : null,
+              child: hasAvatar ? null : const Icon(Icons.person_rounded, size: 52),
+            ),
+            const SizedBox(height: 16),
+            Text(link.patientName, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            Text(_roleLabel(context, link.role), style: Theme.of(context).textTheme.bodyMedium),
+            if ((link.relationshipLabel ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(link.relationshipLabel!.trim()),
+            ],
+            const SizedBox(height: 18),
+            SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.pop(dialogContext), child: Text(AppLocalizations.of(context).cancel))),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -252,6 +284,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
           : RefreshIndicator(
               onRefresh: _reload,
               child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
                 children: [
                   Container(
@@ -308,7 +341,11 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                       SizedBox(width: 220, child: PrimaryButton(label: l.requestFollowNow, onPressed: _openRequestLinkDialog, icon: Icons.person_add_alt_1_rounded)),
                     ])))
                   else
-                    ...provider.linkedPatients.map((link) => _PatientLinkTile(link: link)),
+                    ...provider.linkedPatients.map((link) => FamilyMemberCard(
+                      link: link,
+                      onOpen: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPage(link: link))),
+                      onProfile: () => _openFamilyMemberProfile(link),
+                    )),
                 ],
               ),
             ),
@@ -370,67 +407,6 @@ class _SentRequestTile extends StatelessWidget {
     subtitle: Text('${AppLocalizations.of(context).waitingApproval} · ${_roleLabel(context, request.role)}'),
     trailing: TextButton(onPressed: onCancel, child: Text(AppLocalizations.of(context).cancel)),
   ));
-}
-
-class _PatientLinkTile extends StatelessWidget {
-  final CaregiverLink link;
-  const _PatientLinkTile({required this.link});
-
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return 'م';
-    if (parts.length == 1) return parts.first.characters.take(2).toString().toUpperCase();
-    return (parts.first.characters.first.toString() + parts.last.characters.first.toString()).toUpperCase();
-  }
-
-  Future<void> _showProfile(BuildContext context) async {
-    final hasAvatar = link.patientAvatarUrl != null && link.patientAvatarUrl!.trim().isNotEmpty;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            CircleAvatar(
-              radius: 72,
-              backgroundImage: hasAvatar ? NetworkImage(link.patientAvatarUrl!) : null,
-              child: hasAvatar ? null : Text(_initials(link.patientName), style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900)),
-            ),
-            const SizedBox(height: 16),
-            Text(link.patientName, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 8),
-            Text(_roleLabel(context, link.role), style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 18),
-            SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.pop(context), child: Text(AppLocalizations.of(context).cancel))),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final relationship = link.relationshipLabel;
-    final subtitle = [if (relationship != null && relationship.isNotEmpty) relationship, _roleLabel(context, link.role)].join(' · ');
-    final hasAvatar = link.patientAvatarUrl != null && link.patientAvatarUrl!.trim().isNotEmpty;
-    return Card(
-      child: ListTile(
-        leading: GestureDetector(
-          onTap: () => _showProfile(context),
-          child: CircleAvatar(
-            radius: 25,
-            backgroundImage: hasAvatar ? NetworkImage(link.patientAvatarUrl!) : null,
-            child: hasAvatar ? null : Text(_initials(link.patientName), style: const TextStyle(fontWeight: FontWeight.w900)),
-          ),
-        ),
-        title: Text(link.patientName, style: const TextStyle(fontWeight: FontWeight.w800)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPage(link: link))),
-      ),
-    );
-  }
 }
 
 class _AlertTile extends StatelessWidget {

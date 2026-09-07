@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
-import '../../../../core/utils/date_time_utils.dart';
 import '../../../../models/caregiver_link.dart';
 
 /// Presentation-only card for a linked family member.
@@ -38,6 +37,20 @@ class FamilyMemberCard extends StatelessWidget {
       case CaregiverRole.caregiver:
         return _tr(context, 'مرافق', 'Caregiver', 'Accompagnant');
     }
+  }
+
+  String _createdLabel(BuildContext context) {
+    final elapsed = DateTime.now().difference(link.createdAt);
+    final days = elapsed.inDays;
+    if (days <= 0) return _tr(context, 'اليوم', 'Today', "Aujourd’hui");
+    if (days == 1) return _tr(context, 'منذ يوم', '1 day ago', 'Il y a 1 jour');
+    if (days < 7) return _tr(context, 'منذ $days أيام', '$days days ago', 'Il y a $days jours');
+    final weeks = days ~/ 7;
+    if (weeks == 1) return _tr(context, 'منذ أسبوع', '1 week ago', 'Il y a 1 semaine');
+    if (weeks < 5) return _tr(context, 'منذ $weeks أسابيع', '$weeks weeks ago', 'Il y a $weeks semaines');
+    final months = days ~/ 30;
+    if (months == 1) return _tr(context, 'منذ شهر', '1 month ago', 'Il y a 1 mois');
+    return _tr(context, 'منذ $months أشهر', '$months months ago', 'Il y a $months mois');
   }
 
   String _tr(BuildContext context, String ar, String en, String fr) {
@@ -127,7 +140,7 @@ class FamilyMemberCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      DateTimeUtils.relativeDayLabel(link.createdAt),
+                      _createdLabel(context),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],

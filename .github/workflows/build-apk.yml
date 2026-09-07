@@ -38,6 +38,17 @@ jobs:
           test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
           test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
+      - name: Verify checked out stock source
+        run: |
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo "FILE_SHA=$(git hash-object lib/features/medications/presentation/pages/medication_stock_detail_page.dart)"
+          echo "Checking for stale stock badge API references..."
+          if grep -nE "MedicationStockBadge|lowStockThreshold:|threshold:" lib/features/medications/presentation/pages/medication_stock_detail_page.dart; then
+            echo "ERROR: stale MedicationStockBadge API reference found in stock detail page"
+            exit 1
+          fi
+          echo "Stock detail page is decoupled from MedicationStockBadge."
+
       - name: Analyze
         run: flutter analyze
 

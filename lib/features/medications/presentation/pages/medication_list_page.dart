@@ -11,6 +11,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../doses/domain/dose_engine.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../providers/medication_provider.dart';
+import '../widgets/medication_stock_badge.dart';
 import 'add_edit_medication_page.dart';
 import 'medication_detail_page.dart';
 
@@ -74,6 +75,40 @@ class _MedicationListPageState extends State<MedicationListPage> {
     if (userId != null) await provider.load(userId);
   }
 
+  Future<void> _addStock(Medication medication) async {
+    final controller = TextEditingController();
+    final quantity = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(medication.stockEnabled ? 'إضافة مخزون ${medication.name}' : 'تفعيل عداد ${medication.name}'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            labelText: medication.stockEnabled ? 'الكمية المضافة' : 'الكمية الموجودة الآن',
+            suffixText: 'وحدة',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(ctx).cancel)),
+          FilledButton(
+            onPressed: () {
+              final value = double.tryParse(controller.text.trim());
+              if (value != null && value > 0) Navigator.pop(ctx, value);
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (quantity == null || !mounted) return;
+    final ok = await context.read<MedicationProvider>().addMedicationStock(medication: medication, quantity: quantity);
+    if (!mounted || ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<MedicationProvider>().error ?? 'تعذر تحديث المخزون')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -120,6 +155,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
             onChangeImage: () => _changeImage(med),
             onRemoveImage: med.imageUrl == null ? null : () => _removeImage(med),
             onDeactivate: () => _confirmDeactivate(med),
+            onAddStock: () => _addStock(med),
           );
         },
       ),
@@ -149,8 +185,9 @@ class _MedicationTile extends StatelessWidget {
   final VoidCallback onChangeImage;
   final VoidCallback? onRemoveImage;
   final VoidCallback onDeactivate;
+  final VoidCallback onAddStock;
 
-  const _MedicationTile({required this.medication, required this.schedules, required this.imageUrlFuture, required this.onTap, required this.onChangeImage, required this.onRemoveImage, required this.onDeactivate});
+  const _MedicationTile({required this.medication, required this.schedules, required this.imageUrlFuture, required this.onTap, required this.onChangeImage, required this.onRemoveImage, required this.onDeactivate, required this.onAddStock});
 
   @override
   Widget build(BuildContext context) {
@@ -198,6 +235,8 @@ class _MedicationTile extends StatelessWidget {
               ],
               const SizedBox(height: 4),
               Text(_periodLabel(context), style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              MedicationStockBadge(medication: medication, onAdd: onAddStock),
             ])),
             PopupMenuButton<String>(
               tooltip: l.medicines,

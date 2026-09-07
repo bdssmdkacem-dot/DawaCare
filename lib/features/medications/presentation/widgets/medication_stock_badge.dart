@@ -11,6 +11,11 @@ class MedicationStockBadge extends StatelessWidget {
   final VoidCallback? onSettings;
   final VoidCallback? onDetails;
 
+  // Compatibility with older callers. The medication setting remains the source
+  // of truth when neither override is supplied.
+  final double? threshold;
+  final double? lowStockThreshold;
+
   const MedicationStockBadge({
     super.key,
     required this.medication,
@@ -18,6 +23,8 @@ class MedicationStockBadge extends StatelessWidget {
     this.onAdd,
     this.onSettings,
     this.onDetails,
+    this.threshold,
+    this.lowStockThreshold,
   });
 
   @override
@@ -32,9 +39,9 @@ class MedicationStockBadge extends StatelessWidget {
     }
 
     final quantity = medication.stockQuantity;
-    final threshold = medication.lowStockThreshold;
+    final effectiveThreshold = lowStockThreshold ?? threshold ?? medication.lowStockThreshold;
     final empty = quantity <= 0;
-    final low = !empty && quantity <= threshold;
+    final low = !empty && quantity <= effectiveThreshold;
     final daily = _dailyConsumption();
     final days = daily > 0 ? quantity / daily : null;
     final color = empty ? theme.colorScheme.error : low ? theme.colorScheme.tertiary : AppColors.primary;
@@ -58,14 +65,14 @@ class MedicationStockBadge extends StatelessWidget {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(empty ? 'نفد الدواء' : 'متبقي ${_format(quantity)} ${_unitLabel(medication.stockUnit)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: color)),
                 const SizedBox(height: 2),
-                Text(empty ? 'أضف المخزون قبل الجرعة القادمة' : low ? 'المخزون منخفض • الحد ${_format(threshold)}' : 'المخزون بحالة جيدة', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                Text(empty ? 'أضف المخزون قبل الجرعة القادمة' : low ? 'المخزون منخفض • الحد ${_format(effectiveThreshold)}' : 'المخزون بحالة جيدة', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
               ])),
               if (onSettings != null) IconButton(tooltip: 'إعدادات المخزون', visualDensity: VisualDensity.compact, onPressed: onSettings, icon: const Icon(Icons.tune_rounded, size: 19)),
               if (onAdd != null) IconButton.filledTonal(tooltip: 'إضافة مخزون', visualDensity: VisualDensity.compact, onPressed: onAdd, icon: const Icon(Icons.add_rounded, size: 20)),
             ]),
             if (!empty) ...[
               const SizedBox(height: 9),
-              ClipRRect(borderRadius: BorderRadius.circular(20), child: LinearProgressIndicator(minHeight: 6, value: threshold > 0 ? (quantity / (threshold * 3)).clamp(0.0, 1.0).toDouble() : 1.0, backgroundColor: color.withValues(alpha: .10), valueColor: AlwaysStoppedAnimation<Color>(color))),
+              ClipRRect(borderRadius: BorderRadius.circular(20), child: LinearProgressIndicator(minHeight: 6, value: effectiveThreshold > 0 ? (quantity / (effectiveThreshold * 3)).clamp(0.0, 1.0).toDouble() : 1.0, backgroundColor: color.withValues(alpha: .10), valueColor: AlwaysStoppedAnimation<Color>(color))),
               const SizedBox(height: 7),
               Row(children: [
                 Icon(Icons.schedule_rounded, size: 15, color: theme.colorScheme.onSurfaceVariant),
@@ -86,12 +93,19 @@ class MedicationStockBadge extends StatelessWidget {
       final dose = _extractNumber(schedule.doseAmount);
       if (dose <= 0 || schedule.type == ScheduleType.prn) continue;
       switch (schedule.type) {
-        case ScheduleType.daily: total += dose; break;
+        case ScheduleType.daily:
+          total += dose;
+          break;
         case ScheduleType.weekly:
-        case ScheduleType.specificDays: total += dose * (schedule.daysOfWeek.isEmpty ? 1 : schedule.daysOfWeek.length) / 7; break;
-        case ScheduleType.interval: total += dose / (schedule.intervalDays ?? 1); break;
+        case ScheduleType.specificDays:
+          total += dose * (schedule.daysOfWeek.isEmpty ? 1 : schedule.daysOfWeek.length) / 7;
+          break;
+        case ScheduleType.interval:
+          total += dose / (schedule.intervalDays ?? 1);
+          break;
         case ScheduleType.once:
-        case ScheduleType.prn: break;
+        case ScheduleType.prn:
+          break;
       }
     }
     return total;

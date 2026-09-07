@@ -43,11 +43,11 @@ class MedicationRepository {
         created = Medication.fromMap(updated);
       }
 
-      if (created.stockEnabled && created.stockQuantity > 0) {
+      if (medication.stockEnabled && medication.stockQuantity > 0) {
         final newQuantity = await addStock(
           medicationId: created.id,
           patientId: created.patientId,
-          quantity: created.stockQuantity,
+          quantity: medication.stockQuantity,
           type: 'INITIAL',
           note: 'Initial medication stock',
         );
@@ -67,9 +67,9 @@ class MedicationRepository {
           createdAt: created.createdAt,
           stockEnabled: true,
           stockQuantity: newQuantity,
-          stockUnit: created.stockUnit,
-          packageQuantity: created.packageQuantity,
-          lowStockThreshold: created.lowStockThreshold,
+          stockUnit: medication.stockUnit,
+          packageQuantity: medication.packageQuantity,
+          lowStockThreshold: medication.lowStockThreshold,
         );
       }
     } catch (_) {
@@ -96,6 +96,26 @@ class MedicationRepository {
       'p_note': note,
     });
     return (result as num).toDouble();
+  }
+
+  Future<Map<String, dynamic>> updateStockSettings({
+    required String medicationId,
+    required String unit,
+    required double? packageQuantity,
+    required double threshold,
+  }) async {
+    final row = await _client
+        .from('medications')
+        .update({
+          'stock_enabled': true,
+          'stock_unit': unit,
+          'package_quantity': packageQuantity,
+          'low_stock_threshold': threshold,
+        })
+        .eq('id', medicationId)
+        .select()
+        .single();
+    return row;
   }
 
   Future<String> updateMedicationImage({

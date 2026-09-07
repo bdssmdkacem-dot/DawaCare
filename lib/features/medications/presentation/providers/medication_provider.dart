@@ -31,9 +31,7 @@ class MedicationProvider extends ChangeNotifier {
     try {
       medications = await _repo.fetchMedications(forPatientId);
       schedulesByMedicationId.clear();
-      for (final med in medications) {
-        schedulesByMedicationId[med.id] = await _repo.fetchSchedules(med.id);
-      }
+      for (final med in medications) schedulesByMedicationId[med.id] = await _repo.fetchSchedules(med.id);
     } catch (_) {
       error = 'تعذّر تحميل الأدوية.';
     } finally {
@@ -74,10 +72,11 @@ class MedicationProvider extends ChangeNotifier {
       return false;
     }
     try {
+      final unit = medication.stockEnabled ? medication.stockUnit : _unitForDosageForm(medication.dosageForm);
       if (!medication.stockEnabled) {
         await _repo.updateStockSettings(
           medicationId: medication.id,
-          unit: medication.stockUnit,
+          unit: unit,
           packageQuantity: medication.packageQuantity,
           threshold: medication.lowStockThreshold,
         );
@@ -91,7 +90,7 @@ class MedicationProvider extends ChangeNotifier {
       );
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
-        medications[index] = _copyMedication(medications[index], stockEnabled: true, stockQuantity: newQuantity);
+        medications[index] = _copyMedication(medications[index], stockEnabled: true, stockQuantity: newQuantity, stockUnit: unit);
         notifyListeners();
       }
       return true;
@@ -189,14 +188,36 @@ class MedicationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Medication _copyMedication(Medication medication, {String? imageUrl, bool? stockEnabled, double? stockQuantity}) {
+  String _unitForDosageForm(String? form) {
+    switch ((form ?? '').trim()) {
+      case 'كبسولة':
+      case 'Capsule':
+        return 'capsule';
+      case 'قرص':
+      case 'Tablet':
+        return 'tablet';
+      case 'شراب':
+      case 'Syrup':
+        return 'ml';
+      case 'قطرة':
+      case 'Drop':
+        return 'drop';
+      case 'حقنة':
+      case 'Injection':
+        return 'injection';
+      default:
+        return 'unit';
+    }
+  }
+
+  Medication _copyMedication(Medication medication, {String? imageUrl, bool? stockEnabled, double? stockQuantity, String? stockUnit}) {
     return Medication(
       id: medication.id, patientId: medication.patientId, name: medication.name, genericName: medication.genericName,
       strength: medication.strength, dosageForm: medication.dosageForm, instructions: medication.instructions,
       imageUrl: imageUrl ?? medication.imageUrl, startDate: medication.startDate, endDate: medication.endDate,
       active: medication.active, createdBy: medication.createdBy, createdAt: medication.createdAt,
       stockEnabled: stockEnabled ?? medication.stockEnabled, stockQuantity: stockQuantity ?? medication.stockQuantity,
-      stockUnit: medication.stockUnit, packageQuantity: medication.packageQuantity, lowStockThreshold: medication.lowStockThreshold,
+      stockUnit: stockUnit ?? medication.stockUnit, packageQuantity: medication.packageQuantity, lowStockThreshold: medication.lowStockThreshold,
     );
   }
 }

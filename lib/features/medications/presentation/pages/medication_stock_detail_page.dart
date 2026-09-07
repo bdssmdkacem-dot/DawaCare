@@ -206,6 +206,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
             MedicationStockBadge(
               medication: _medication,
               schedules: _schedules,
+              threshold: _medication.lowStockThreshold,
               onAdd: _medication.stockEnabled ? _addStock : null,
               onSettings: _editSettings,
             ),

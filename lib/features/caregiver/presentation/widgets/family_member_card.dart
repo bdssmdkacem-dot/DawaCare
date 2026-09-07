@@ -42,7 +42,7 @@ class FamilyMemberCard extends StatelessWidget {
   String _createdLabel(BuildContext context) {
     final elapsed = DateTime.now().difference(link.createdAt);
     final days = elapsed.inDays;
-    if (days <= 0) return _tr(context, 'اليوم', 'Today', "Aujourd’hui");
+    if (days <= 0) return _tr(context, 'اليوم', 'Today', 'Aujourd’hui');
     if (days == 1) return _tr(context, 'منذ يوم', '1 day ago', 'Il y a 1 jour');
     if (days < 7) return _tr(context, 'منذ $days أيام', '$days days ago', 'Il y a $days jours');
     final weeks = days ~/ 7;

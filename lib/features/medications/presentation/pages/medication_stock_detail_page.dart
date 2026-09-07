@@ -1,21 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
-import '../../data/medication_repository.dart';
 import '../providers/medication_provider.dart';
 
 class MedicationStockDetailPage extends StatefulWidget {
-  const MedicationStockDetailPage({
-    super.key,
-    required this.medication,
-    required this.schedules,
-  });
-
   final Medication medication;
-  final List<MedicationSchedule> schedules;
+
+  const MedicationStockDetailPage({super.key, required this.medication});
 
   @override
   State<MedicationStockDetailPage> createState() => _MedicationStockDetailPageState();
@@ -23,77 +16,98 @@ class MedicationStockDetailPage extends StatefulWidget {
 
 class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
   late Medication _medication;
-  late List<MedicationSchedule> _schedules;
-  final _repository = MedicationRepository();
-  bool _loadingHistory = true;
-  List<Map<String, dynamic>> _transactions = const [];
+  List<MedicationSchedule> _schedules = const [];
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _medication = widget.medication;
-    _schedules = widget.schedules;
-    _loadHistory();
+    _load();
   }
 
-  Future<void> _loadHistory() async {
-    if (mounted) setState(() => _loadingHistory = true);
+  Future<void> _load() async {
     try {
-      final rows = await _repository.fetchStockTransactions(_medication.id);
+      final provider = context.read<MedicationProvider>();
+      final schedules = await provider.fetchSchedules(_medication.id);
       if (!mounted) return;
       setState(() {
-        _transactions = rows;
-        _loadingHistory = false;
+        _schedules = schedules;
+        _loading = false;
+        _error = null;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loadingHistory = false);
+      setState(() {
+        _loading = false;
+        _error = 'تعذّر تحميل بيانات المخزون.';
+      });
     }
   }
 
-  String _unitLabel(String? value) {
-    switch (value) {
-      case 'capsule': return 'كبسولة';
-      case 'tablet': return 'قرص';
-      case 'ml': return 'مل';
-      case 'drop': return 'قطرة';
-      case 'injection': return 'حقنة';
-      case 'spoon': return 'ملعقة';
-      default: return 'وحدة';
+  double _calculateDailyConsumption() {
+    var total = 0.0;
+    for (final schedule in _schedules) {
+      final dose = _extractNumber(schedule.doseAmount);
+      if (dose <= 0) continue;
+      switch (schedule.type.toLowerCase()) {
+        case 'daily':
+          total += dose;
+          break;
+        case 'weekly':
+          total += dose / 7;
+          break;
+        case 'monthly':
+          total += dose / 30;
+          break;
+        case 'interval':
+          final days = schedule.intervalDays <= 0 ? 1 : schedule.intervalDays;
+          total += dose / days;
+          break;
+        default:
+          total += dose;
+      }
     }
+    return total;
   }
 
-  String _transactionLabel(String? type) {
-    switch (type) {
-      case 'INITIAL': return 'رصيد أولي';
-      case 'ADD': return 'إضافة مخزون';
-      case 'TAKEN': return 'استهلاك جرعة';
-      case 'ADJUSTMENT': return 'تعديل المخزون';
-      default: return type ?? 'عملية';
-    }
+  double _extractNumber(String value) {
+    final match = RegExp(r'[-+]?\d+(?:[.,]\d+)?').firstMatch(value.trim());
+    if (match == null) return 0;
+    return double.tryParse(match.group(0)!.replaceAll(',', '.')) ?? 0;
+  }
+
+  String _formatNumber(double value) {
+    if (value == value.roundToDouble()) return value.toInt().toString();
+    return value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+  }
+
+  String _stockStatus() {
+    final quantity = _medication.stockQuantity;
+    final threshold = _medication.lowStockThreshold;
+    if (quantity <= 0) return 'منتهي';
+    if (quantity <= threshold) return 'منخفض';
+    return 'جيد';
   }
 
   Future<void> _addStock() async {
     final controller = TextEditingController();
-    final quantity = await showDialog<double>(
+    final result = await showDialog<double>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('إضافة مخزون'),
         content: TextField(
           controller: controller,
-          autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
-            labelText: 'الكمية',
-            suffixText: _unitLabel(_medication.stockUnit),
-          ),
+          decoration: InputDecoration(labelText: 'الكمية (${_medication.stockUnit})'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           FilledButton(
             onPressed: () {
               final value = double.tryParse(controller.text.trim().replaceAll(',', '.'));
-              if (value != null && value > 0) Navigator.pop(ctx, value);
+              Navigator.pop(ctx, value);
             },
             child: const Text('إضافة'),
           ),
@@ -102,27 +116,23 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
     );
     controller.dispose();
 
-    if (quantity == null || !mounted) return;
+    if (!mounted || result == null || result <= 0) return;
     final provider = context.read<MedicationProvider>();
-    final ok = await provider.addMedicationStock(
-      medication: _medication,
-      quantity: quantity,
-    );
+    final ok = await provider.addMedicationStock(medication: _medication, quantity: result);
     if (!mounted) return;
     if (ok) {
       final updated = provider.medications.where((m) => m.id == _medication.id).firstOrNull;
       if (updated != null) setState(() => _medication = updated);
-      await _loadHistory();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر تحديث المخزون')),
-      );
     }
   }
 
   Future<void> _editSettings() async {
-    final package = TextEditingController(text: _medication.packageQuantity?.toString() ?? '');
-    final threshold = TextEditingController(text: _medication.lowStockThreshold.toString());
+    final package = TextEditingController(
+      text: _medication.packageQuantity?.toString() ?? '',
+    );
+    final threshold = TextEditingController(
+      text: _medication.lowStockThreshold.toString(),
+    );
     var unit = _medication.stockUnit;
 
     final result = await showDialog<bool>(
@@ -130,36 +140,37 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           title: const Text('إعدادات المخزون'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: unit,
-                decoration: const InputDecoration(labelText: 'الوحدة'),
-                items: const [
-                  DropdownMenuItem(value: 'capsule', child: Text('كبسولة')),
-                  DropdownMenuItem(value: 'tablet', child: Text('قرص')),
-                  DropdownMenuItem(value: 'ml', child: Text('مل')),
-                  DropdownMenuItem(value: 'drop', child: Text('قطرة')),
-                  DropdownMenuItem(value: 'injection', child: Text('حقنة')),
-                  DropdownMenuItem(value: 'spoon', child: Text('ملعقة')),
-                  DropdownMenuItem(value: 'unit', child: Text('وحدة')),
-                ],
-                onChanged: (value) => setDialogState(() => unit = value ?? unit),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: package,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'حجم العبوة (اختياري)'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: threshold,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'حد التنبيه للمخزون المنخفض'),
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: unit,
+                  decoration: const InputDecoration(labelText: 'الوحدة'),
+                  items: const [
+                    DropdownMenuItem(value: 'unit', child: Text('وحدة')),
+                    DropdownMenuItem(value: 'tablet', child: Text('قرص')),
+                    DropdownMenuItem(value: 'capsule', child: Text('كبسولة')),
+                    DropdownMenuItem(value: 'ml', child: Text('مل')),
+                    DropdownMenuItem(value: 'drop', child: Text('قطرة')),
+                    DropdownMenuItem(value: 'injection', child: Text('حقنة')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setDialogState(() => unit = value);
+                  },
+                ),
+                TextField(
+                  controller: package,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'كمية العبوة'),
+                ),
+                TextField(
+                  controller: threshold,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'حد المخزون المنخفض'),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
@@ -181,7 +192,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       medication: _medication,
       unit: unit,
       packageQuantity: packageValue,
-      lowStockThreshold: thresholdValue,
+      threshold: thresholdValue,
     );
     if (!mounted) return;
     if (ok) {
@@ -196,247 +207,90 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final dailyConsumption = _calculateDailyConsumption(_schedules);
-    final daysRemaining = dailyConsumption > 0
-        ? _medication.stockQuantity / dailyConsumption
-        : null;
-    final unit = _unitLabel(_medication.stockUnit);
-    final threshold = _medication.lowStockThreshold;
-    final isDepleted = _medication.stockQuantity <= 0;
-    final isLow = !isDepleted && _medication.stockQuantity <= threshold;
+    final daily = _calculateDailyConsumption();
+    final daysRemaining = daily > 0 ? _medication.stockQuantity / daily : null;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('مخزون ${_medication.name}'),
+        title: Text(_medication.name),
         actions: [
-          IconButton(
-            tooltip: 'تحديث',
-            onPressed: _loadHistory,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
+          IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadHistory,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          child: Icon(
-                            isDepleted
-                                ? Icons.warning_amber_rounded
-                                : isLow
-                                    ? Icons.inventory_2_outlined
-                                    : Icons.inventory_2_rounded,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Text(_error!))
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'الرصيد الحالي',
-                                style: Theme.of(context).textTheme.titleMedium,
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('المخزون الحالي', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  Chip(label: Text(_stockStatus())),
+                                ],
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 12),
                               Text(
-                                '${_formatNumber(_medication.stockQuantity)} $unit',
-                                style: Theme.of(context).textTheme.headlineSmall,
+                                '${_formatNumber(_medication.stockQuantity)} ${_medication.stockUnit}',
+                                style: Theme.of(context).textTheme.headlineMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              _InfoRow(label: 'حد المخزون المنخفض', value: '${_formatNumber(_medication.lowStockThreshold)} ${_medication.stockUnit}'),
+                              if (_medication.packageQuantity != null)
+                                _InfoRow(label: 'كمية العبوة', value: '${_formatNumber(_medication.packageQuantity!)} ${_medication.stockUnit}'),
+                              _InfoRow(label: 'الاستهلاك اليومي المتوقع', value: daily > 0 ? '${_formatNumber(daily)} ${_medication.stockUnit}' : 'غير متاح'),
+                              if (daysRemaining != null)
+                                _InfoRow(label: 'الأيام المتبقية تقديريًا', value: _formatNumber(daysRemaining)),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(child: FilledButton.icon(onPressed: _addStock, icon: const Icon(Icons.add), label: const Text('إضافة مخزون'))),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: OutlinedButton.icon(onPressed: _editSettings, icon: const Icon(Icons.settings), label: const Text('الإعدادات'))),
+                                ],
                               ),
                             ],
                           ),
                         ),
-                        if (isDepleted)
-                          const Chip(label: Text('منتهي'))
-                        else if (isLow)
-                          const Chip(label: Text('منخفض'))
-                        else
-                          const Chip(label: Text('جيد')),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        if (_medication.stockEnabled)
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: _addStock,
-                              icon: const Icon(Icons.add_rounded),
-                              label: const Text('إضافة مخزون'),
-                            ),
-                          ),
-                        if (_medication.stockEnabled) const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _editSettings,
-                            icon: const Icon(Icons.settings_outlined),
-                            label: const Text('الإعدادات'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('ملخص الاستهلاك', style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 12),
-                    _InfoRow(
-                      label: 'الاستهلاك اليومي المتوقع',
-                      value: dailyConsumption > 0
-                          ? '${_formatNumber(dailyConsumption)} $unit'
-                          : 'غير محدد',
-                    ),
-                    if (daysRemaining != null) ...[
-                      const SizedBox(height: 8),
-                      _InfoRow(
-                        label: 'المدة التقديرية',
-                        value: '${_formatNumber(daysRemaining)} يوم',
                       ),
                     ],
-                    const SizedBox(height: 8),
-                    _InfoRow(
-                      label: 'حد التنبيه',
-                      value: '${_formatNumber(threshold)} $unit',
-                    ),
-                    if (_medication.packageQuantity != null) ...[
-                      const SizedBox(height: 8),
-                      _InfoRow(
-                        label: 'حجم العبوة',
-                        value: '${_formatNumber(_medication.packageQuantity!)} $unit',
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('سجل المخزون', style: Theme.of(context).textTheme.titleMedium),
-                if (_medication.stockEnabled)
-                  FilledButton.tonalIcon(
-                    onPressed: _addStock,
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('إضافة'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (_loadingHistory)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: LoadingIndicator(),
-              )
-            else if (_transactions.isEmpty)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(child: Text('لا توجد عمليات مخزون بعد.')),
-                ),
-              )
-            else
-              ..._transactions.map(
-                (row) => Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      child: Icon(
-                        (row['transaction_type'] as String?) == 'TAKEN'
-                            ? Icons.remove_rounded
-                            : Icons.add_rounded,
-                      ),
-                    ),
-                    title: Text(_transactionLabel(row['transaction_type'] as String?)),
-                    subtitle: Text((row['created_at'] as String?) ?? ''),
-                    trailing: Text(
-                      '${_formatNumber((row['quantity'] as num?)?.toDouble() ?? 0)} $unit',
-                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
-      ),
     );
-  }
-
-  double _calculateDailyConsumption(List<MedicationSchedule> schedules) {
-    double total = 0;
-    for (final schedule in schedules) {
-      final dose = _extractNumber(schedule.doseAmount);
-      if (dose <= 0 || schedule.type == ScheduleType.prn) continue;
-      switch (schedule.type) {
-        case ScheduleType.daily:
-          total += dose;
-          break;
-        case ScheduleType.weekly:
-        case ScheduleType.specificDays:
-          total += dose * (schedule.daysOfWeek.isEmpty ? 1 : schedule.daysOfWeek.length) / 7;
-          break;
-        case ScheduleType.interval:
-          total += dose / (schedule.intervalDays ?? 1);
-          break;
-        case ScheduleType.once:
-        case ScheduleType.prn:
-          break;
-      }
-    }
-    return total;
-  }
-
-  double _extractNumber(String value) {
-    final match = RegExp(r'\d+(?:[.,]\d+)?').firstMatch(value.trim());
-    return match == null ? 0 : double.tryParse(match.group(0)!.replaceAll(',', '.')) ?? 0;
-  }
-
-  String _formatNumber(double value) {
-    if (value == value.roundToDouble()) return value.toInt().toString();
-    return value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
   }
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
-
   final String label;
   final String value;
 
+  const _InfoRow({required this.label, required this.value});
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(label)),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Flexible(child: Text(value, textAlign: TextAlign.end)),
+        ],
+      ),
     );
   }
 }
 
-extension on Iterable<Medication> {
-  Medication? get firstOrNull => isEmpty ? null : first;
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

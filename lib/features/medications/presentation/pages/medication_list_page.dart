@@ -87,7 +87,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
             labelText: medication.stockEnabled ? 'الكمية المضافة' : 'الكمية الموجودة الآن',
-            suffixText: _unitLabel(medication.stockEnabled ? (medication.stockUnit ?? medication.dosageForm ?? 'unit') : (medication.dosageForm ?? 'unit')),
+            suffixText: _unitLabel(medication.stockEnabled ? medication.stockUnit : medication.dosageForm),
           ),
         ),
         actions: [
@@ -109,7 +109,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<MedicationProvider>().error ?? 'تعذر تحديث المخزون')));
   }
 
-  String _unitLabel(String value) {
+  String _unitLabel(String? value) {
     switch (value) {
       case 'capsule':
       case 'كبسولة': return 'كبسولة';
@@ -135,7 +135,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final medicationProvider = context.read<MedicationProvider>();
-          final added = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const AddEditMedicationPage()));
+          final added = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const AddMedicationPage()));
           if (!mounted) return;
           if (added == true && userId != null) await medicationProvider.load(userId);
         },

@@ -24,6 +24,7 @@ CaregiverLink _link({
 Widget _app(Widget child) {
   return MaterialApp(
     locale: const Locale('ar'),
+    supportedLocales: const [Locale('ar')],
     home: Scaffold(body: child),
   );
 }

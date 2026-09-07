@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../../models/dose_instance.dart';
@@ -40,8 +42,7 @@ class MedicationProvider extends ChangeNotifier {
     }
   }
 
-  Future<List<MedicationSchedule>> fetchSchedules(String medicationId) =>
-      _repo.fetchSchedules(medicationId);
+  Future<List<MedicationSchedule>> fetchSchedules(String medicationId) => _repo.fetchSchedules(medicationId);
 
   Future<bool> addMedication({
     required Medication medication,
@@ -70,12 +71,71 @@ class MedicationProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> addMedicationStock({
+    required Medication medication,
+    required double quantity,
+  }) async {
+    if (quantity <= 0) {
+      error = 'يجب أن تكون الكمية أكبر من صفر.';
+      notifyListeners();
+      return false;
+    }
+    try {
+      final newQuantity = await _repo.addStock(
+        medicationId: medication.id,
+        patientId: medication.patientId,
+        quantity: quantity,
+        type: medication.stockEnabled ? 'ADD' : 'INITIAL',
+        note: medication.stockEnabled ? 'Manual stock refill' : 'Initial stock setup',
+      );
+      final index = medications.indexWhere((m) => m.id == medication.id);
+      if (index >= 0) {
+        medications[index] = _copyMedication(
+          medications[index],
+          stockEnabled: true,
+          stockQuantity: newQuantity,
+        );
+        notifyListeners();
+      }
+      return true;
+    } catch (_) {
+      error = 'تعذّرت إضافة مخزون الدواء.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateMedicationStockSettings({
+    required Medication medication,
+    required String unit,
+    required double? packageQuantity,
+    required double threshold,
+  }) async {
+    try {
+      final row = await _repo.updateStockSettings(
+        medicationId: medication.id,
+        unit: unit,
+        packageQuantity: packageQuantity,
+        threshold: threshold,
+      );
+      final updated = Medication.fromMap(row);
+      final index = medications.indexWhere((m) => m.id == medication.id);
+      if (index >= 0) medications[index] = updated;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      error = 'تعذّر تحديث إعدادات المخزون.';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> updateMedicationImage(Medication medication, Uint8List bytes) async {
     try {
       final path = await _repo.updateMedicationImage(medication: medication, bytes: bytes);
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
-        medications[index] = Medication(id: medication.id, patientId: medication.patientId, name: medication.name, genericName: medication.genericName, strength: medication.strength, dosageForm: medication.dosageForm, instructions: medication.instructions, imageUrl: path, startDate: medication.startDate, endDate: medication.endDate, active: medication.active, createdBy: medication.createdBy, createdAt: medication.createdAt);
+        medications[index] = _copyMedication(medications[index], imageUrl: path);
         _imageUrlFutures.remove(medication.imageUrl);
         notifyListeners();
       }
@@ -92,7 +152,7 @@ class MedicationProvider extends ChangeNotifier {
       await _repo.removeMedicationImage(medication);
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
-        medications[index] = Medication(id: medication.id, patientId: medication.patientId, name: medication.name, genericName: medication.genericName, strength: medication.strength, dosageForm: medication.dosageForm, instructions: medication.instructions, imageUrl: null, startDate: medication.startDate, endDate: medication.endDate, active: medication.active, createdBy: medication.createdBy, createdAt: medication.createdAt);
+        medications[index] = _copyMedication(medications[index], imageUrl: null);
         _imageUrlFutures.remove(medication.imageUrl);
         notifyListeners();
       }
@@ -142,5 +202,33 @@ class MedicationProvider extends ChangeNotifier {
     await _repo.deactivateMedication(medication.id);
     medications.removeWhere((m) => m.id == medication.id);
     notifyListeners();
+  }
+
+  Medication _copyMedication(
+    Medication medication, {
+    String? imageUrl,
+    bool? stockEnabled,
+    double? stockQuantity,
+  }) {
+    return Medication(
+      id: medication.id,
+      patientId: medication.patientId,
+      name: medication.name,
+      genericName: medication.genericName,
+      strength: medication.strength,
+      dosageForm: medication.dosageForm,
+      instructions: medication.instructions,
+      imageUrl: imageUrl ?? medication.imageUrl,
+      startDate: medication.startDate,
+      endDate: medication.endDate,
+      active: medication.active,
+      createdBy: medication.createdBy,
+      createdAt: medication.createdAt,
+      stockEnabled: stockEnabled ?? medication.stockEnabled,
+      stockQuantity: stockQuantity ?? medication.stockQuantity,
+      stockUnit: medication.stockUnit,
+      packageQuantity: medication.packageQuantity,
+      lowStockThreshold: medication.lowStockThreshold,
+    );
   }
 }

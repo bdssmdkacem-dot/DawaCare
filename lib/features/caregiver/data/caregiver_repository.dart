@@ -2,11 +2,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../models/caregiver_alert.dart';
 import '../../../models/caregiver_link.dart';
-import '../../../models/caregiver_role.dart';
+import '../../../models/dose_instance.dart';
 import '../../../models/family_link_code.dart';
 import '../../../models/family_link_request.dart';
 import '../../../models/family_member_summary.dart';
-import '../../../models/dose_instance.dart';
+
+/// Errors surfaced by the family_link_* RPCs.
+class FamilyLinkException implements Exception {
+  final String code;
+  const FamilyLinkException(this.code);
+
+  @override
+  String toString() => 'FamilyLinkException($code)';
+}
 
 class CaregiverRepository {
   final SupabaseClient _client = Supabase.instance.client;
@@ -51,11 +59,14 @@ class CaregiverRepository {
 
   Future<FamilyLinkCode> createLinkCode() async {
     final rows = await _client.rpc('create_family_link_code');
-    final row = (rows as List).first as Map<String, dynamic>;
-    return FamilyLinkCode.fromMap(row);
+    return FamilyLinkCode.fromMap((rows as List).first as Map<String, dynamic>);
   }
 
-  Future<String> requestLink({required String code, required CaregiverRole role, String? relationshipLabel}) async {
+  Future<String> requestLink({
+    required String code,
+    required CaregiverRole role,
+    String? relationshipLabel,
+  }) async {
     try {
       final rows = await _client.rpc('request_family_link', params: {
         'p_code': _normalizeLinkCode(code),
@@ -130,12 +141,18 @@ class CaregiverRepository {
     return rows.map((r) => FamilyLinkRequest.fromMap(r)).toList();
   }
 
-  Future<List<CaregiverAlert>> fetchAlerts(String caregiverId) async {
-    final rows = await _client
+  Future<List<CaregiverAlert>> fetchAlerts(
+    String caregiverId, {
+    bool unreadOnly = false,
+  }) async {
+    var query = _client
         .from('caregiver_alerts')
-        .select()
-        .eq('caregiver_id', caregiverId)
-        .order('created_at', ascending: false);
+        .select('*, patient:profiles!patient_id(full_name)')
+        .eq('caregiver_id', caregiverId);
+    if (unreadOnly) {
+      query = query.eq('read', false);
+    }
+    final rows = await query.order('created_at', ascending: false).limit(50);
     return rows.map((r) => CaregiverAlert.fromMap(r)).toList();
   }
 
@@ -149,13 +166,14 @@ class CaregiverRepository {
     const latin = '0123456789';
     var result = value.trim();
     for (var i = 0; i < latin.length; i++) {
-      result = result
-          .replaceAll(arabicIndic[i], latin[i])
-          .replaceAll(extendedArabicIndic[i], latin[i]);
+      result = result.replaceAll(arabicIndic[i], latin[i]);
+      result = result.replaceAll(extendedArabicIndic[i], latin[i]);
     }
     return result.replaceAll(RegExp(r'[^0-9]'), '');
   }
 
-  String _extractCode(String message) =>
-      RegExp(r'[A-Z_]{6,}').firstMatch(message)?.group(0) ?? 'UNKNOWN_ERROR';
+  String _extractCode(String message) {
+    final match = RegExp(r'[A-Z_]{6,}').firstMatch(message);
+    return match?.group(0) ?? 'UNKNOWN_ERROR';
+  }
 }

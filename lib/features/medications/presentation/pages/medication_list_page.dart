@@ -87,14 +87,14 @@ class _MedicationListPageState extends State<MedicationListPage> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
             labelText: medication.stockEnabled ? 'الكمية المضافة' : 'الكمية الموجودة الآن',
-            suffixText: 'وحدة',
+            suffixText: _unitLabel(medication.stockEnabled ? medication.stockUnit : medication.dosageForm),
           ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(ctx).cancel)),
           FilledButton(
             onPressed: () {
-              final value = double.tryParse(controller.text.trim());
+              final value = double.tryParse(controller.text.trim().replaceAll(',', '.'));
               if (value != null && value > 0) Navigator.pop(ctx, value);
             },
             child: const Text('حفظ'),
@@ -107,6 +107,22 @@ class _MedicationListPageState extends State<MedicationListPage> {
     final ok = await context.read<MedicationProvider>().addMedicationStock(medication: medication, quantity: quantity);
     if (!mounted || ok) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<MedicationProvider>().error ?? 'تعذر تحديث المخزون')));
+  }
+
+  String _unitLabel(String value) {
+    switch (value) {
+      case 'capsule':
+      case 'كبسولة': return 'كبسولة';
+      case 'tablet':
+      case 'قرص': return 'قرص';
+      case 'ml':
+      case 'شراب': return 'مل';
+      case 'drop':
+      case 'قطرة': return 'قطرة';
+      case 'injection':
+      case 'حقنة': return 'حقنة';
+      default: return 'وحدة';
+    }
   }
 
   @override
@@ -236,7 +252,7 @@ class _MedicationTile extends StatelessWidget {
               const SizedBox(height: 4),
               Text(_periodLabel(context), style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              MedicationStockBadge(medication: medication, onAdd: onAddStock),
+              MedicationStockBadge(medication: medication, schedules: schedules, onAdd: onAddStock),
             ])),
             PopupMenuButton<String>(
               tooltip: l.medicines,

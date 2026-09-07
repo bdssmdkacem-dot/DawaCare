@@ -11,10 +11,10 @@ class MedicationStockHistory extends StatefulWidget {
   const MedicationStockHistory({super.key, required this.medicationId, required this.unit});
 
   @override
-  State<MedicationStockHistory> createState() => _MedicationStockHistoryState();
+  State<MedicationStockHistory> createState() => MedicationStockHistoryState();
 }
 
-class _MedicationStockHistoryState extends State<MedicationStockHistory> {
+class MedicationStockHistoryState extends State<MedicationStockHistory> {
   late Future<List<Map<String, dynamic>>> _future;
 
   @override
@@ -24,6 +24,7 @@ class _MedicationStockHistoryState extends State<MedicationStockHistory> {
   }
 
   void refresh() {
+    if (!mounted) return;
     setState(() {
       _future = context.read<MedicationProvider>().fetchStockTransactions(widget.medicationId);
     });

@@ -1,5 +1,10 @@
 import '../../../models/dose_instance.dart';
 
+bool _isPendingStatus(DoseStatus status) =>
+    status == DoseStatus.pending ||
+    status == DoseStatus.reminderSent ||
+    status == DoseStatus.snoozed;
+
 class MedicationReport {
   final String medicationId;
   final String medicationName;
@@ -22,7 +27,11 @@ class MedicationReport {
   int get resolved => taken + missed + skipped;
   double get adherence => resolved == 0 ? 0 : taken / resolved;
 
-  factory MedicationReport.fromDoses(String medicationId, String name, List<DoseInstance> doses) {
+  factory MedicationReport.fromDoses(
+    String medicationId,
+    String name,
+    List<DoseInstance> doses,
+  ) {
     return MedicationReport(
       medicationId: medicationId,
       medicationName: name,
@@ -30,7 +39,7 @@ class MedicationReport {
       taken: doses.where((d) => d.status == DoseStatus.taken).length,
       missed: doses.where((d) => d.status == DoseStatus.missed).length,
       skipped: doses.where((d) => d.status == DoseStatus.skipped).length,
-      pending: doses.where((d) => !isResolvedStatus(d.status)).length,
+      pending: doses.where((d) => _isPendingStatus(d.status)).length,
     );
   }
 }
@@ -52,20 +61,28 @@ class AdherenceReport {
   int get taken => doses.where((d) => d.status == DoseStatus.taken).length;
   int get missed => doses.where((d) => d.status == DoseStatus.missed).length;
   int get skipped => doses.where((d) => d.status == DoseStatus.skipped).length;
-  int get pending => doses.where((d) => !isResolvedStatus(d.status)).length;
+  int get pending => doses.where((d) => _isPendingStatus(d.status)).length;
   int get resolved => taken + missed + skipped;
   double get adherence => resolved == 0 ? 0 : taken / resolved;
 
   Map<DateTime, int> get takenByDay {
     final result = <DateTime, int>{};
     for (final dose in doses.where((d) => d.status == DoseStatus.taken)) {
-      final day = DateTime(dose.scheduledAt.year, dose.scheduledAt.month, dose.scheduledAt.day);
+      final day = DateTime(
+        dose.scheduledAt.year,
+        dose.scheduledAt.month,
+        dose.scheduledAt.day,
+      );
       result[day] = (result[day] ?? 0) + 1;
     }
     return result;
   }
 
-  factory AdherenceReport.fromDoses(DateTime from, DateTime to, List<DoseInstance> doses) {
+  factory AdherenceReport.fromDoses(
+    DateTime from,
+    DateTime to,
+    List<DoseInstance> doses,
+  ) {
     final grouped = <String, List<DoseInstance>>{};
     for (final dose in doses) {
       grouped.putIfAbsent(dose.medicationId, () => []).add(dose);
@@ -73,7 +90,13 @@ class AdherenceReport {
     final medicationReports = grouped.entries.map((entry) {
       final name = entry.value.first.medicationName;
       return MedicationReport.fromDoses(entry.key, name, entry.value);
-    }).toList()..sort((a, b) => a.medicationName.compareTo(b.medicationName));
-    return AdherenceReport(from: from, to: to, doses: doses, medications: medicationReports);
+    }).toList()
+      ..sort((a, b) => a.medicationName.compareTo(b.medicationName));
+    return AdherenceReport(
+      from: from,
+      to: to,
+      doses: doses,
+      medications: medicationReports,
+    );
   }
 }

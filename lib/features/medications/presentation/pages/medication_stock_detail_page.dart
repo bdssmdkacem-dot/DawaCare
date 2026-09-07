@@ -6,7 +6,6 @@ import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
 import '../../data/medication_repository.dart';
 import '../providers/medication_provider.dart';
-import '../widgets/medication_stock_badge.dart';
 
 class MedicationStockDetailPage extends StatefulWidget {
   const MedicationStockDetailPage({
@@ -38,7 +37,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
   }
 
   Future<void> _loadHistory() async {
-    setState(() => _loadingHistory = true);
+    if (mounted) setState(() => _loadingHistory = true);
     try {
       final rows = await _repository.fetchStockTransactions(_medication.id);
       if (!mounted) return;
@@ -84,7 +83,10 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
           controller: controller,
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(labelText: 'الكمية', suffixText: _unitLabel(_medication.stockUnit)),
+          decoration: InputDecoration(
+            labelText: 'الكمية',
+            suffixText: _unitLabel(_medication.stockUnit),
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
@@ -102,14 +104,19 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
 
     if (quantity == null || !mounted) return;
     final provider = context.read<MedicationProvider>();
-    final ok = await provider.addMedicationStock(medication: _medication, quantity: quantity);
+    final ok = await provider.addMedicationStock(
+      medication: _medication,
+      quantity: quantity,
+    );
     if (!mounted) return;
     if (ok) {
       final updated = provider.medications.where((m) => m.id == _medication.id).firstOrNull;
       if (updated != null) setState(() => _medication = updated);
       await _loadHistory();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تحديث المخزون')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر تحديث المخزون')),
+      );
     }
   }
 
@@ -181,20 +188,32 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       final updated = provider.medications.where((m) => m.id == _medication.id).firstOrNull;
       if (updated != null) setState(() => _medication = updated);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر حفظ إعدادات المخزون')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر حفظ إعدادات المخزون')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final dailyConsumption = _calculateDailyConsumption(_schedules);
-    final daysRemaining = dailyConsumption > 0 ? _medication.stockQuantity / dailyConsumption : null;
+    final daysRemaining = dailyConsumption > 0
+        ? _medication.stockQuantity / dailyConsumption
+        : null;
+    final unit = _unitLabel(_medication.stockUnit);
+    final threshold = _medication.lowStockThreshold;
+    final isDepleted = _medication.stockQuantity <= 0;
+    final isLow = !isDepleted && _medication.stockQuantity <= threshold;
 
     return Scaffold(
       appBar: AppBar(
         title: Text('مخزون ${_medication.name}'),
         actions: [
-          IconButton(tooltip: 'تحديث', onPressed: _loadHistory, icon: const Icon(Icons.refresh_rounded)),
+          IconButton(
+            tooltip: 'تحديث',
+            onPressed: _loadHistory,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
         ],
       ),
       body: RefreshIndicator(
@@ -203,12 +222,72 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
-            MedicationStockBadge(
-              medication: _medication,
-              schedules: _schedules,
-              threshold: _medication.lowStockThreshold,
-              onAdd: _medication.stockEnabled ? _addStock : null,
-              onSettings: _editSettings,
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          child: Icon(
+                            isDepleted
+                                ? Icons.warning_amber_rounded
+                                : isLow
+                                    ? Icons.inventory_2_outlined
+                                    : Icons.inventory_2_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'الرصيد الحالي',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${_formatNumber(_medication.stockQuantity)} $unit',
+                                style: Theme.of(context).textTheme.headlineSmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isDepleted)
+                          const Chip(label: Text('منتهي'))
+                        else if (isLow)
+                          const Chip(label: Text('منخفض'))
+                        else
+                          const Chip(label: Text('جيد')),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        if (_medication.stockEnabled)
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: _addStock,
+                              icon: const Icon(Icons.add_rounded),
+                              label: const Text('إضافة مخزون'),
+                            ),
+                          ),
+                        if (_medication.stockEnabled) const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _editSettings,
+                            icon: const Icon(Icons.settings_outlined),
+                            label: const Text('الإعدادات'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             Card(
@@ -219,16 +298,30 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                   children: [
                     Text('ملخص الاستهلاك', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 12),
-                    _InfoRow(label: 'الاستهلاك اليومي المتوقع', value: dailyConsumption > 0 ? '${_formatNumber(dailyConsumption)} ${_unitLabel(_medication.stockUnit)}' : 'غير محدد'),
+                    _InfoRow(
+                      label: 'الاستهلاك اليومي المتوقع',
+                      value: dailyConsumption > 0
+                          ? '${_formatNumber(dailyConsumption)} $unit'
+                          : 'غير محدد',
+                    ),
                     if (daysRemaining != null) ...[
                       const SizedBox(height: 8),
-                      _InfoRow(label: 'المدة التقديرية', value: '${_formatNumber(daysRemaining)} يوم'),
+                      _InfoRow(
+                        label: 'المدة التقديرية',
+                        value: '${_formatNumber(daysRemaining)} يوم',
+                      ),
                     ],
                     const SizedBox(height: 8),
-                    _InfoRow(label: 'حد التنبيه', value: '${_formatNumber(_medication.lowStockThreshold)} ${_unitLabel(_medication.stockUnit)}'),
+                    _InfoRow(
+                      label: 'حد التنبيه',
+                      value: '${_formatNumber(threshold)} $unit',
+                    ),
                     if (_medication.packageQuantity != null) ...[
                       const SizedBox(height: 8),
-                      _InfoRow(label: 'حجم العبوة', value: '${_formatNumber(_medication.packageQuantity!)} ${_unitLabel(_medication.stockUnit)}'),
+                      _InfoRow(
+                        label: 'حجم العبوة',
+                        value: '${_formatNumber(_medication.packageQuantity!)} $unit',
+                      ),
                     ],
                   ],
                 ),
@@ -240,24 +333,42 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
               children: [
                 Text('سجل المخزون', style: Theme.of(context).textTheme.titleMedium),
                 if (_medication.stockEnabled)
-                  FilledButton.tonalIcon(onPressed: _addStock, icon: const Icon(Icons.add_rounded), label: const Text('إضافة')),
+                  FilledButton.tonalIcon(
+                    onPressed: _addStock,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('إضافة'),
+                  ),
               ],
             ),
             const SizedBox(height: 8),
             if (_loadingHistory)
-              const Padding(padding: EdgeInsets.all(24), child: LoadingIndicator())
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: LoadingIndicator(),
+              )
             else if (_transactions.isEmpty)
-              const Card(child: Padding(padding: EdgeInsets.all(20), child: Center(child: Text('لا توجد عمليات مخزون بعد.'))))
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: Text('لا توجد عمليات مخزون بعد.')),
+                ),
+              )
             else
               ..._transactions.map(
                 (row) => Card(
                   child: ListTile(
                     leading: CircleAvatar(
-                      child: Icon((row['transaction_type'] as String?) == 'TAKEN' ? Icons.remove_rounded : Icons.add_rounded),
+                      child: Icon(
+                        (row['transaction_type'] as String?) == 'TAKEN'
+                            ? Icons.remove_rounded
+                            : Icons.add_rounded,
+                      ),
                     ),
                     title: Text(_transactionLabel(row['transaction_type'] as String?)),
                     subtitle: Text((row['created_at'] as String?) ?? ''),
-                    trailing: Text('${_formatNumber((row['quantity'] as num?)?.toDouble() ?? 0)} ${_unitLabel(_medication.stockUnit)}'),
+                    trailing: Text(
+                      '${_formatNumber((row['quantity'] as num?)?.toDouble() ?? 0)} $unit',
+                    ),
                   ),
                 ),
               ),
@@ -314,7 +425,13 @@ class _InfoRow extends StatelessWidget {
       children: [
         Expanded(child: Text(label)),
         const SizedBox(width: 12),
-        Flexible(child: Text(value, textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w600))),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
       ],
     );
   }

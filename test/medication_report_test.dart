@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-
-import '../lib/features/caregiver/domain/medication_report.dart';
-import '../lib/models/dose_instance.dart';
+import 'package:dawacare/features/caregiver/domain/medication_report.dart';
+import 'package:dawacare/models/dose_instance.dart';
 
 DoseInstance _dose(String id, DoseStatus status, {int day = 1}) => DoseInstance(
       id: id,

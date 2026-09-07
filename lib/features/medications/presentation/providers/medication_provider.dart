@@ -44,11 +44,7 @@ class MedicationProvider extends ChangeNotifier {
 
   Future<List<MedicationSchedule>> fetchSchedules(String medicationId) => _repo.fetchSchedules(medicationId);
 
-  Future<bool> addMedication({
-    required Medication medication,
-    required MedicationSchedule schedule,
-    Uint8List? imageBytes,
-  }) async {
+  Future<bool> addMedication({required Medication medication, required MedicationSchedule schedule, Uint8List? imageBytes}) async {
     try {
       final created = await _repo.createMedication(medication, imageBytes: imageBytes);
       final createdSchedule = await _repo.createSchedule(created.id, schedule);
@@ -71,16 +67,21 @@ class MedicationProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> addMedicationStock({
-    required Medication medication,
-    required double quantity,
-  }) async {
+  Future<bool> addMedicationStock({required Medication medication, required double quantity}) async {
     if (quantity <= 0) {
       error = 'يجب أن تكون الكمية أكبر من صفر.';
       notifyListeners();
       return false;
     }
     try {
+      if (!medication.stockEnabled) {
+        await _repo.updateStockSettings(
+          medicationId: medication.id,
+          unit: medication.stockUnit,
+          packageQuantity: medication.packageQuantity,
+          threshold: medication.lowStockThreshold,
+        );
+      }
       final newQuantity = await _repo.addStock(
         medicationId: medication.id,
         patientId: medication.patientId,
@@ -90,11 +91,7 @@ class MedicationProvider extends ChangeNotifier {
       );
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
-        medications[index] = _copyMedication(
-          medications[index],
-          stockEnabled: true,
-          stockQuantity: newQuantity,
-        );
+        medications[index] = _copyMedication(medications[index], stockEnabled: true, stockQuantity: newQuantity);
         notifyListeners();
       }
       return true;
@@ -105,19 +102,9 @@ class MedicationProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateMedicationStockSettings({
-    required Medication medication,
-    required String unit,
-    required double? packageQuantity,
-    required double threshold,
-  }) async {
+  Future<bool> updateMedicationStockSettings({required Medication medication, required String unit, required double? packageQuantity, required double threshold}) async {
     try {
-      final row = await _repo.updateStockSettings(
-        medicationId: medication.id,
-        unit: unit,
-        packageQuantity: packageQuantity,
-        threshold: threshold,
-      );
+      final row = await _repo.updateStockSettings(medicationId: medication.id, unit: unit, packageQuantity: packageQuantity, threshold: threshold);
       final updated = Medication.fromMap(row);
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) medications[index] = updated;
@@ -170,9 +157,7 @@ class MedicationProvider extends ChangeNotifier {
       final from = DateTime(now.year, now.month, now.day);
       final to = from.add(const Duration(days: 2, hours: 23));
       final oldDoses = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
-      for (final dose in oldDoses.where((d) => d.scheduleId == schedule.id && !isResolvedStatus(d.status))) {
-        await ReminderEngine.cancelFor(dose.id);
-      }
+      for (final dose in oldDoses.where((d) => d.scheduleId == schedule.id && !isResolvedStatus(d.status))) await ReminderEngine.cancelFor(dose.id);
       final updated = await _repo.updateSchedule(MedicationSchedule(id: schedule.id, medicationId: schedule.medicationId, type: schedule.type, time: time, daysOfWeek: schedule.daysOfWeek, intervalDays: schedule.intervalDays, doseAmount: doseAmount, startDate: schedule.startDate, endDate: schedule.endDate, timezone: schedule.timezone));
       await _repo.deleteFuturePendingDoses(schedule.id, from);
       await _doseRepo.ensureDosesGenerated(patientId);
@@ -204,31 +189,14 @@ class MedicationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Medication _copyMedication(
-    Medication medication, {
-    String? imageUrl,
-    bool? stockEnabled,
-    double? stockQuantity,
-  }) {
+  Medication _copyMedication(Medication medication, {String? imageUrl, bool? stockEnabled, double? stockQuantity}) {
     return Medication(
-      id: medication.id,
-      patientId: medication.patientId,
-      name: medication.name,
-      genericName: medication.genericName,
-      strength: medication.strength,
-      dosageForm: medication.dosageForm,
-      instructions: medication.instructions,
-      imageUrl: imageUrl ?? medication.imageUrl,
-      startDate: medication.startDate,
-      endDate: medication.endDate,
-      active: medication.active,
-      createdBy: medication.createdBy,
-      createdAt: medication.createdAt,
-      stockEnabled: stockEnabled ?? medication.stockEnabled,
-      stockQuantity: stockQuantity ?? medication.stockQuantity,
-      stockUnit: medication.stockUnit,
-      packageQuantity: medication.packageQuantity,
-      lowStockThreshold: medication.lowStockThreshold,
+      id: medication.id, patientId: medication.patientId, name: medication.name, genericName: medication.genericName,
+      strength: medication.strength, dosageForm: medication.dosageForm, instructions: medication.instructions,
+      imageUrl: imageUrl ?? medication.imageUrl, startDate: medication.startDate, endDate: medication.endDate,
+      active: medication.active, createdBy: medication.createdBy, createdAt: medication.createdAt,
+      stockEnabled: stockEnabled ?? medication.stockEnabled, stockQuantity: stockQuantity ?? medication.stockQuantity,
+      stockUnit: medication.stockUnit, packageQuantity: medication.packageQuantity, lowStockThreshold: medication.lowStockThreshold,
     );
   }
 }

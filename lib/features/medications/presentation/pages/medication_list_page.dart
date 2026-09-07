@@ -87,7 +87,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
             labelText: medication.stockEnabled ? 'الكمية المضافة' : 'الكمية الموجودة الآن',
-            suffixText: _unitLabel(medication.stockEnabled ? (medication.stockUnit ?? medication.dosageForm) : medication.dosageForm),
+            suffixText: _unitLabel(medication.stockEnabled ? (medication.stockUnit ?? medication.dosageForm ?? 'unit') : (medication.dosageForm ?? 'unit')),
           ),
         ),
         actions: [

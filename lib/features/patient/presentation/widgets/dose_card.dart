@@ -31,8 +31,14 @@ class DoseCard extends StatelessWidget {
   });
 
   bool get _isFollowedDose {
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-    return currentUserId != null && currentUserId != dose.patientId;
+    try {
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+      return currentUserId != null && currentUserId != dose.patientId;
+    } catch (_) {
+      // Widget/unit tests may render DoseCard before Supabase.initialize().
+      // A missing client must never break the medication-card UI.
+      return false;
+    }
   }
 
   @override
@@ -130,19 +136,26 @@ class DoseCard extends StatelessWidget {
   }
 
   Future<void> _showFollowedDoseVoice(BuildContext context) async {
-    final messages = await VoiceMessageService.instance.fetchForDose(dose.patientId, dose.id);
-    if (!context.mounted) return;
-    if (messages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لا يوجد تسجيل صوتي مرتبط بهذه الجرعة.')),
+    try {
+      final messages = await VoiceMessageService.instance.fetchForDose(dose.patientId, dose.id);
+      if (!context.mounted) return;
+      if (messages.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لا يوجد تسجيل صوتي مرتبط بهذه الجرعة.')),
+        );
+        return;
+      }
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheetContext) => _DoseVoiceSheet(messages: messages),
       );
-      return;
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذّر تحميل التسجيل الصوتي لهذه الجرعة.')),
+      );
     }
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => _DoseVoiceSheet(messages: messages),
-    );
   }
 
   String _time(DateTime value) =>

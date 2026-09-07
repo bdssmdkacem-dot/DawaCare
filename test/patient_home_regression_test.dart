@@ -1,6 +1,7 @@
 import 'package:dawacare/core/localization/app_localizations.dart';
 import 'package:dawacare/features/patient/presentation/widgets/dose_card.dart';
 import 'package:dawacare/models/dose_instance.dart';
+import 'package:dawacare/models/medication.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,6 +23,25 @@ DoseInstance _dose({
     scheduledAt: scheduledAt ?? now,
     status: status,
     updatedAt: now,
+  );
+}
+
+Medication _medication({String? imageUrl = 'medications/test/image.jpg'}) {
+  final now = DateTime.now();
+  return Medication(
+    id: 'med-1',
+    patientId: 'patient-1',
+    name: 'دواء الاختبار',
+    genericName: 'Test Generic',
+    strength: '500 mg',
+    dosageForm: 'Tablet',
+    instructions: 'بعد الأكل',
+    imageUrl: imageUrl,
+    startDate: now,
+    endDate: null,
+    active: true,
+    createdBy: 'patient-1',
+    createdAt: now,
   );
 }
 
@@ -107,6 +127,39 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.check_rounded));
       expect(confirmed, isTrue);
+    });
+
+    testWidgets('medication image is rendered inside the dose card when available', (tester) async {
+      await tester.pumpWidget(
+        _host(
+          DoseCard(
+            dose: _dose(status: DoseStatus.pending),
+            medication: _medication(),
+            imageUrlFuture: Future<String?>.value('https://example.com/med.jpg'),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(DoseCard), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets('dose card tap contract invokes its callback', (tester) async {
+      var tapped = false;
+      await tester.pumpWidget(
+        _host(
+          DoseCard(
+            dose: _dose(status: DoseStatus.pending),
+            onTap: () => tapped = true,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byType(DoseCard));
+      expect(tapped, isTrue);
     });
 
     testWidgets('empty and error presentation primitives remain renderable', (tester) async {

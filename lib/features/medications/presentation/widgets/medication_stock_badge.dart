@@ -77,11 +77,7 @@ class MedicationStockBadge extends StatelessWidget {
                           : 'متبقي ${_format(quantity)} ${_unitLabel(medication.stockUnit)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                        color: color,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: color),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -92,9 +88,7 @@ class MedicationStockBadge extends StatelessWidget {
                               : 'المخزون بحالة جيدة',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -121,9 +115,7 @@ class MedicationStockBadge extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               child: LinearProgressIndicator(
                 minHeight: 6,
-                value: threshold > 0
-                    ? (quantity / (threshold * 3)).clamp(0.0, 1.0)
-                    : 1,
+                value: threshold > 0 ? (quantity / (threshold * 3)).clamp(0.0, 1.0).toDouble() : 1.0,
                 backgroundColor: color.withValues(alpha: .10),
                 valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
@@ -156,28 +148,29 @@ class MedicationStockBadge extends StatelessWidget {
   }
 
   double _dailyConsumption() {
-    if (schedules.isEmpty) return 0;
     double total = 0;
     for (final schedule in schedules) {
-      if (schedule.type == ScheduleType.prn) continue;
       final dose = _extractNumber(schedule.doseAmount);
-      if (dose <= 0) continue;
-      switch (schedule.type) {
-        case ScheduleType.daily:
-          total += dose;
-        case ScheduleType.weekly:
-        case ScheduleType.specificDays:
-          final days = schedule.daysOfWeek.isEmpty ? 1 : schedule.daysOfWeek.length;
-          total += dose * days / 7;
-        case ScheduleType.interval:
-          final interval = schedule.intervalDays ?? 1;
-          total += dose / interval;
-        case ScheduleType.once:
-        case ScheduleType.prn:
-          break;
-      }
+      if (dose <= 0 || schedule.type == ScheduleType.prn) continue;
+      total += _dailyScheduleConsumption(schedule, dose);
     }
     return total;
+  }
+
+  double _dailyScheduleConsumption(MedicationSchedule schedule, double dose) {
+    switch (schedule.type) {
+      case ScheduleType.daily:
+        return dose;
+      case ScheduleType.weekly:
+      case ScheduleType.specificDays:
+        final days = schedule.daysOfWeek.isEmpty ? 1 : schedule.daysOfWeek.length;
+        return dose * days / 7;
+      case ScheduleType.interval:
+        return dose / (schedule.intervalDays ?? 1);
+      case ScheduleType.once:
+      case ScheduleType.prn:
+        return 0;
+    }
   }
 
   double _extractNumber(String value) {
@@ -190,10 +183,9 @@ class MedicationStockBadge extends StatelessWidget {
       ? value.toInt().toString()
       : value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
 
-  String _formatDays(double value) {
-    if (value < 10) return value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
-    return value.floor().toString();
-  }
+  String _formatDays(double value) => value < 10
+      ? value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '')
+      : value.floor().toString();
 
   String _unitLabel(String unit) {
     switch (unit) {

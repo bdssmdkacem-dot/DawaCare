@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dawacare/app/theme/app_colors.dart';
@@ -25,6 +27,11 @@ Widget _app(Widget child) {
   return MaterialApp(
     locale: const Locale('ar'),
     supportedLocales: const [Locale('ar')],
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
     home: Scaffold(body: child),
   );
 }

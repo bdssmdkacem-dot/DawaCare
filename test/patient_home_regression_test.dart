@@ -2,6 +2,7 @@ import 'package:dawacare/core/localization/app_localizations.dart';
 import 'package:dawacare/features/patient/presentation/widgets/dose_card.dart';
 import 'package:dawacare/models/dose_instance.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 DoseInstance _dose({
@@ -28,7 +29,12 @@ Widget _host(Widget child) {
   return MaterialApp(
     locale: const Locale('ar'),
     supportedLocales: AppLocalizations.supportedLocales,
-    localizationsDelegates: const [AppLocalizations.delegate],
+    localizationsDelegates: const [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+    ],
     home: Scaffold(body: child),
   );
 }
@@ -50,15 +56,17 @@ void main() {
           ),
         ),
       );
+      await tester.pump();
 
+      expect(find.byType(DoseCard), findsOneWidget);
       expect(find.text('دواء الاختبار'), findsOneWidget);
-      expect(find.text('تم أخذ الجرعة'), findsOneWidget);
-      expect(find.text('تأجيل'), findsOneWidget);
-      expect(find.text('تخطي'), findsOneWidget);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.close_rounded), findsOneWidget);
 
-      await tester.tap(find.text('تم أخذ الجرعة'));
-      await tester.tap(find.text('تأجيل'));
-      await tester.tap(find.text('تخطي'));
+      await tester.tap(find.byIcon(Icons.check_rounded));
+      await tester.tap(find.byIcon(Icons.schedule_rounded).last);
+      await tester.tap(find.byIcon(Icons.close_rounded));
 
       expect(confirmed, isTrue);
       expect(snoozed, isTrue);
@@ -69,12 +77,14 @@ void main() {
       await tester.pumpWidget(
         _host(DoseCard(dose: _dose(status: DoseStatus.taken))),
       );
+      await tester.pump();
 
+      expect(find.byType(DoseCard), findsOneWidget);
       expect(find.text('دواء الاختبار'), findsOneWidget);
-      expect(find.text('تم أخذ الجرعة'), findsOneWidget);
       expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
-      expect(find.text('تأجيل'), findsNothing);
-      expect(find.text('تخطي'), findsNothing);
+      expect(find.byIcon(Icons.check_rounded), findsNothing);
+      expect(find.byIcon(Icons.schedule_rounded), findsNothing);
+      expect(find.byIcon(Icons.close_rounded), findsNothing);
     });
 
     testWidgets('snoozed dose remains actionable for a later confirmation', (tester) async {
@@ -88,11 +98,14 @@ void main() {
           ),
         ),
       );
+      await tester.pump();
 
+      expect(find.byType(DoseCard), findsOneWidget);
+      expect(find.text('دواء الاختبار'), findsOneWidget);
       expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
-      expect(find.text('تم أخذ الجرعة'), findsOneWidget);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
 
-      await tester.tap(find.text('تم أخذ الجرعة'));
+      await tester.tap(find.byIcon(Icons.check_rounded));
       expect(confirmed, isTrue);
     });
 
@@ -101,15 +114,16 @@ void main() {
         _host(
           ListView(
             children: const [
-              Card(child: Text('لا توجد جرعات مجدولة لك اليوم.')),
-              Card(child: Text('تعذّر تحميل الجرعات. تحقق من الاتصال بالإنترنت.')),
+              Card(child: Text('لا توجد أدوية مجدولة اليوم')),
+              Card(child: Text('حدث خطأ غير متوقع. حاول مرة أخرى.')),
             ],
           ),
         ),
       );
+      await tester.pump();
 
-      expect(find.text('لا توجد جرعات مجدولة لك اليوم.'), findsOneWidget);
-      expect(find.text('تعذّر تحميل الجرعات. تحقق من الاتصال بالإنترنت.'), findsOneWidget);
+      expect(find.text('لا توجد أدوية مجدولة اليوم'), findsOneWidget);
+      expect(find.text('حدث خطأ غير متوقع. حاول مرة أخرى.'), findsOneWidget);
     });
 
     testWidgets('multiple dose cards can coexist in the parent children list', (tester) async {
@@ -128,9 +142,10 @@ void main() {
           ),
         ),
       );
+      await tester.pump();
 
-      expect(find.text('دواء الاختبار'), findsNWidgets(3));
       expect(find.byType(DoseCard), findsNWidgets(3));
+      expect(find.text('دواء الاختبار'), findsNWidgets(3));
     });
   });
 }

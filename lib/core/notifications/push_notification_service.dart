@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'notification_service.dart';
+import 'rich_push_notification_service.dart';
 
 /// Registers this device for FCM and routes notification taps to the app.
 class PushNotificationService {
@@ -33,18 +34,10 @@ class PushNotificationService {
 
   Future<void> init() async {
     if (_initialized || !Platform.isAndroid) return;
-
-    // Ensure the local notification channels exist before any FCM message can
-    // arrive. This is especially important for a freshly installed app.
     await NotificationService.instance.init();
+    await RichPushNotificationService.instance.init();
     await _messaging.setAutoInitEnabled(true);
-
-    final settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+    final settings = await _messaging.requestPermission(alert: true, badge: true, sound: true, provisional: false);
     debugPrint('DawaCare FCM permission: ${settings.authorizationStatus}');
 
     _localVoiceSubscription = NotificationService.instance.voiceMessageOpened.listen(_queueVoiceMessageId);
@@ -56,19 +49,21 @@ class PushNotificationService {
       final type = message.data['type'];
       final messageId = message.data['voice_message_id'];
       final alertId = message.data['alert_id'];
+      final requestId = message.data['request_id'];
+      final senderAvatar = message.data['sender_avatar_url'];
       final payload = type == 'VOICE_MESSAGE' && messageId is String && messageId.isNotEmpty
           ? 'VOICE_MESSAGE:$messageId'
           : type == 'CAREGIVER_ALERT' && alertId is String && alertId.isNotEmpty
               ? 'CAREGIVER_ALERT:$alertId'
-              : null;
-
-      // FCM notification messages normally contain notification.title/body.
-      // Keep a data fallback so a server-side data-only message is also
-      // visible while the app is in the foreground.
-      if (type == 'VOICE_MESSAGE' || type == 'CAREGIVER_ALERT') {
-        await NotificationService.instance.showCaregiverAlert(
-          title: notification?.title ?? (type == 'VOICE_MESSAGE' ? 'رسالة صوتية جديدة 🎙️' : 'تنبيه جديد'),
-          body: notification?.body ?? (type == 'VOICE_MESSAGE' ? 'لديك رسالة صوتية جديدة من أحد المتابعين.' : 'لديك تنبيه جديد من أحد أفراد العائلة.'),
+              : type is String && type.startsWith('FAMILY_LINK_') && requestId is String && requestId.isNotEmpty
+                  ? 'FAMILY_LINK:$requestId'
+                  : null;
+      final isPushEvent = type == 'VOICE_MESSAGE' || type == 'CAREGIVER_ALERT' || (type is String && type.startsWith('FAMILY_LINK_'));
+      if (isPushEvent) {
+        await RichPushNotificationService.instance.show(
+          title: notification?.title ?? 'DawaCare',
+          body: notification?.body ?? 'لديك إشعار جديد.',
+          imageUrl: senderAvatar is String && senderAvatar.isNotEmpty ? senderAvatar : null,
           payload: payload,
         );
       }
@@ -143,13 +138,7 @@ class PushNotificationService {
     if (user == null) return;
     try {
       final existing = await _client.from('devices').select('id').eq('user_id', user.id).eq('push_token', token).maybeSingle();
-      final values = {
-        'user_id': user.id,
-        'platform': 'android',
-        'push_token': token,
-        'timezone': 'Africa/Casablanca',
-        'last_seen': DateTime.now().toUtc().toIso8601String(),
-      };
+      final values = {'user_id': user.id, 'platform': 'android', 'push_token': token, 'timezone': 'Africa/Casablanca', 'last_seen': DateTime.now().toUtc().toIso8601String()};
       if (existing != null) {
         await _client.from('devices').update(values).eq('id', existing['id']);
       } else {
@@ -181,7 +170,4 @@ class PushNotificationService {
 Future<void> dawacareFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint('DawaCare FCM background received: id=${message.messageId} type=${message.data['type']}');
-  // Notification messages are displayed by Android/FCM automatically when
-  // the app is backgrounded or terminated. We intentionally do not show a
-  // second local notification here, which would create duplicates.
 }

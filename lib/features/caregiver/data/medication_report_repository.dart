@@ -1,4 +1,3 @@
-import '../../../models/dose_instance.dart';
 import '../../doses/data/dose_repository.dart';
 import '../domain/medication_report.dart';
 
@@ -17,7 +16,11 @@ class MedicationReportRepository {
       from: start,
       to: endExclusive.subtract(const Duration(microseconds: 1)),
     );
-    return AdherenceReport.fromDoses(start, endExclusive.subtract(const Duration(days: 1)), doses);
+    return AdherenceReport.fromDoses(
+      start,
+      endExclusive.subtract(const Duration(days: 1)),
+      doses,
+    );
   }
 
   Future<AdherenceReport> today(String patientId) {

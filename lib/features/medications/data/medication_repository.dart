@@ -27,8 +27,8 @@ class MedicationRepository {
     var created = Medication.fromMap(row);
     String? uploadedPath;
 
-    if (imageBytes != null) {
-      try {
+    try {
+      if (imageBytes != null) {
         uploadedPath = await _imageService.upload(
           patientId: created.patientId,
           medicationId: created.id,
@@ -41,14 +41,61 @@ class MedicationRepository {
             .select()
             .single();
         created = Medication.fromMap(updated);
-      } catch (_) {
-        await _imageService.delete(uploadedPath);
-        await _client.from('medications').delete().eq('id', created.id);
-        rethrow;
       }
+
+      if (created.stockEnabled && created.stockQuantity > 0) {
+        final newQuantity = await addStock(
+          medicationId: created.id,
+          patientId: created.patientId,
+          quantity: created.stockQuantity,
+          type: 'INITIAL',
+          note: 'Initial medication stock',
+        );
+        created = Medication(
+          id: created.id,
+          patientId: created.patientId,
+          name: created.name,
+          genericName: created.genericName,
+          strength: created.strength,
+          dosageForm: created.dosageForm,
+          instructions: created.instructions,
+          imageUrl: created.imageUrl,
+          startDate: created.startDate,
+          endDate: created.endDate,
+          active: created.active,
+          createdBy: created.createdBy,
+          createdAt: created.createdAt,
+          stockEnabled: true,
+          stockQuantity: newQuantity,
+          stockUnit: created.stockUnit,
+          packageQuantity: created.packageQuantity,
+          lowStockThreshold: created.lowStockThreshold,
+        );
+      }
+    } catch (_) {
+      await _imageService.delete(uploadedPath);
+      await _client.from('medications').delete().eq('id', created.id);
+      rethrow;
     }
 
     return created;
+  }
+
+  Future<double> addStock({
+    required String medicationId,
+    required String patientId,
+    required double quantity,
+    String type = 'ADD',
+    String? note,
+  }) async {
+    final result = await _client.rpc('apply_medication_stock_transaction', params: {
+      'p_medication_id': medicationId,
+      'p_patient_id': patientId,
+      'p_quantity': quantity,
+      'p_transaction_type': type,
+      'p_note': note,
+    });
+    return (result as num).toDouble();
   }
 
   Future<String> updateMedicationImage({

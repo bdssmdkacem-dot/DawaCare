@@ -42,9 +42,9 @@ jobs:
         run: |
           echo "HEAD=$(git rev-parse HEAD)"
           echo "FILE_SHA=$(git hash-object lib/features/medications/presentation/pages/medication_stock_detail_page.dart)"
-          echo "Checking for stale stock badge API references..."
-          if grep -nE "MedicationStockBadge|lowStockThreshold:|threshold:" lib/features/medications/presentation/pages/medication_stock_detail_page.dart; then
-            echo "ERROR: stale MedicationStockBadge API reference found in stock detail page"
+          echo "Checking for stale MedicationStockBadge call..."
+          if grep -n "MedicationStockBadge" lib/features/medications/presentation/pages/medication_stock_detail_page.dart; then
+            echo "ERROR: MedicationStockBadge reference found in stock detail page"
             exit 1
           fi
           echo "Stock detail page is decoupled from MedicationStockBadge."

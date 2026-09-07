@@ -1,8 +1,12 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/voice/voice_message_service.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
+import '../../../../models/voice_message.dart';
 
 class DoseCard extends StatelessWidget {
   final DoseInstance dose;
@@ -25,6 +29,11 @@ class DoseCard extends StatelessWidget {
     this.onTap,
     this.compact = false,
   });
+
+  bool get _isFollowedDose {
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    return currentUserId != null && currentUserId != dose.patientId;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,12 +124,104 @@ class DoseCard extends StatelessWidget {
       ),
     );
 
-    if (onTap == null) return card;
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(16), child: card);
+    final tap = onTap ?? (_isFollowedDose ? () => _showFollowedDoseVoice(context) : null);
+    if (tap == null) return card;
+    return InkWell(onTap: tap, borderRadius: BorderRadius.circular(16), child: card);
+  }
+
+  Future<void> _showFollowedDoseVoice(BuildContext context) async {
+    final messages = await VoiceMessageService.instance.fetchForDose(dose.patientId, dose.id);
+    if (!context.mounted) return;
+    if (messages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا يوجد تسجيل صوتي مرتبط بهذه الجرعة.')),
+      );
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => _DoseVoiceSheet(messages: messages),
+    );
   }
 
   String _time(DateTime value) =>
       '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+}
+
+class _DoseVoiceSheet extends StatefulWidget {
+  const _DoseVoiceSheet({required this.messages});
+  final List<VoiceMessage> messages;
+
+  @override
+  State<_DoseVoiceSheet> createState() => _DoseVoiceSheetState();
+}
+
+class _DoseVoiceSheetState extends State<_DoseVoiceSheet> {
+  final AudioPlayer _player = AudioPlayer();
+  String? _playingId;
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle(VoiceMessage message) async {
+    try {
+      if (_playingId == message.id) {
+        await _player.pause();
+        if (mounted) setState(() => _playingId = null);
+        return;
+      }
+      final url = await VoiceMessageService.instance.signedUrl(message.storagePath);
+      await _player.play(UrlSource(url));
+      await VoiceMessageService.instance.markRead(message.id);
+      if (mounted) setState(() => _playingId = message.id);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذّر تشغيل التسجيل الصوتي.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('التسجيل الصوتي للجرعة', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 12),
+            ...widget.messages.map((message) {
+              final playing = _playingId == message.id;
+              return Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                  ),
+                  title: Text(message.senderName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text('${_duration(message.durationMs)} • استماع ${message.completedListens}/2'),
+                  onTap: () => _toggle(message),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _duration(int? ms) {
+    if (ms == null) return '00:00';
+    final seconds = (ms / 1000).round();
+    return '${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
+  }
 }
 
 class _MedicationImage extends StatelessWidget {

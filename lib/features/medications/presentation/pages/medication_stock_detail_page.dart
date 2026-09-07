@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/widgets/loading_indicator.dart';
+import '../../../../models/medication.dart';
+import '../../../../models/medication_schedule.dart';
 import '../../data/medication_repository.dart';
-import '../../models/medication.dart';
-import '../../models/medication_schedule.dart';
 import '../providers/medication_provider.dart';
 import '../widgets/medication_stock_badge.dart';
 
@@ -54,35 +54,23 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
 
   String _unitLabel(String? value) {
     switch (value) {
-      case 'capsule':
-        return 'كبسولة';
-      case 'tablet':
-        return 'قرص';
-      case 'ml':
-        return 'مل';
-      case 'drop':
-        return 'قطرة';
-      case 'injection':
-        return 'حقنة';
-      case 'spoon':
-        return 'ملعقة';
-      default:
-        return 'وحدة';
+      case 'capsule': return 'كبسولة';
+      case 'tablet': return 'قرص';
+      case 'ml': return 'مل';
+      case 'drop': return 'قطرة';
+      case 'injection': return 'حقنة';
+      case 'spoon': return 'ملعقة';
+      default: return 'وحدة';
     }
   }
 
   String _transactionLabel(String? type) {
     switch (type) {
-      case 'INITIAL':
-        return 'رصيد أولي';
-      case 'ADD':
-        return 'إضافة مخزون';
-      case 'TAKEN':
-        return 'استهلاك جرعة';
-      case 'ADJUSTMENT':
-        return 'تعديل المخزون';
-      default:
-        return type ?? 'عملية';
+      case 'INITIAL': return 'رصيد أولي';
+      case 'ADD': return 'إضافة مخزون';
+      case 'TAKEN': return 'استهلاك جرعة';
+      case 'ADJUSTMENT': return 'تعديل المخزون';
+      default: return type ?? 'عملية';
     }
   }
 
@@ -96,16 +84,10 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
           controller: controller,
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
-            labelText: 'الكمية',
-            suffixText: _unitLabel(_medication.stockUnit),
-          ),
+          decoration: InputDecoration(labelText: 'الكمية', suffixText: _unitLabel(_medication.stockUnit)),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           FilledButton(
             onPressed: () {
               final value = double.tryParse(controller.text.trim().replaceAll(',', '.'));
@@ -120,29 +102,20 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
 
     if (quantity == null || !mounted) return;
     final provider = context.read<MedicationProvider>();
-    final ok = await provider.addMedicationStock(
-      medication: _medication,
-      quantity: quantity,
-    );
+    final ok = await provider.addMedicationStock(medication: _medication, quantity: quantity);
     if (!mounted) return;
     if (ok) {
       final updated = provider.medications.where((m) => m.id == _medication.id).firstOrNull;
       if (updated != null) setState(() => _medication = updated);
       await _loadHistory();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر تحديث المخزون')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تحديث المخزون')));
     }
   }
 
   Future<void> _editSettings() async {
-    final package = TextEditingController(
-      text: _medication.packageQuantity?.toString() ?? '',
-    );
-    final threshold = TextEditingController(
-      text: _medication.lowStockThreshold.toString(),
-    );
+    final package = TextEditingController(text: _medication.packageQuantity?.toString() ?? '');
+    final threshold = TextEditingController(text: _medication.lowStockThreshold.toString());
     var unit = _medication.stockUnit;
 
     final result = await showDialog<bool>(
@@ -165,9 +138,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                   DropdownMenuItem(value: 'spoon', child: Text('ملعقة')),
                   DropdownMenuItem(value: 'unit', child: Text('وحدة')),
                 ],
-                onChanged: (value) {
-                  setDialogState(() => unit = value ?? unit);
-                },
+                onChanged: (value) => setDialogState(() => unit = value ?? unit),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -184,14 +155,8 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('حفظ'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حفظ')),
           ],
         ),
       ),
@@ -202,9 +167,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
     package.dispose();
     threshold.dispose();
 
-    if (result != true || !mounted || thresholdValue == null || thresholdValue < 0) {
-      return;
-    }
+    if (result != true || !mounted || thresholdValue == null || thresholdValue < 0) return;
 
     final provider = context.read<MedicationProvider>();
     final ok = await provider.updateMedicationStockSettings(
@@ -218,28 +181,20 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       final updated = provider.medications.where((m) => m.id == _medication.id).firstOrNull;
       if (updated != null) setState(() => _medication = updated);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر حفظ إعدادات المخزون')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر حفظ إعدادات المخزون')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final dailyConsumption = calculateDailyConsumption(_schedules);
-    final daysRemaining = dailyConsumption > 0
-        ? _medication.stockQuantity / dailyConsumption
-        : null;
+    final dailyConsumption = _calculateDailyConsumption(_schedules);
+    final daysRemaining = dailyConsumption > 0 ? _medication.stockQuantity / dailyConsumption : null;
 
     return Scaffold(
       appBar: AppBar(
         title: Text('مخزون ${_medication.name}'),
         actions: [
-          IconButton(
-            tooltip: 'تحديث',
-            onPressed: _loadHistory,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
+          IconButton(tooltip: 'تحديث', onPressed: _loadHistory, icon: const Icon(Icons.refresh_rounded)),
         ],
       ),
       body: RefreshIndicator(
@@ -253,7 +208,6 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
               schedules: _schedules,
               onAdd: _medication.stockEnabled ? _addStock : null,
               onSettings: _editSettings,
-              onDetails: null,
             ),
             const SizedBox(height: 16),
             Card(
@@ -285,42 +239,24 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
               children: [
                 Text('سجل المخزون', style: Theme.of(context).textTheme.titleMedium),
                 if (_medication.stockEnabled)
-                  FilledButton.tonalIcon(
-                    onPressed: _addStock,
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('إضافة'),
-                  ),
+                  FilledButton.tonalIcon(onPressed: _addStock, icon: const Icon(Icons.add_rounded), label: const Text('إضافة')),
               ],
             ),
             const SizedBox(height: 8),
             if (_loadingHistory)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: LoadingIndicator(),
-              )
+              const Padding(padding: EdgeInsets.all(24), child: LoadingIndicator())
             else if (_transactions.isEmpty)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(child: Text('لا توجد عمليات مخزون بعد.')),
-                ),
-              )
+              const Card(child: Padding(padding: EdgeInsets.all(20), child: Center(child: Text('لا توجد عمليات مخزون بعد.'))))
             else
               ..._transactions.map(
                 (row) => Card(
                   child: ListTile(
                     leading: CircleAvatar(
-                      child: Icon(
-                        (row['transaction_type'] as String?) == 'TAKEN'
-                            ? Icons.remove_rounded
-                            : Icons.add_rounded,
-                      ),
+                      child: Icon((row['transaction_type'] as String?) == 'TAKEN' ? Icons.remove_rounded : Icons.add_rounded),
                     ),
                     title: Text(_transactionLabel(row['transaction_type'] as String?)),
                     subtitle: Text((row['created_at'] as String?) ?? ''),
-                    trailing: Text(
-                      '${_formatNumber((row['quantity'] as num?)?.toDouble() ?? 0)} ${_unitLabel(_medication.stockUnit)}',
-                    ),
+                    trailing: Text('${_formatNumber((row['quantity'] as num?)?.toDouble() ?? 0)} ${_unitLabel(_medication.stockUnit)}'),
                   ),
                 ),
               ),
@@ -328,6 +264,32 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
         ),
       ),
     );
+  }
+
+  double _calculateDailyConsumption(List<MedicationSchedule> schedules) {
+    double total = 0;
+    for (final schedule in schedules) {
+      final dose = _extractNumber(schedule.doseAmount);
+      if (dose <= 0 || schedule.type == ScheduleType.prn) continue;
+      switch (schedule.type) {
+        case ScheduleType.daily:
+          total += dose;
+        case ScheduleType.weekly:
+        case ScheduleType.specificDays:
+          total += dose * (schedule.daysOfWeek.isEmpty ? 1 : schedule.daysOfWeek.length) / 7;
+        case ScheduleType.interval:
+          total += dose / (schedule.intervalDays ?? 1);
+        case ScheduleType.once:
+        case ScheduleType.prn:
+          break;
+      }
+    }
+    return total;
+  }
+
+  double _extractNumber(String value) {
+    final match = RegExp(r'\d+(?:[.,]\d+)?').firstMatch(value.trim());
+    return match == null ? 0 : double.tryParse(match.group(0)!.replaceAll(',', '.')) ?? 0;
   }
 
   String _formatNumber(double value) {

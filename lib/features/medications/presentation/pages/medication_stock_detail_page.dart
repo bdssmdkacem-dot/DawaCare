@@ -7,8 +7,13 @@ import '../providers/medication_provider.dart';
 
 class MedicationStockDetailPage extends StatefulWidget {
   final Medication medication;
+  final List<MedicationSchedule> schedules;
 
-  const MedicationStockDetailPage({super.key, required this.medication});
+  const MedicationStockDetailPage({
+    super.key,
+    required this.medication,
+    required this.schedules,
+  });
 
   @override
   State<MedicationStockDetailPage> createState() => _MedicationStockDetailPageState();
@@ -16,7 +21,7 @@ class MedicationStockDetailPage extends StatefulWidget {
 
 class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
   late Medication _medication;
-  List<MedicationSchedule> _schedules = const [];
+  late List<MedicationSchedule> _schedules;
   bool _loading = true;
   String? _error;
 
@@ -24,13 +29,13 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
   void initState() {
     super.initState();
     _medication = widget.medication;
+    _schedules = widget.schedules;
     _load();
   }
 
   Future<void> _load() async {
     try {
-      final provider = context.read<MedicationProvider>();
-      final schedules = await provider.fetchSchedules(_medication.id);
+      final schedules = await context.read<MedicationProvider>().fetchSchedules(_medication.id);
       if (!mounted) return;
       setState(() {
         _schedules = schedules;
@@ -51,22 +56,21 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
     for (final schedule in _schedules) {
       final dose = _extractNumber(schedule.doseAmount);
       if (dose <= 0) continue;
-      switch (schedule.type.toLowerCase()) {
-        case 'daily':
+      switch (schedule.type) {
+        case ScheduleType.daily:
           total += dose;
-          break;
-        case 'weekly':
+        case ScheduleType.weekly:
           total += dose / 7;
-          break;
-        case 'monthly':
+        case ScheduleType.specificDays:
+          final count = schedule.daysOfWeek.length;
+          if (count > 0) total += dose * count / 7;
+        case ScheduleType.interval:
+          final days = schedule.intervalDays ?? 1;
+          total += dose / (days <= 0 ? 1 : days);
+        case ScheduleType.once:
           total += dose / 30;
+        case ScheduleType.prn:
           break;
-        case 'interval':
-          final days = schedule.intervalDays <= 0 ? 1 : schedule.intervalDays;
-          total += dose / days;
-          break;
-        default:
-          total += dose;
       }
     }
     return total;
@@ -80,7 +84,9 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
 
   String _formatNumber(double value) {
     if (value == value.roundToDouble()) return value.toInt().toString();
-    return value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+    return value.toStringAsFixed(2)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 
   String _stockStatus() {
@@ -115,24 +121,24 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       ),
     );
     controller.dispose();
-
     if (!mounted || result == null || result <= 0) return;
+
     final provider = context.read<MedicationProvider>();
     final ok = await provider.addMedicationStock(medication: _medication, quantity: result);
     if (!mounted) return;
     if (ok) {
       final updated = provider.medications.where((m) => m.id == _medication.id).firstOrNull;
       if (updated != null) setState(() => _medication = updated);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.error ?? 'تعذر تحديث المخزون')),
+      );
     }
   }
 
   Future<void> _editSettings() async {
-    final package = TextEditingController(
-      text: _medication.packageQuantity?.toString() ?? '',
-    );
-    final threshold = TextEditingController(
-      text: _medication.lowStockThreshold.toString(),
-    );
+    final package = TextEditingController(text: _medication.packageQuantity?.toString() ?? '');
+    final threshold = TextEditingController(text: _medication.lowStockThreshold.toString());
     var unit = _medication.stockUnit;
 
     final result = await showDialog<bool>(
@@ -200,7 +206,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       if (updated != null) setState(() => _medication = updated);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر حفظ إعدادات المخزون')),
+        SnackBar(content: Text(provider.error ?? 'تعذر حفظ إعدادات المخزون')),
       );
     }
   }
@@ -224,6 +230,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     children: [
                       Card(

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
 import '../providers/medication_provider.dart';
+import '../widgets/medication_stock_history.dart';
 
 class MedicationStockDetailPage extends StatefulWidget {
   final Medication medication;
@@ -24,6 +25,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
   late List<MedicationSchedule> _schedules;
   bool _loading = true;
   String? _error;
+  final GlobalKey<_MedicationStockHistoryState> _historyKey = GlobalKey<_MedicationStockHistoryState>();
 
   @override
   void initState() {
@@ -42,6 +44,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
         _loading = false;
         _error = null;
       });
+      _historyKey.currentState?.refresh();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -84,9 +87,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
 
   String _formatNumber(double value) {
     if (value == value.roundToDouble()) return value.toInt().toString();
-    return value.toStringAsFixed(2)
-        .replaceFirst(RegExp(r'0+$'), '')
-        .replaceFirst(RegExp(r'\.$'), '');
+    return value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
   }
 
   String _stockStatus() {
@@ -129,10 +130,9 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
     if (ok) {
       final updated = provider.medications.where((m) => m.id == _medication.id).firstOrNull;
       if (updated != null) setState(() => _medication = updated);
+      _historyKey.currentState?.refresh();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'تعذر تحديث المخزون')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error ?? 'تعذر تحديث المخزون')));
     }
   }
 
@@ -165,16 +165,8 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                     if (value != null) setDialogState(() => unit = value);
                   },
                 ),
-                TextField(
-                  controller: package,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'كمية العبوة'),
-                ),
-                TextField(
-                  controller: threshold,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'حد المخزون المنخفض'),
-                ),
+                TextField(controller: package, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'كمية العبوة')),
+                TextField(controller: threshold, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'حد المخزون المنخفض')),
               ],
             ),
           ),
@@ -190,24 +182,16 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
     final thresholdValue = double.tryParse(threshold.text.trim().replaceAll(',', '.'));
     package.dispose();
     threshold.dispose();
-
     if (result != true || !mounted || thresholdValue == null || thresholdValue < 0) return;
 
     final provider = context.read<MedicationProvider>();
-    final ok = await provider.updateMedicationStockSettings(
-      medication: _medication,
-      unit: unit,
-      packageQuantity: packageValue,
-      threshold: thresholdValue,
-    );
+    final ok = await provider.updateMedicationStockSettings(medication: _medication, unit: unit, packageQuantity: packageValue, threshold: thresholdValue);
     if (!mounted) return;
     if (ok) {
       final updated = provider.medications.where((m) => m.id == _medication.id).firstOrNull;
       if (updated != null) setState(() => _medication = updated);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'تعذر حفظ إعدادات المخزون')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error ?? 'تعذر حفظ إعدادات المخزون')));
     }
   }
 
@@ -219,9 +203,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_medication.name),
-        actions: [
-          IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
-        ],
+        actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh))],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -239,37 +221,26 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('المخزون الحالي', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  Chip(label: Text(_stockStatus())),
-                                ],
-                              ),
+                              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('المخزون الحالي', style: TextStyle(fontWeight: FontWeight.bold)), Chip(label: Text(_stockStatus()))]),
                               const SizedBox(height: 12),
-                              Text(
-                                '${_formatNumber(_medication.stockQuantity)} ${_medication.stockUnit}',
-                                style: Theme.of(context).textTheme.headlineMedium,
-                              ),
+                              Text('${_formatNumber(_medication.stockQuantity)} ${_medication.stockUnit}', style: Theme.of(context).textTheme.headlineMedium),
                               const SizedBox(height: 12),
                               _InfoRow(label: 'حد المخزون المنخفض', value: '${_formatNumber(_medication.lowStockThreshold)} ${_medication.stockUnit}'),
-                              if (_medication.packageQuantity != null)
-                                _InfoRow(label: 'كمية العبوة', value: '${_formatNumber(_medication.packageQuantity!)} ${_medication.stockUnit}'),
+                              if (_medication.packageQuantity != null) _InfoRow(label: 'كمية العبوة', value: '${_formatNumber(_medication.packageQuantity!)} ${_medication.stockUnit}'),
                               _InfoRow(label: 'الاستهلاك اليومي المتوقع', value: daily > 0 ? '${_formatNumber(daily)} ${_medication.stockUnit}' : 'غير متاح'),
-                              if (daysRemaining != null)
-                                _InfoRow(label: 'الأيام المتبقية تقديريًا', value: _formatNumber(daysRemaining)),
+                              if (daysRemaining != null) _InfoRow(label: 'الأيام المتبقية تقديريًا', value: _formatNumber(daysRemaining)),
                               const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(child: FilledButton.icon(onPressed: _addStock, icon: const Icon(Icons.add), label: const Text('إضافة مخزون'))),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: OutlinedButton.icon(onPressed: _editSettings, icon: const Icon(Icons.settings), label: const Text('الإعدادات'))),
-                                ],
-                              ),
+                              Row(children: [
+                                Expanded(child: FilledButton.icon(onPressed: _addStock, icon: const Icon(Icons.add), label: const Text('إضافة مخزون'))),
+                                const SizedBox(width: 8),
+                                Expanded(child: OutlinedButton.icon(onPressed: _editSettings, icon: const Icon(Icons.settings), label: const Text('الإعدادات'))),
+                              ]),
                             ],
                           ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      MedicationStockHistory(key: _historyKey, medicationId: _medication.id, unit: _medication.stockUnit),
                     ],
                   ),
                 ),
@@ -287,13 +258,7 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label),
-          Flexible(child: Text(value, textAlign: TextAlign.end)),
-        ],
-      ),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label), Flexible(child: Text(value, textAlign: TextAlign.end))]),
     );
   }
 }

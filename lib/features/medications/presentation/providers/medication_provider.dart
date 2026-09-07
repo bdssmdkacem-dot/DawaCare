@@ -3,10 +3,11 @@ import 'package:flutter/foundation.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
+import '../../data/medication_repository.dart';
+import '../../data/stock_alert_service.dart';
 import '../../../doses/data/dose_repository.dart';
 import '../../../reminders/data/reminder_policy_repository.dart';
 import '../../../reminders/domain/reminder_engine.dart';
-import '../../data/medication_repository.dart';
 
 class MedicationProvider extends ChangeNotifier {
   final MedicationRepository _repo = MedicationRepository();
@@ -32,6 +33,13 @@ class MedicationProvider extends ChangeNotifier {
       for (final med in medications) {
         schedulesByMedicationId[med.id] = await _repo.fetchSchedules(med.id);
       }
+      for (final med in medications) {
+        try {
+          await StockAlertService.instance.checkMedication(med);
+        } catch (_) {
+          // Stock alerts are non-critical and must never block medication loading.
+        }
+      }
     } catch (_) {
       error = 'تعذّر تحميل الأدوية.';
     } finally {
@@ -41,6 +49,8 @@ class MedicationProvider extends ChangeNotifier {
   }
 
   Future<List<MedicationSchedule>> fetchSchedules(String medicationId) => _repo.fetchSchedules(medicationId);
+
+  Future<List<Map<String, dynamic>>> fetchStockTransactions(String medicationId) => _repo.fetchStockTransactions(medicationId);
 
   Future<bool> addMedication({required Medication medication, required MedicationSchedule schedule, Uint8List? imageBytes}) async {
     try {

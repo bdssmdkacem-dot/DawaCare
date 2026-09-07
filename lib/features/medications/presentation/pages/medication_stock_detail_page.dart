@@ -274,11 +274,14 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       switch (schedule.type) {
         case ScheduleType.daily:
           total += dose;
+          break;
         case ScheduleType.weekly:
         case ScheduleType.specificDays:
           total += dose * (schedule.daysOfWeek.isEmpty ? 1 : schedule.daysOfWeek.length) / 7;
+          break;
         case ScheduleType.interval:
           total += dose / (schedule.intervalDays ?? 1);
+          break;
         case ScheduleType.once:
         case ScheduleType.prn:
           break;

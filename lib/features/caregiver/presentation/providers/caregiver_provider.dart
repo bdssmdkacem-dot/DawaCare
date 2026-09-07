@@ -4,6 +4,7 @@ import '../../../../models/caregiver_alert.dart';
 import '../../../../models/caregiver_link.dart';
 import '../../../../models/family_link_code.dart';
 import '../../../../models/family_link_request.dart';
+import '../../../../models/family_member_summary.dart';
 import '../../data/caregiver_repository.dart';
 
 class CaregiverProvider extends ChangeNotifier {
@@ -12,14 +13,17 @@ class CaregiverProvider extends ChangeNotifier {
   List<CaregiverAlert> alerts = [];
   List<FamilyLinkRequest> incomingRequests = [];
   List<FamilyLinkRequest> sentRequests = [];
-  FamilyLinkCode? activeCode;
+  final Map<String, FamilyMemberSummary> memberSummaries = {};
   bool isLoading = false;
   bool isCodeLoading = false;
   bool isSubmittingCode = false;
+  bool isSummariesLoading = false;
   String? error;
 
   int get unreadAlertCount => alerts.where((a) => !a.read).length;
   int get pendingApprovalCount => incomingRequests.length;
+
+  FamilyMemberSummary? summaryFor(String patientId) => memberSummaries[patientId];
 
   Future<void> load(String userId) async {
     isLoading = true; error = null; notifyListeners();
@@ -32,8 +36,34 @@ class CaregiverProvider extends ChangeNotifier {
       alerts = results[1] as List<CaregiverAlert>;
       incomingRequests = results[2] as List<FamilyLinkRequest>;
       sentRequests = results[3] as List<FamilyLinkRequest>;
+      await loadMemberSummaries(notify: false);
     } catch (_) { error = 'تعذّر تحميل بيانات العائلة.'; }
     finally { isLoading = false; notifyListeners(); }
+  }
+
+  Future<void> loadMemberSummaries({bool notify = true}) async {
+    if (linkedPatients.isEmpty) {
+      memberSummaries.clear();
+      if (notify) notifyListeners();
+      return;
+    }
+    isSummariesLoading = true;
+    if (notify) notifyListeners();
+    try {
+      final entries = await Future.wait(linkedPatients.map((link) async {
+        try {
+          return MapEntry(link.patientId, await _repo.fetchMemberSummary(link.patientId));
+        } catch (_) {
+          return MapEntry(link.patientId, const FamilyMemberSummary.empty());
+        }
+      }));
+      memberSummaries
+        ..clear()
+        ..addEntries(entries);
+    } finally {
+      isSummariesLoading = false;
+      if (notify) notifyListeners();
+    }
   }
 
   Future<void> generateCode() async {
@@ -42,6 +72,8 @@ class CaregiverProvider extends ChangeNotifier {
     catch (_) { error = 'تعذّر إنشاء رمز الربط. حاول مرة أخرى.'; }
     finally { isCodeLoading = false; notifyListeners(); }
   }
+
+  FamilyLinkCode? activeCode;
 
   void clearCode() { activeCode = null; notifyListeners(); }
 
@@ -73,7 +105,7 @@ class CaregiverProvider extends ChangeNotifier {
     catch (_) { error = 'تعذّر تنفيذ العملية. حاول مرة أخرى.'; notifyListeners(); return false; }
   }
 
-  Future<void> unlink(CaregiverLink link) async { await _repo.unlink(link.id); linkedPatients.removeWhere((l) => l.id == link.id); notifyListeners(); }
+  Future<void> unlink(CaregiverLink link) async { await _repo.unlink(link.id); linkedPatients.removeWhere((l) => l.id == link.id); memberSummaries.remove(link.patientId); notifyListeners(); }
 
   Future<void> markAlertRead(CaregiverAlert alert) async {
     await _repo.markAlertRead(alert.id);

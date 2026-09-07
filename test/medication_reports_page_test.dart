@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dawacare/features/caregiver/presentation/pages/medication_reports_page.dart';
+import 'package:dawacare/features/caregiver/presentation/providers/medication_report_provider.dart';
 
 void main() {
   testWidgets('renders caregiver reports shell and period selector',

@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
 import '../../../../models/dose_instance.dart';
@@ -31,7 +29,9 @@ class MedicationProvider extends ChangeNotifier {
     try {
       medications = await _repo.fetchMedications(forPatientId);
       schedulesByMedicationId.clear();
-      for (final med in medications) schedulesByMedicationId[med.id] = await _repo.fetchSchedules(med.id);
+      for (final med in medications) {
+        schedulesByMedicationId[med.id] = await _repo.fetchSchedules(med.id);
+      }
     } catch (_) {
       error = 'تعذّر تحميل الأدوية.';
     } finally {
@@ -156,7 +156,9 @@ class MedicationProvider extends ChangeNotifier {
       final from = DateTime(now.year, now.month, now.day);
       final to = from.add(const Duration(days: 2, hours: 23));
       final oldDoses = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
-      for (final dose in oldDoses.where((d) => d.scheduleId == schedule.id && !isResolvedStatus(d.status))) await ReminderEngine.cancelFor(dose.id);
+      for (final dose in oldDoses.where((d) => d.scheduleId == schedule.id && !isResolvedStatus(d.status))) {
+        await ReminderEngine.cancelFor(dose.id);
+      }
       final updated = await _repo.updateSchedule(MedicationSchedule(id: schedule.id, medicationId: schedule.medicationId, type: schedule.type, time: time, daysOfWeek: schedule.daysOfWeek, intervalDays: schedule.intervalDays, doseAmount: doseAmount, startDate: schedule.startDate, endDate: schedule.endDate, timezone: schedule.timezone));
       await _repo.deleteFuturePendingDoses(schedule.id, from);
       await _doseRepo.ensureDosesGenerated(patientId);

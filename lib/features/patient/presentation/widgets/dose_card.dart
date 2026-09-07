@@ -35,8 +35,6 @@ class DoseCard extends StatelessWidget {
       final currentUserId = Supabase.instance.client.auth.currentUser?.id;
       return currentUserId != null && currentUserId != dose.patientId;
     } catch (_) {
-      // Widget/unit tests may render DoseCard before Supabase.initialize().
-      // A missing client must never break the medication-card UI.
       return false;
     }
   }
@@ -64,10 +62,7 @@ class DoseCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        dose.medicationName,
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                      ),
+                      Text(dose.medicationName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                       const SizedBox(height: 4),
                       Text('${dose.doseAmount} • ${_time(dose.scheduledAt)}'),
                       if (medication != null) ...[
@@ -76,12 +71,9 @@ class DoseCard extends StatelessWidget {
                           spacing: 6,
                           runSpacing: 4,
                           children: [
-                            if ((medication!.genericName ?? '').isNotEmpty)
-                              Text(medication!.genericName!, style: theme.textTheme.bodySmall),
-                            if ((medication!.strength ?? '').isNotEmpty)
-                              Text(medication!.strength!, style: theme.textTheme.bodySmall),
-                            if ((medication!.dosageForm ?? '').isNotEmpty)
-                              Text(medication!.dosageForm!, style: theme.textTheme.bodySmall),
+                            if ((medication!.genericName ?? '').isNotEmpty) Text(medication!.genericName!, style: theme.textTheme.bodySmall),
+                            if ((medication!.strength ?? '').isNotEmpty) Text(medication!.strength!, style: theme.textTheme.bodySmall),
+                            if ((medication!.dosageForm ?? '').isNotEmpty) Text(medication!.dosageForm!, style: theme.textTheme.bodySmall),
                           ],
                         ),
                         if ((medication!.instructions ?? '').isNotEmpty) ...[
@@ -92,10 +84,7 @@ class DoseCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                _StatusChip(
-                  status: dose.status,
-                  label: l.doseStatus(doseStatusToDb(dose.status)),
-                ),
+                _StatusChip(status: dose.status, label: l.doseStatus(doseStatusToDb(dose.status))),
               ],
             ),
             if (actionable && (onConfirm != null || onSnooze != null || onSkip != null)) ...[
@@ -104,24 +93,9 @@ class DoseCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  if (onConfirm != null)
-                    FilledButton.icon(
-                      onPressed: onConfirm,
-                      icon: const Icon(Icons.check_rounded),
-                      label: Text(l.doseStatus('TAKEN')),
-                    ),
-                  if (onSnooze != null)
-                    OutlinedButton.icon(
-                      onPressed: onSnooze,
-                      icon: const Icon(Icons.schedule_rounded),
-                      label: Text(l.doseStatus('SNOOZED')),
-                    ),
-                  if (onSkip != null)
-                    TextButton.icon(
-                      onPressed: onSkip,
-                      icon: const Icon(Icons.close_rounded),
-                      label: Text(l.skip),
-                    ),
+                  if (onConfirm != null) FilledButton.icon(onPressed: onConfirm, icon: const Icon(Icons.check_rounded), label: Text(l.doseStatus('TAKEN'))),
+                  if (onSnooze != null) OutlinedButton.icon(onPressed: onSnooze, icon: const Icon(Icons.schedule_rounded), label: Text(l.doseStatus('SNOOZED'))),
+                  if (onSkip != null) TextButton.icon(onPressed: onSkip, icon: const Icon(Icons.close_rounded), label: Text(l.skip)),
                 ],
               ),
             ],
@@ -130,7 +104,9 @@ class DoseCard extends StatelessWidget {
       ),
     );
 
-    final tap = onTap ?? (_isFollowedDose ? () => _showFollowedDoseVoice(context) : null);
+    // A followed dose always keeps its exact-dose voice interaction, even
+    // when the caller also supplies an onTap for medication navigation.
+    final tap = _isFollowedDose ? () => _showFollowedDoseVoice(context) : onTap;
     if (tap == null) return card;
     return InkWell(onTap: tap, borderRadius: BorderRadius.circular(16), child: card);
   }
@@ -140,9 +116,7 @@ class DoseCard extends StatelessWidget {
       final messages = await VoiceMessageService.instance.fetchForDose(dose.patientId, dose.id);
       if (!context.mounted) return;
       if (messages.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لا يوجد تسجيل صوتي مرتبط بهذه الجرعة.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يوجد تسجيل صوتي مرتبط بهذه الجرعة.')));
         return;
       }
       await showModalBottomSheet<void>(
@@ -152,20 +126,16 @@ class DoseCard extends StatelessWidget {
       );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذّر تحميل التسجيل الصوتي لهذه الجرعة.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذّر تحميل التسجيل الصوتي لهذه الجرعة.')));
     }
   }
 
-  String _time(DateTime value) =>
-      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  String _time(DateTime value) => '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 }
 
 class _DoseVoiceSheet extends StatefulWidget {
   const _DoseVoiceSheet({required this.messages});
   final List<VoiceMessage> messages;
-
   @override
   State<_DoseVoiceSheet> createState() => _DoseVoiceSheetState();
 }
@@ -173,12 +143,8 @@ class _DoseVoiceSheet extends StatefulWidget {
 class _DoseVoiceSheetState extends State<_DoseVoiceSheet> {
   final AudioPlayer _player = AudioPlayer();
   String? _playingId;
-
   @override
-  void dispose() {
-    _player.dispose();
-    super.dispose();
-  }
+  void dispose() { _player.dispose(); super.dispose(); }
 
   Future<void> _toggle(VoiceMessage message) async {
     try {
@@ -192,11 +158,7 @@ class _DoseVoiceSheetState extends State<_DoseVoiceSheet> {
       await VoiceMessageService.instance.markRead(message.id);
       if (mounted) setState(() => _playingId = message.id);
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذّر تشغيل التسجيل الصوتي.')),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذّر تشغيل التسجيل الصوتي.')));
     }
   }
 
@@ -213,16 +175,12 @@ class _DoseVoiceSheetState extends State<_DoseVoiceSheet> {
             const SizedBox(height: 12),
             ...widget.messages.map((message) {
               final playing = _playingId == message.id;
-              return Card(
-                child: ListTile(
-                  leading: CircleAvatar(
-                    child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                  ),
-                  title: Text(message.senderName, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text('${_duration(message.durationMs)} • استماع ${message.completedListens}/2'),
-                  onTap: () => _toggle(message),
-                ),
-              );
+              return Card(child: ListTile(
+                leading: CircleAvatar(child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded)),
+                title: Text(message.senderName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text('${_duration(message.durationMs)} • استماع ${message.completedListens}/2'),
+                onTap: () => _toggle(message),
+              ));
             }),
           ],
         ),
@@ -240,14 +198,11 @@ class _DoseVoiceSheetState extends State<_DoseVoiceSheet> {
 class _MedicationImage extends StatelessWidget {
   final Future<String?>? future;
   final bool compact;
-
   const _MedicationImage({required this.future, required this.compact});
-
   @override
   Widget build(BuildContext context) {
     final size = compact ? 54.0 : 64.0;
     if (future == null) return _placeholder(context, size);
-
     return FutureBuilder<String?>(
       future: future,
       builder: (context, snapshot) {
@@ -255,62 +210,29 @@ class _MedicationImage extends StatelessWidget {
         if (url == null || url.isEmpty) return _placeholder(context, size);
         return ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            url,
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            cacheWidth: compact ? 162 : 192,
-            cacheHeight: compact ? 162 : 192,
-            errorBuilder: (_, __, ___) => _placeholder(context, size),
-          ),
+          child: Image.network(url, width: size, height: size, fit: BoxFit.cover, cacheWidth: compact ? 162 : 192, cacheHeight: compact ? 162 : 192, errorBuilder: (_, __, ___) => _placeholder(context, size)),
         );
       },
     );
   }
-
-  Widget _placeholder(BuildContext context, double size) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.medication_rounded),
-      );
+  Widget _placeholder(BuildContext context, double size) => Container(width: size, height: size, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.medication_rounded));
 }
 
 class _StatusChip extends StatelessWidget {
   final DoseStatus status;
   final String label;
-
   const _StatusChip({required this.status, required this.label});
-
   @override
-  Widget build(BuildContext context) {
-    return Chip(
-      avatar: Icon(_icon, size: 16),
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
+  Widget build(BuildContext context) => Chip(avatar: Icon(_icon, size: 16), label: Text(label), visualDensity: VisualDensity.compact);
   IconData get _icon {
     switch (status) {
-      case DoseStatus.taken:
-        return Icons.check_circle_rounded;
-      case DoseStatus.missed:
-        return Icons.warning_rounded;
-      case DoseStatus.snoozed:
-        return Icons.schedule_rounded;
-      case DoseStatus.skipped:
-        return Icons.remove_circle_outline_rounded;
-      case DoseStatus.cancelled:
-        return Icons.cancel_outlined;
-      case DoseStatus.reminderSent:
-        return Icons.notifications_active_rounded;
-      case DoseStatus.pending:
-        return Icons.access_time_rounded;
+      case DoseStatus.taken: return Icons.check_circle_rounded;
+      case DoseStatus.missed: return Icons.warning_rounded;
+      case DoseStatus.snoozed: return Icons.schedule_rounded;
+      case DoseStatus.skipped: return Icons.remove_circle_outline_rounded;
+      case DoseStatus.cancelled: return Icons.cancel_outlined;
+      case DoseStatus.reminderSent: return Icons.notifications_active_rounded;
+      case DoseStatus.pending: return Icons.access_time_rounded;
     }
   }
 }

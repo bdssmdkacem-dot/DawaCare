@@ -41,8 +41,6 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _loadProfile() async {
-    // The `profiles` row is created by a DB trigger on signup; it may take
-    // a beat to appear right after signUp(), so retry briefly.
     for (int attempt = 0; attempt < 5; attempt++) {
       final p = await _repo.fetchMyProfile();
       if (p != null) {
@@ -54,17 +52,24 @@ class AuthProvider extends ChangeNotifier {
       }
       await Future.delayed(const Duration(milliseconds: 400));
     }
-    status = AuthStatus.signedIn; // signed in even if profile fetch raced out
+    status = AuthStatus.signedIn;
     notifyListeners();
   }
 
-  Future<bool> signUp({required String email, required String password, required String fullName}) =>
-      _run(() => _repo.signUp(email: email, password: password, fullName: fullName));
+  Future<bool> signUp({required String email, required String password, required String fullName}) {
+    if (isLoading) return Future.value(false);
+    return _run(() => _repo.signUp(email: email, password: password, fullName: fullName));
+  }
 
-  Future<bool> signIn({required String email, required String password}) =>
-      _run(() => _repo.signIn(email: email, password: password));
+  Future<bool> signIn({required String email, required String password}) {
+    if (isLoading) return Future.value(false);
+    return _run(() => _repo.signIn(email: email, password: password));
+  }
 
-  Future<bool> resetPassword(String email) => _run(() => _repo.resetPassword(email));
+  Future<bool> resetPassword(String email) {
+    if (isLoading) return Future.value(false);
+    return _run(() => _repo.resetPassword(email));
+  }
 
   Future<void> signOut() async {
     final userId = profile?.id;
@@ -82,6 +87,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> _run(Future<void> Function() action) async {
+    if (isLoading) return false;
     isLoading = true;
     errorMessage = null;
     notifyListeners();
@@ -95,7 +101,7 @@ class AuthProvider extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
       return false;
-    } catch (e) {
+    } catch (_) {
       errorMessage = 'حدث خطأ غير متوقع. حاول مرة أخرى.';
       isLoading = false;
       notifyListeners();

@@ -16,8 +16,9 @@ CaregiverLink _link() => CaregiverLink(
       createdAt: DateTime(2026, 1, 1),
     );
 
-Widget _app() {
+Widget _app(GlobalKey<NavigatorState> navigatorKey) {
   return MaterialApp(
+    navigatorKey: navigatorKey,
     locale: const Locale('ar'),
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: const [
@@ -26,57 +27,51 @@ Widget _app() {
       GlobalCupertinoLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,
     ],
-    home: Scaffold(
-      body: Builder(
-        builder: (context) => Center(
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => PatientDetailPage(link: _link()),
-              ),
-            ),
-            child: const Text('فتح المريض'),
-          ),
-        ),
-      ),
+    home: const Scaffold(
+      body: Center(child: Text('Lifecycle host')),
     ),
   );
 }
 
-Future<void> _openAndRapidlyClose(WidgetTester tester) async {
-  await tester.tap(find.text('فتح المريض'));
+Future<void> _openAndRapidlyClose(
+  WidgetTester tester,
+  GlobalKey<NavigatorState> navigatorKey,
+) async {
+  navigatorKey.currentState!.push(
+    MaterialPageRoute(
+      builder: (_) => PatientDetailPage(link: _link()),
+    ),
+  );
   await tester.pump();
   expect(find.byType(PatientDetailPage), findsOneWidget);
 
-  // Allow the page's post-frame callback to start the real provider loads,
-  // then pop the route while those asynchronous operations may still be in
-  // flight. Do not wait for the providers to finish before disposing the page.
+  // Let the page's post-frame callback start the real provider loads, then
+  // immediately tear the route down while those asynchronous operations may
+  // still be in flight. This is the lifecycle condition that previously
+  // produced the framework red screen.
   await tester.pump(const Duration(milliseconds: 1));
-  Navigator.of(tester.element(find.byType(PatientDetailPage))).pop();
+  navigatorKey.currentState!.pop();
 
-  // Complete the Navigator route transition before interacting with the
-  // underlying entry point again. A single pump is not sufficient because
-  // MaterialPageRoute has an exit animation; without settling it, the button
-  // remains covered by the outgoing route and the test can fail for the wrong
-  // reason (finder sees zero buttons), rather than exercising lifecycle.
+  // Finish the route transition before the next push. The test deliberately
+  // avoids a text/button finder here: the regression target is Navigator and
+  // notifier lifecycle, not the entry-point UI contract.
   await tester.pumpAndSettle();
+  expect(find.byType(PatientDetailPage), findsNothing);
 }
 
 void main() {
   testWidgets(
     'PatientDetailPage survives rapid push/pop while async loading is in flight',
     (tester) async {
-      await tester.pumpWidget(_app());
+      final navigatorKey = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(_app(navigatorKey));
 
       for (var i = 0; i < 5; i++) {
-        await _openAndRapidlyClose(tester);
-        expect(find.text('فتح المريض'), findsOneWidget);
-        expect(find.byType(PatientDetailPage), findsNothing);
+        await _openAndRapidlyClose(tester, navigatorKey);
       }
 
       // Flush deferred notifier disposal callbacks and any provider futures.
       await tester.pump(const Duration(milliseconds: 50));
-      expect(find.text('فتح المريض'), findsOneWidget);
       expect(find.byType(PatientDetailPage), findsNothing);
     },
   );
@@ -84,19 +79,23 @@ void main() {
   testWidgets(
     'PatientDetailPage can be re-entered immediately after disposal',
     (tester) async {
-      await tester.pumpWidget(_app());
+      final navigatorKey = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(_app(navigatorKey));
 
-      await _openAndRapidlyClose(tester);
-      expect(find.text('فتح المريض'), findsOneWidget);
-      expect(find.byType(PatientDetailPage), findsNothing);
+      await _openAndRapidlyClose(tester, navigatorKey);
 
       // Re-enter immediately after the previous route has completed its
-      // transition and disposal callback has had a chance to run.
-      await tester.tap(find.text('فتح المريض'));
+      // transition and deferred disposal callback has had a chance to run.
+      navigatorKey.currentState!.push(
+        MaterialPageRoute(
+          builder: (_) => PatientDetailPage(link: _link()),
+        ),
+      );
       await tester.pump();
       expect(find.byType(PatientDetailPage), findsOneWidget);
 
-      Navigator.of(tester.element(find.byType(PatientDetailPage))).pop();
+      await tester.pump(const Duration(milliseconds: 1));
+      navigatorKey.currentState!.pop();
       await tester.pumpAndSettle();
       expect(find.byType(PatientDetailPage), findsNothing);
     },

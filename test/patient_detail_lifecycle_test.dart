@@ -33,8 +33,12 @@ Widget _app() {
 }
 
 Future<void> _openAndRapidlyClose(WidgetTester tester) async {
-  final hostContext = tester.element(find.text('Lifecycle host'));
-  Navigator.of(hostContext).push(
+  final hostFinder = find.text('Lifecycle host');
+  expect(hostFinder, findsOneWidget);
+  final hostContext = tester.element(hostFinder);
+  final navigator = Navigator.of(hostContext);
+
+  navigator.push(
     MaterialPageRoute(
       builder: (_) => PatientDetailPage(link: _link()),
     ),
@@ -42,17 +46,12 @@ Future<void> _openAndRapidlyClose(WidgetTester tester) async {
   await tester.pump();
   expect(find.byType(PatientDetailPage), findsOneWidget);
 
-  // Let the page's post-frame callback start the real provider loads, then
-  // immediately tear the route down while those asynchronous operations may
-  // still be in flight. This is the lifecycle condition that previously
-  // produced the framework red screen.
+  // Start the page's post-frame async work, then pop immediately while the
+  // real providers may still be loading.
   await tester.pump(const Duration(milliseconds: 1));
-  final pageContext = tester.element(find.byType(PatientDetailPage));
-  Navigator.of(pageContext).pop();
+  navigator.pop();
 
-  // Finish the route transition before the next push. The test deliberately
-  // uses mounted widget contexts rather than a NavigatorState key so it tests
-  // the same navigation mechanism used by the application.
+  // Complete route teardown before the next iteration/re-entry.
   await tester.pumpAndSettle();
   expect(find.byType(PatientDetailPage), findsNothing);
 }
@@ -80,10 +79,9 @@ void main() {
 
       await _openAndRapidlyClose(tester);
 
-      // Re-enter immediately after the previous route has completed its
-      // transition and deferred disposal callback has had a chance to run.
       final hostContext = tester.element(find.text('Lifecycle host'));
-      Navigator.of(hostContext).push(
+      final navigator = Navigator.of(hostContext);
+      navigator.push(
         MaterialPageRoute(
           builder: (_) => PatientDetailPage(link: _link()),
         ),
@@ -92,8 +90,7 @@ void main() {
       expect(find.byType(PatientDetailPage), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 1));
-      final pageContext = tester.element(find.byType(PatientDetailPage));
-      Navigator.of(pageContext).pop();
+      navigator.pop();
       await tester.pumpAndSettle();
       expect(find.byType(PatientDetailPage), findsNothing);
     },

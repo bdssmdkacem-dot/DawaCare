@@ -37,8 +37,12 @@ class _BlockingMedicationProvider extends MedicationProvider {
   Future<void> load(String forPatientId) => _loadCompleter.future;
 }
 
-Widget _app({required MedicationProvider provider}) {
+Widget _app({
+  required MedicationProvider provider,
+  required GlobalKey<NavigatorState> navigatorKey,
+}) {
   return MaterialApp(
+    navigatorKey: navigatorKey,
     locale: const Locale('ar'),
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: const [
@@ -50,7 +54,7 @@ Widget _app({required MedicationProvider provider}) {
     home: Scaffold(
       body: Center(
         child: ElevatedButton(
-          onPressed: () => Navigator.of(_buttonContext!).push(
+          onPressed: () => navigatorKey.currentState!.push(
             MaterialPageRoute(
               builder: (_) => ChangeNotifierProvider<MedicationProvider>.value(
                 value: provider,
@@ -69,20 +73,13 @@ Widget _app({required MedicationProvider provider}) {
   );
 }
 
-BuildContext? _buttonContext;
-
-Widget _host({required MedicationProvider provider}) {
-  return Builder(
-    builder: (context) {
-      _buttonContext = context;
-      return _app(provider: provider);
-    },
-  );
-}
-
 Future<void> _openAndPop(WidgetTester tester) async {
   final provider = _BlockingMedicationProvider();
-  await tester.pumpWidget(_host(provider: provider));
+  final navigatorKey = GlobalKey<NavigatorState>();
+
+  await tester.pumpWidget(
+    _app(provider: provider, navigatorKey: navigatorKey),
+  );
   await tester.pump();
 
   await tester.tap(find.text('Open medication'));
@@ -94,11 +91,11 @@ Future<void> _openAndPop(WidgetTester tester) async {
 
   // The detail page is a real Navigator route. Pop the route while its
   // provider load remains pending instead of replacing the whole app tree.
-  await tester.pageBack();
+  navigatorKey.currentState!.pop();
   await tester.pump();
   expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
 
-  // Give the route teardown and inherited-dependency removal a full frame.
+  // Give route teardown and inherited-dependency removal a full frame.
   await tester.pump(const Duration(milliseconds: 50));
   expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
 

@@ -21,22 +21,6 @@ Future<void> _ensureSupabaseInitialized() async {
 void main() {
   setUpAll(_ensureSupabaseInitialized);
 
-  Widget buildApp({required String patientName}) {
-    return const MaterialApp(
-      locale: Locale('ar'),
-      supportedLocales: [Locale('ar')],
-      localizationsDelegates: [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      home: MedicationReportsPage(
-        patientId: 'patient-test',
-        patientName: 'PLACEHOLDER',
-      ),
-    );
-  }
-
   testWidgets('renders caregiver reports shell and period selector',
       (tester) async {
     await tester.pumpWidget(

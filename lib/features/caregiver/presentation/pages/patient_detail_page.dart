@@ -50,9 +50,6 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
 
   @override
   void dispose() {
-    // Provider.value exposes existing notifiers and does not own their disposal.
-    // Defer disposal until this frame has finished so Consumer dependents are
-    // removed before the notifiers are disposed.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _patientDoseProvider.dispose();
       _patientMedicationProvider.dispose();
@@ -98,11 +95,16 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
   }
 
   void _openMedication(Medication medication) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => CaregiverMedicationDetailPage(
-      medication: medication,
-      patientName: widget.link.patientName,
-      canManageDoses: _canManageDoses,
-    )));
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ChangeNotifierProvider<MedicationProvider>.value(
+        value: _patientMedicationProvider,
+        child: CaregiverMedicationDetailPage(
+          medication: medication,
+          patientName: widget.link.patientName,
+          canManageDoses: _canManageDoses,
+        ),
+      ),
+    ));
   }
 
   Medication? _medicationFor(DoseInstance dose) {

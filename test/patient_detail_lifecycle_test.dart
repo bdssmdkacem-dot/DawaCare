@@ -4,6 +4,7 @@ import 'package:dawacare/models/caregiver_link.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 CaregiverLink _link() => CaregiverLink(
@@ -62,9 +63,10 @@ Future<void> _openAndRapidlyClose(WidgetTester tester) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // Supabase.initialize creates an HttpClient. It must run inside the test
-  // zone so flutter_test's HTTP override has a current invoker.
+  // The lifecycle test mounts real providers that construct Supabase storage.
+  // Mock the platform-backed preferences channel before Supabase initializes.
   setUpAll(() async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
     await Supabase.initialize(
       url: 'https://test.supabase.co',
       publishableKey: 'test-publishable-key',

@@ -15,6 +15,14 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/medication_provider.dart';
 
 const _dosageForms = ['قرص', 'كبسولة', 'شراب', 'حقنة', 'قطرة', 'أخرى'];
+const _stockUnits = [
+  ('unit', 'وحدة'),
+  ('tablet', 'قرص'),
+  ('capsule', 'كبسولة'),
+  ('ml', 'مل'),
+  ('drop', 'قطرة'),
+  ('injection', 'حقنة'),
+];
 
 class AddMedicationPage extends StatefulWidget {
   const AddMedicationPage({super.key});
@@ -30,10 +38,15 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   final _instructionsCtrl = TextEditingController();
   final _doseAmountCtrl = TextEditingController(text: '1');
   final _intervalCtrl = TextEditingController(text: '2');
+  final _initialStockCtrl = TextEditingController(text: '0');
+  final _packageQuantityCtrl = TextEditingController();
+  final _lowStockThresholdCtrl = TextEditingController(text: '5');
   final _imagePicker = ImagePicker();
 
   Uint8List? _imageBytes;
   String? _dosageForm;
+  String _stockUnit = 'unit';
+  bool _stockEnabled = false;
   ScheduleType _scheduleType = ScheduleType.daily;
   TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
   final Set<int> _selectedDays = {};
@@ -48,8 +61,34 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     _instructionsCtrl.dispose();
     _doseAmountCtrl.dispose();
     _intervalCtrl.dispose();
+    _initialStockCtrl.dispose();
+    _packageQuantityCtrl.dispose();
+    _lowStockThresholdCtrl.dispose();
     super.dispose();
   }
+
+  String _defaultStockUnit(String? form) {
+    switch ((form ?? '').trim()) {
+      case 'قرص':
+        return 'tablet';
+      case 'كبسولة':
+        return 'capsule';
+      case 'شراب':
+        return 'ml';
+      case 'قطرة':
+        return 'drop';
+      case 'حقنة':
+        return 'injection';
+      default:
+        return 'unit';
+    }
+  }
+
+  String _stockUnitLabel(String unit) =>
+      _stockUnits.firstWhere((item) => item.$1 == unit, orElse: () => _stockUnits.first).$2;
+
+  double? _parseNumber(String value) =>
+      double.tryParse(value.trim().replaceAll(',', '.'));
 
   Future<void> _pickImage(ImageSource source) async {
     final file = await _imagePicker.pickImage(
@@ -58,13 +97,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       maxHeight: 1200,
       imageQuality: 82,
     );
-    if (file == null) {
-      return;
-    }
+    if (file == null) return;
     final bytes = await file.readAsBytes();
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     setState(() => _imageBytes = bytes);
   }
 
@@ -89,19 +124,12 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         ),
       ),
     );
-    if (source != null) {
-      await _pickImage(source);
-    }
+    if (source != null) await _pickImage(source);
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _time,
-    );
-    if (picked != null && mounted) {
-      setState(() => _time = picked);
-    }
+    final picked = await showTimePicker(context: context, initialTime: _time);
+    if (picked != null && mounted) setState(() => _time = picked);
   }
 
   Future<void> _pickDate({required bool isStart}) async {
@@ -111,26 +139,46 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
     );
-    if (picked == null || !mounted) {
-      return;
-    }
+    if (picked == null || !mounted) return;
     setState(() => isStart ? _startDate = picked : _endDate = picked);
   }
 
   Future<void> _submit() async {
     final l = AppLocalizations.of(context);
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
     if (_scheduleType == ScheduleType.specificDays && _selectedDays.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.chooseAtLeastOneDay)),
       );
       return;
     }
+
     final auth = context.read<AuthProvider>();
     final userId = auth.profile?.id;
-    if (userId == null) {
+    if (userId == null) return;
+
+    final initialStock = _parseNumber(_initialStockCtrl.text) ?? 0;
+    final packageQuantity = _packageQuantityCtrl.text.trim().isEmpty
+        ? null
+        : _parseNumber(_packageQuantityCtrl.text);
+    final threshold = _parseNumber(_lowStockThresholdCtrl.text) ?? 5;
+
+    if (_stockEnabled && initialStock < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('كمية المخزون الأولية لا يمكن أن تكون سالبة.')),
+      );
+      return;
+    }
+    if (_stockEnabled && packageQuantity != null && packageQuantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('كمية العبوة يجب أن تكون أكبر من صفر.')),
+      );
+      return;
+    }
+    if (_stockEnabled && threshold < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حد المخزون المنخفض لا يمكن أن يكون سالبًا.')),
+      );
       return;
     }
 
@@ -138,13 +186,12 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     const uuid = Uuid();
     final time =
         '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
+
     final medication = Medication(
       id: uuid.v4(),
       patientId: userId,
       name: _nameCtrl.text.trim(),
-      strength: _strengthCtrl.text.trim().isEmpty
-          ? null
-          : _strengthCtrl.text.trim(),
+      strength: _strengthCtrl.text.trim().isEmpty ? null : _strengthCtrl.text.trim(),
       dosageForm: _dosageForm,
       instructions: _instructionsCtrl.text.trim().isEmpty
           ? null
@@ -155,7 +202,13 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       active: true,
       createdBy: userId,
       createdAt: DateTime.now(),
+      stockEnabled: _stockEnabled,
+      stockQuantity: _stockEnabled ? initialStock : 0,
+      stockUnit: _stockUnit,
+      packageQuantity: _stockEnabled ? packageQuantity : null,
+      lowStockThreshold: _stockEnabled ? threshold : 5,
     );
+
     final schedule = MedicationSchedule(
       id: uuid.v4(),
       medicationId: medication.id,
@@ -167,31 +220,24 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       intervalDays: _scheduleType == ScheduleType.interval
           ? int.tryParse(_intervalCtrl.text) ?? 2
           : null,
-      doseAmount:
-          _doseAmountCtrl.text.trim().isEmpty ? '1' : _doseAmountCtrl.text.trim(),
+      doseAmount: _doseAmountCtrl.text.trim().isEmpty ? '1' : _doseAmountCtrl.text.trim(),
       startDate: _startDate,
       endDate: _endDate,
       timezone: auth.profile?.timezone ?? 'Africa/Casablanca',
     );
 
     final ok = await context.read<MedicationProvider>().addMedication(
-          medication: medication,
-          schedule: schedule,
-          imageBytes: _imageBytes,
-        );
-    if (!mounted) {
-      return;
-    }
+      medication: medication,
+      schedule: schedule,
+      imageBytes: _imageBytes,
+    );
+    if (!mounted) return;
     setState(() => _submitting = false);
     if (ok) {
       Navigator.of(context).pop(true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            context.read<MedicationProvider>().error ?? l.unexpectedError,
-          ),
-        ),
+        SnackBar(content: Text(context.read<MedicationProvider>().error ?? l.unexpectedError)),
       );
     }
   }
@@ -247,14 +293,17 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         prefixIcon: const Icon(Icons.category_rounded),
                       ),
                       items: _dosageForms
-                          .map(
-                            (f) => DropdownMenuItem(
-                              value: f,
-                              child: Text(l.dosageFormLabel(f)),
-                            ),
-                          )
+                          .map((f) => DropdownMenuItem(
+                                value: f,
+                                child: Text(l.dosageFormLabel(f)),
+                              ))
                           .toList(),
-                      onChanged: (v) => setState(() => _dosageForm = v),
+                      onChanged: (v) => setState(() {
+                        _dosageForm = v;
+                        if (_stockUnit == 'unit' || _stockUnit == _defaultStockUnit(_dosageForm)) {
+                          _stockUnit = _defaultStockUnit(v);
+                        }
+                      }),
                     ),
                   ),
                 ],
@@ -265,6 +314,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 decoration: InputDecoration(
                   labelText: l.doseAmount,
                   prefixIcon: const Icon(Icons.exposure_plus_1_rounded),
+                  helperText: 'مثال: 1 قرص أو 5 مل',
                 ),
               ),
               const SizedBox(height: 12),
@@ -275,6 +325,96 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   prefixIcon: const Icon(Icons.notes_rounded),
                 ),
                 maxLines: 2,
+              ),
+              const SizedBox(height: 28),
+              _sectionHeader(context, Icons.inventory_2_rounded, 'حساب المخزون'),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    children: [
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('تتبع مخزون هذا الدواء', style: TextStyle(fontWeight: FontWeight.w800)),
+                        subtitle: const Text('يحسب المتبقي والأيام التقديرية ويرسل تنبيه المخزون المنخفض.'),
+                        value: _stockEnabled,
+                        onChanged: (value) => setState(() => _stockEnabled = value),
+                      ),
+                      if (_stockEnabled) ...[
+                        const Divider(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _initialStockCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: InputDecoration(
+                                  labelText: 'المخزون الأولي',
+                                  prefixIcon: const Icon(Icons.inventory_rounded),
+                                  suffixText: _stockUnitLabel(_stockUnit),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: _stockUnit,
+                                decoration: const InputDecoration(
+                                  labelText: 'وحدة المخزون',
+                                  prefixIcon: Icon(Icons.straighten_rounded),
+                                ),
+                                items: _stockUnits
+                                    .map((item) => DropdownMenuItem(
+                                          value: item.$1,
+                                          child: Text(item.$2),
+                                        ))
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value != null) setState(() => _stockUnit = value);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _packageQuantityCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: const InputDecoration(
+                                  labelText: 'كمية العبوة (اختياري)',
+                                  prefixIcon: Icon(Icons.inventory_2_outlined),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _lowStockThresholdCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: const InputDecoration(
+                                  labelText: 'حد المخزون المنخفض',
+                                  prefixIcon: Icon(Icons.warning_amber_rounded),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            'سيتم حساب الاستهلاك اليومي من جرعة الجدول، ثم تقدير عدد الأيام المتبقية من المخزون الحالي.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 28),
               _sectionHeader(context, Icons.repeat_rounded, l.frequency),
@@ -301,9 +441,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                       label: Text(l.weekdayLabel(day)),
                       selected: _selectedDays.contains(day),
                       onSelected: (v) => setState(
-                        () => v
-                            ? _selectedDays.add(day)
-                            : _selectedDays.remove(day),
+                        () => v ? _selectedDays.add(day) : _selectedDays.remove(day),
                       ),
                     );
                   }),
@@ -345,9 +483,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 context,
                 icon: Icons.event_busy_rounded,
                 title: l.endDateOptional,
-                value: _endDate != null
-                    ? DateTimeUtils.formatShortDate(_endDate!)
-                    : '—',
+                value: _endDate != null ? DateTimeUtils.formatShortDate(_endDate!) : '—',
                 onTap: () => _pickDate(isStart: false),
               ),
               const SizedBox(height: 24),
@@ -378,9 +514,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         const SizedBox(width: 10),
         Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
       ],
     );
@@ -457,20 +591,10 @@ class _MedicationImagePicker extends StatelessWidget {
                       color: AppColors.primary.withValues(alpha: .10),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.add_a_photo_rounded,
-                      size: 34,
-                      color: AppColors.primary,
-                    ),
+                    child: const Icon(Icons.add_a_photo_rounded, size: 34, color: AppColors.primary),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    l.addMedicinePhoto,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  Text(l.addMedicinePhoto, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
                   Text(l.addMedicinePhotoHint),
                 ],
@@ -484,16 +608,10 @@ class _MedicationImagePicker extends StatelessWidget {
                     right: 10,
                     child: Row(
                       children: [
-                        IconButton.filledTonal(
-                          onPressed: onTap,
-                          icon: const Icon(Icons.edit_rounded),
-                        ),
+                        IconButton.filledTonal(onPressed: onTap, icon: const Icon(Icons.edit_rounded)),
                         if (onRemove != null) ...[
                           const SizedBox(width: 6),
-                          IconButton.filledTonal(
-                            onPressed: onRemove,
-                            icon: const Icon(Icons.delete_outline_rounded),
-                          ),
+                          IconButton.filledTonal(onPressed: onRemove, icon: const Icon(Icons.delete_outline_rounded)),
                         ],
                       ],
                     ),

@@ -36,7 +36,7 @@ class MedicationProvider extends ChangeNotifier {
       medications = await _repo.fetchMedications(forPatientId);
       schedulesByMedicationId.clear();
       for (final med in medications) {
-        await _repo.fetchSchedules(med.id).then((value) => schedulesByMedicationId[med.id] = value);
+        schedulesByMedicationId[med.id] = await _repo.fetchSchedules(med.id);
       }
       for (final med in medications) {
         try {

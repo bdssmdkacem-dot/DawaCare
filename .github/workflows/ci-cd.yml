@@ -80,8 +80,14 @@ jobs:
           EOF
 
       - name: Write google-services.json
-        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
-        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          else
+            echo "GOOGLE_SERVICES_JSON is not configured; skipping Firebase config."
+          fi
 
       - name: Build App Bundle
         run: |

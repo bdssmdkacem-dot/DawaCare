@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
             android: {
               priority: 'high',
               notification: {
-                channel_id: 'caregiver_alerts',
+                channel_id: 'caregiver_alerts_v2',
                 sound: 'default',
                 notification_priority: 'PRIORITY_HIGH',
               },

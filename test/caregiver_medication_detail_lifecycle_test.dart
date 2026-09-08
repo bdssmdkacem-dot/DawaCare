@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dawacare/core/localization/app_localizations.dart';
 import 'package:dawacare/features/caregiver/presentation/pages/caregiver_medication_detail_page.dart';
 import 'package:dawacare/features/medications/presentation/providers/medication_provider.dart';
@@ -6,8 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 Medication _medication() => Medication(
       id: 'medication-lifecycle-test',
@@ -25,6 +25,16 @@ Medication _medication() => Medication(
       createdAt: DateTime(2026, 1, 1),
     );
 
+/// Keeps the real page in its loading state without touching Supabase.
+/// This makes the test deterministic and focuses it on widget/provider
+/// disposal rather than backend availability.
+class _BlockingMedicationProvider extends MedicationProvider {
+  final Completer<void> _loadCompleter = Completer<void>();
+
+  @override
+  Future<void> load(String forPatientId) => _loadCompleter.future;
+}
+
 Widget _app({required Widget home}) {
   return MaterialApp(
     locale: const Locale('ar'),
@@ -41,7 +51,7 @@ Widget _app({required Widget home}) {
 
 Widget _page() => _app(
       home: ChangeNotifierProvider<MedicationProvider>(
-        create: (_) => MedicationProvider(),
+        create: (_) => _BlockingMedicationProvider(),
         child: CaregiverMedicationDetailPage(
           medication: _medication(),
           patientName: 'مريض الاختبار',
@@ -60,29 +70,22 @@ Future<void> _openAndRapidlyClose(WidgetTester tester) async {
   await tester.pumpWidget(_page());
   await tester.pump();
   expect(find.byType(CaregiverMedicationDetailPage), findsOneWidget);
+  expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-  // Allow initState to start the real asynchronous medication/dose loading,
-  // then replace the widget tree while that work is still in flight.
+  // _loadData is deliberately still waiting here. Replace the whole tree
+  // while the page is alive and its async work is in flight.
   await tester.pump(const Duration(milliseconds: 1));
   await tester.pumpWidget(_host());
   await tester.pump();
   expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
 
-  // Flush provider teardown and any already-completed async callbacks.
+  // Ensure the old subtree remains gone after the provider has been disposed.
   await tester.pump(const Duration(milliseconds: 50));
   expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  setUpAll(() async {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    await Supabase.initialize(
-      url: 'https://test.supabase.co',
-      publishableKey: 'test-publishable-key',
-    );
-  });
 
   testWidgets(
     'CaregiverMedicationDetailPage survives rapid replacement while loading',
@@ -101,6 +104,7 @@ void main() {
       await tester.pumpWidget(_page());
       await tester.pump();
       expect(find.byType(CaregiverMedicationDetailPage), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 1));
       await tester.pumpWidget(_host());

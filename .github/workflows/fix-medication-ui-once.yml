@@ -1,0 +1,112 @@
+name: One-time medication UI repair
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Repair responsive stock fields
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('lib/features/medications/presentation/pages/add_edit_medication_page.dart')
+          text = path.read_text(encoding='utf-8')
+          start = text.index("                        Row(\n                          children: [\n                            Expanded(\n                              child: TextFormField(\n                                controller: _initialStockCtrl,")
+          end_marker = "                        const SizedBox(height: 10),\n                        Align("
+          end = text.index(end_marker, start)
+          replacement = '''                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final fieldWidth = constraints.maxWidth < 520
+                                ? constraints.maxWidth
+                                : (constraints.maxWidth - 12) / 2;
+                            return Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
+                                SizedBox(
+                                  width: fieldWidth,
+                                  child: TextFormField(
+                                    controller: _initialStockCtrl,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: InputDecoration(
+                                      labelText: 'المخزون الأولي',
+                                      prefixIcon: const Icon(Icons.inventory_rounded),
+                                      suffixText: _stockUnitLabel(_stockUnit),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: fieldWidth,
+                                  child: DropdownButtonFormField<String>(
+                                    initialValue: _stockUnit,
+                                    decoration: const InputDecoration(
+                                      labelText: 'وحدة المخزون',
+                                      prefixIcon: Icon(Icons.straighten_rounded),
+                                    ),
+                                    items: _stockUnits
+                                        .map((item) => DropdownMenuItem(
+                                              value: item.$1,
+                                              child: Text(item.$2),
+                                            ))
+                                        .toList(),
+                                    onChanged: (value) {
+                                      if (value != null) setState(() => _stockUnit = value);
+                                    },
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: fieldWidth,
+                                  child: TextFormField(
+                                    controller: _packageQuantityCtrl,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: const InputDecoration(
+                                      labelText: 'كمية العبوة (اختياري)',
+                                      prefixIcon: Icon(Icons.inventory_2_outlined),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: fieldWidth,
+                                  child: TextFormField(
+                                    controller: _lowStockThresholdCtrl,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: const InputDecoration(
+                                      labelText: 'حد المخزون المنخفض',
+                                      prefixIcon: Icon(Icons.warning_amber_rounded),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+'''
+          text = text[:start] + replacement + text[end:]
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit repair
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/features/medications/presentation/pages/add_edit_medication_page.dart
+          git commit -m "fix(medications): prevent stock form overflow" || exit 0
+          git push
+
+      - name: Remove one-time workflow
+        if: success()
+        run: |
+          git rm .github/workflows/fix-medication-ui-once.yml || true
+          git commit -m "chore(ci): remove one-time medication UI repair" || exit 0
+          git push

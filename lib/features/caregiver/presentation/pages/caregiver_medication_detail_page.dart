@@ -32,11 +32,16 @@ class CaregiverMedicationDetailPage extends StatefulWidget {
 class _CaregiverMedicationDetailPageState
     extends State<CaregiverMedicationDetailPage> {
   final DoseRepository _doseRepository = DoseRepository();
+  late final MedicationProvider _medicationProvider;
   late Future<_MedicationDetailData> _dataFuture;
 
   @override
   void initState() {
     super.initState();
+    // Capture the existing provider before starting asynchronous work. The
+    // page does not own this provider, and async continuations may outlive
+    // this State after a rapid route/tree replacement.
+    _medicationProvider = context.read<MedicationProvider>();
     _dataFuture = _loadData();
   }
 
@@ -57,19 +62,17 @@ class _CaregiverMedicationDetailPageState
   }
 
   Future<Medication> _loadFreshMedication() async {
-    final provider = context.read<MedicationProvider>();
-    await provider.load(widget.medication.patientId);
-    for (final medication in provider.medications) {
+    await _medicationProvider.load(widget.medication.patientId);
+    for (final medication in _medicationProvider.medications) {
       if (medication.id == widget.medication.id) return medication;
     }
     return widget.medication;
   }
 
   Future<List<MedicationSchedule>> _loadSchedules(String medicationId) async {
-    final provider = context.read<MedicationProvider>();
-    final cached = provider.schedulesByMedicationId[medicationId];
+    final cached = _medicationProvider.schedulesByMedicationId[medicationId];
     if (cached != null) return List<MedicationSchedule>.from(cached);
-    return provider.fetchSchedules(medicationId);
+    return _medicationProvider.fetchSchedules(medicationId);
   }
 
   String _tr(String ar, String en, String fr) {
@@ -215,7 +218,7 @@ class _CaregiverMedicationDetailPageState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             FutureBuilder<String?>(
-              future: context.read<MedicationProvider>().signedMedicationImageUrl(medication.imageUrl),
+              future: _medicationProvider.signedMedicationImageUrl(medication.imageUrl),
               builder: (context, snapshot) {
                 final url = snapshot.data;
                 return Container(

@@ -1,33 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:dawacare/core/config/supabase_config.dart';
 import 'package:dawacare/features/caregiver/presentation/pages/medication_reports_page.dart';
 import 'package:dawacare/features/caregiver/presentation/providers/medication_report_provider.dart';
 
-Future<void> _ensureSupabaseInitialized() async {
-  try {
-    Supabase.instance;
-  } catch (_) {
-    await Supabase.initialize(
-      url: SupabaseConfig.url,
-      publishableKey: SupabaseConfig.publishableKey,
-    );
-  }
-}
-
 void main() {
-  setUpAll(_ensureSupabaseInitialized);
-
   testWidgets('renders caregiver reports shell and period selector',
       (tester) async {
+    final provider = MedicationReportProvider.testLoading();
+
     await tester.pumpWidget(
-      const MaterialApp(
-        locale: Locale('ar'),
-        supportedLocales: [Locale('ar')],
-        localizationsDelegates: [
+      MaterialApp(
+        locale: const Locale('ar'),
+        supportedLocales: const [Locale('ar')],
+        localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
@@ -35,6 +22,7 @@ void main() {
         home: MedicationReportsPage(
           patientId: 'patient-test',
           patientName: 'محمد',
+          provider: provider,
         ),
       ),
     );
@@ -46,15 +34,19 @@ void main() {
     expect(find.byType(SegmentedButton<ReportPeriod>), findsOneWidget);
     expect(find.text('محمد'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    provider.dispose();
   });
 
   testWidgets('period selector remains available during initial load',
       (tester) async {
+    final provider = MedicationReportProvider.testLoading();
+
     await tester.pumpWidget(
-      const MaterialApp(
-        locale: Locale('ar'),
-        supportedLocales: [Locale('ar')],
-        localizationsDelegates: [
+      MaterialApp(
+        locale: const Locale('ar'),
+        supportedLocales: const [Locale('ar')],
+        localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
@@ -62,6 +54,7 @@ void main() {
         home: MedicationReportsPage(
           patientId: 'patient-test',
           patientName: 'Test Patient',
+          provider: provider,
         ),
       ),
     );
@@ -70,5 +63,7 @@ void main() {
     expect(selector, findsOneWidget);
     expect(tester.widget<SegmentedButton<ReportPeriod>>(selector).segments,
         hasLength(3));
+
+    provider.dispose();
   });
 }

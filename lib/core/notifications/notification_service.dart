@@ -24,13 +24,13 @@ class NotificationService {
   bool _initialized = false;
 
   static const String _channelId = 'dose_reminders';
-  static const String _caregiverChannelId = 'caregiver_alerts';
+  static const String _caregiverChannelId = 'caregiver_alerts_v2';
   static const String _imageBucket = 'medication-images';
   static const String _voicePayloadPrefix = 'VOICE_MESSAGE:';
   static const String _caregiverAlertPayloadPrefix = 'CAREGIVER_ALERT:';
+  static const int _beforeDoseMinutes = 5;
   static const String _actionTaken = 'DOSE_TAKEN';
   static const String _actionSnooze = 'DOSE_SNOOZE';
-  static const int _beforeDoseMinutes = 5;
 
   Stream<String> get voiceMessageOpened => _voiceMessageController.stream;
   Stream<String> get notificationOpened => _notificationController.stream;
@@ -68,6 +68,7 @@ class NotificationService {
       description: 'تنبيه عند تفويت أحد أفراد العائلة لجرعة دواء',
       importance: Importance.high,
       enableVibration: true,
+      playSound: true,
     );
     await android?.createNotificationChannel(caregiverChannel);
 
@@ -270,8 +271,6 @@ class NotificationService {
       ],
     );
 
-    // The pre-dose reminder has its own notification id, so the five-minute
-    // reminder and the exact-time reminder can coexist.
     if (!beforeTime.isBefore(now)) {
       await _schedule(
         _notificationId(dose.id, 0),
@@ -336,6 +335,8 @@ class NotificationService {
           channelDescription: 'تنبيه عند تفويت أحد أفراد العائلة لجرعة دواء',
           importance: Importance.high,
           priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
         ),
       ),
       payload: payload,

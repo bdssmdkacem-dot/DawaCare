@@ -9,11 +9,13 @@ import '../providers/medication_report_provider.dart';
 class MedicationReportsPage extends StatefulWidget {
   final String patientId;
   final String patientName;
+  final MedicationReportProvider? provider;
 
   const MedicationReportsPage({
     super.key,
     required this.patientId,
     required this.patientName,
+    this.provider,
   });
 
   @override
@@ -22,19 +24,23 @@ class MedicationReportsPage extends StatefulWidget {
 
 class _MedicationReportsPageState extends State<MedicationReportsPage> {
   late final MedicationReportProvider _provider;
+  late final bool _ownsProvider;
 
   @override
   void initState() {
     super.initState();
-    _provider = MedicationReportProvider();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _provider.load(widget.patientId);
-    });
+    _provider = widget.provider ?? MedicationReportProvider();
+    _ownsProvider = widget.provider == null;
+    if (widget.provider == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _provider.load(widget.patientId);
+      });
+    }
   }
 
   @override
   void dispose() {
-    _provider.dispose();
+    if (_ownsProvider) _provider.dispose();
     super.dispose();
   }
 

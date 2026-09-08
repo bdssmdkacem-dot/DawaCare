@@ -73,6 +73,7 @@ class MedicationRepository {
       'p_patient_id': patientId,
       'p_quantity': quantity,
       'p_transaction_type': type,
+      'p_dose_id': null,
       'p_note': note,
     });
     return (result as num).toDouble();

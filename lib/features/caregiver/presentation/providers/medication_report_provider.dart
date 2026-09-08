@@ -22,8 +22,13 @@ class MedicationReportProvider extends ChangeNotifier {
   bool isLoading = false;
   String? error;
 
-  Future<void> load(String patientId, {ReportPeriod? selectedPeriod, DateTime? selectedAnchor}) async {
-    if (_repository == null) return;
+  Future<void> load(
+    String patientId, {
+    ReportPeriod? selectedPeriod,
+    DateTime? selectedAnchor,
+  }) async {
+    final repository = _repository;
+    if (repository == null) return;
     period = selectedPeriod ?? period;
     anchor = selectedAnchor ?? anchor;
     isLoading = true;
@@ -31,9 +36,9 @@ class MedicationReportProvider extends ChangeNotifier {
     notifyListeners();
     try {
       report = switch (period) {
-        ReportPeriod.today => await _repository!.today(patientId),
-        ReportPeriod.week => await _repository!.week(patientId, anchor: anchor),
-        ReportPeriod.month => await _repository!.month(patientId, anchor: anchor),
+        ReportPeriod.today => await repository.today(patientId),
+        ReportPeriod.week => await repository.week(patientId, anchor: anchor),
+        ReportPeriod.month => await repository.month(patientId, anchor: anchor),
       };
     } catch (_) {
       error = 'تعذّر تحميل تقرير الالتزام.';

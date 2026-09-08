@@ -4,6 +4,7 @@ import 'package:dawacare/models/caregiver_link.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 CaregiverLink _link() => CaregiverLink(
       id: 'link-test',
@@ -58,7 +59,18 @@ Future<void> _openAndRapidlyClose(WidgetTester tester) async {
   expect(find.byType(PatientDetailPage), findsNothing);
 }
 
-void main() {
+Future<void> main() async {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  // PatientDetailPage constructs providers whose repositories access
+  // Supabase.instance during initState. The lifecycle test does not need a
+  // live backend, but Supabase must be initialized so the real page can mount.
+  await Supabase.initialize(
+    url: 'https://test.supabase.co',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiJ9.test',
+  );
+
   testWidgets(
     'PatientDetailPage survives rapid replacement while async loading is in flight',
     (tester) async {

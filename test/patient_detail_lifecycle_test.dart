@@ -43,6 +43,25 @@ Widget _app() {
   );
 }
 
+Future<void> _openAndRapidlyClose(WidgetTester tester) async {
+  await tester.tap(find.text('فتح المريض'));
+  await tester.pump();
+  expect(find.byType(PatientDetailPage), findsOneWidget);
+
+  // Allow the page's post-frame callback to start the real provider loads,
+  // then pop the route while those asynchronous operations may still be in
+  // flight. Do not wait for the providers to finish before disposing the page.
+  await tester.pump(const Duration(milliseconds: 1));
+  Navigator.of(tester.element(find.byType(PatientDetailPage))).pop();
+
+  // Complete the Navigator route transition before interacting with the
+  // underlying entry point again. A single pump is not sufficient because
+  // MaterialPageRoute has an exit animation; without settling it, the button
+  // remains covered by the outgoing route and the test can fail for the wrong
+  // reason (finder sees zero buttons), rather than exercising lifecycle.
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets(
     'PatientDetailPage survives rapid push/pop while async loading is in flight',
@@ -50,19 +69,9 @@ void main() {
       await tester.pumpWidget(_app());
 
       for (var i = 0; i < 5; i++) {
-        await tester.tap(find.text('فتح المريض'));
-        await tester.pump();
-
-        // Let initState's post-frame callback start the real provider loads,
-        // then immediately tear the route down while those futures may still
-        // be completing. A framework lifecycle assertion here reproduces the
-        // class of red screen that previously occurred on this page.
-        await tester.pump(const Duration(milliseconds: 1));
-        expect(find.byType(PatientDetailPage), findsOneWidget);
-
-        Navigator.of(tester.element(find.byType(PatientDetailPage))).pop();
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 1));
+        await _openAndRapidlyClose(tester);
+        expect(find.text('فتح المريض'), findsOneWidget);
+        expect(find.byType(PatientDetailPage), findsNothing);
       }
 
       // Flush deferred notifier disposal callbacks and any provider futures.
@@ -77,19 +86,18 @@ void main() {
     (tester) async {
       await tester.pumpWidget(_app());
 
+      await _openAndRapidlyClose(tester);
+      expect(find.text('فتح المريض'), findsOneWidget);
+      expect(find.byType(PatientDetailPage), findsNothing);
+
+      // Re-enter immediately after the previous route has completed its
+      // transition and disposal callback has had a chance to run.
       await tester.tap(find.text('فتح المريض'));
       await tester.pump();
       expect(find.byType(PatientDetailPage), findsOneWidget);
 
       Navigator.of(tester.element(find.byType(PatientDetailPage))).pop();
-      await tester.pump();
-
-      await tester.tap(find.text('فتح المريض'));
-      await tester.pump();
-      expect(find.byType(PatientDetailPage), findsOneWidget);
-
-      Navigator.of(tester.element(find.byType(PatientDetailPage))).pop();
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
       expect(find.byType(PatientDetailPage), findsNothing);
     },
   );

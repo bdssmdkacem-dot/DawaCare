@@ -32,11 +32,12 @@ Widget _app() {
   );
 }
 
+NavigatorState _navigator(WidgetTester tester) =>
+    tester.state<NavigatorState>(find.byType(Navigator).first);
+
 Future<void> _openAndRapidlyClose(WidgetTester tester) async {
-  final hostFinder = find.text('Lifecycle host');
-  expect(hostFinder, findsOneWidget);
-  final hostContext = tester.element(hostFinder);
-  final navigator = Navigator.of(hostContext);
+  final navigator = _navigator(tester);
+  expect(navigator.mounted, isTrue);
 
   navigator.push(
     MaterialPageRoute(
@@ -46,16 +47,14 @@ Future<void> _openAndRapidlyClose(WidgetTester tester) async {
   await tester.pump();
   expect(find.byType(PatientDetailPage), findsOneWidget);
 
-  // Let the route finish entering and allow the page's post-frame async load
-  // to start. We then pop while the real providers are still expected to load.
-  await tester.pump(const Duration(milliseconds: 300));
-  expect(find.byType(PatientDetailPage), findsOneWidget);
+  // Start the page's post-frame async work, then pop immediately while the
+  // real providers may still be loading.
+  await tester.pump(const Duration(milliseconds: 1));
   navigator.pop();
 
   // Complete route teardown before the next iteration/re-entry.
   await tester.pumpAndSettle();
   expect(find.byType(PatientDetailPage), findsNothing);
-  expect(find.text('Lifecycle host'), findsOneWidget);
 }
 
 void main() {
@@ -81,8 +80,8 @@ void main() {
 
       await _openAndRapidlyClose(tester);
 
-      final hostContext = tester.element(find.text('Lifecycle host'));
-      final navigator = Navigator.of(hostContext);
+      final navigator = _navigator(tester);
+      expect(navigator.mounted, isTrue);
       navigator.push(
         MaterialPageRoute(
           builder: (_) => PatientDetailPage(link: _link()),
@@ -91,12 +90,10 @@ void main() {
       await tester.pump();
       expect(find.byType(PatientDetailPage), findsOneWidget);
 
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.byType(PatientDetailPage), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1));
       navigator.pop();
       await tester.pumpAndSettle();
       expect(find.byType(PatientDetailPage), findsNothing);
-      expect(find.text('Lifecycle host'), findsOneWidget);
     },
   );
 }

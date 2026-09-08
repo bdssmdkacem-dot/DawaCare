@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const { data: message, error } = await admin
     .from('voice_messages')
-    .select('id, sender_id, patient_id')
+    .select('id, sender_id, patient_id, dose_id')
     .eq('id', messageId)
     .single();
   if (error || !message || message.sender_id !== user.id) return new Response('Forbidden', { status: 403 });
@@ -37,23 +37,28 @@ Deno.serve(async (req) => {
   if (!link) return new Response('Forbidden', { status: 403 });
 
   if (!FCM_SERVICE_ACCOUNT_JSON) {
-    return new Response(JSON.stringify({ sent: 0, reason: 'FCM_NOT_CONFIGURED' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return jsonResponse({ sent: 0, devices: 0, invalid: 0, reason: 'FCM_NOT_CONFIGURED' }, 503);
   }
 
-  const { data: sender } = await admin.from('profiles').select('full_name').eq('id', user.id).single();
+  const { data: sender } = await admin.from('profiles').select('full_name, avatar_url').eq('id', user.id).single();
   const senderName = sender?.full_name || 'متابعك';
-  const { data: devices } = await admin
+  const { data: devices, error: devicesError } = await admin
     .from('devices')
     .select('id,push_token')
     .eq('user_id', message.patient_id)
     .not('push_token', 'is', null);
 
-  const account = JSON.parse(FCM_SERVICE_ACCOUNT_JSON);
+  if (devicesError) return jsonResponse({ sent: 0, devices: 0, invalid: 0, reason: 'DEVICES_LOOKUP_FAILED' }, 502);
+  if (!devices?.length) return jsonResponse({ sent: 0, devices: 0, invalid: 0, reason: 'NO_PUSH_DEVICES' }, 502);
+
+  const account = JSON.parse(FCM_SERVICE_ACCOUNT_JSON) as ServiceAccount;
   const accessToken = await getAccessToken(account);
   let sent = 0;
   let invalid = 0;
+  let failed = 0;
+  let lastFailure: string | null = null;
 
-  for (const device of devices ?? []) {
+  for (const device of devices) {
     try {
       const response = await fetch(`https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`, {
         method: 'POST',
@@ -65,7 +70,13 @@ Deno.serve(async (req) => {
               title: 'رسالة صوتية جديدة 🎙️',
               body: `${senderName} أرسل لك رسالة صوتية.`,
             },
-            data: { type: 'VOICE_MESSAGE', voice_message_id: message.id, sender_name: senderName },
+            data: {
+              type: 'VOICE_MESSAGE',
+              voice_message_id: message.id,
+              sender_name: senderName,
+              sender_avatar_url: sender?.avatar_url ?? '',
+              dose_id: message.dose_id ?? '',
+            },
             android: {
               priority: 'high',
               notification: {
@@ -82,15 +93,31 @@ Deno.serve(async (req) => {
       } else if (response.status === 404 || response.status === 410) {
         invalid++;
         try { await admin.from('devices').delete().eq('id', device.id); } catch (_) {}
+        lastFailure = `FCM_${response.status}`;
+      } else {
+        failed++;
+        const text = await response.text();
+        lastFailure = `FCM_${response.status}: ${text.slice(0, 300)}`;
       }
-    } catch (_) {}
+    } catch (error) {
+      failed++;
+      lastFailure = error instanceof Error ? error.message : String(error);
+    }
   }
 
-  return new Response(JSON.stringify({ sent, devices: devices?.length ?? 0, invalid }), {
-    status: 200,
+  if (sent === 0) {
+    return jsonResponse({ sent, devices: devices.length, invalid, failed, reason: lastFailure ?? 'FCM_DELIVERY_FAILED' }, 502);
+  }
+
+  return jsonResponse({ sent, devices: devices.length, invalid, failed, reason: lastFailure }, 200);
+});
+
+function jsonResponse(body: Record<string, unknown>, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
     headers: { 'Content-Type': 'application/json' },
   });
-});
+}
 
 interface ServiceAccount {
   project_id: string;

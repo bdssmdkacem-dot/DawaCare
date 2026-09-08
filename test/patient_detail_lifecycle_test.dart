@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+final _navigatorKey = GlobalKey<NavigatorState>();
+
 CaregiverLink _link() => CaregiverLink(
       id: 'link-test',
       caregiverId: 'caregiver-test',
@@ -18,6 +20,7 @@ CaregiverLink _link() => CaregiverLink(
 
 Widget _app() {
   return MaterialApp(
+    navigatorKey: _navigatorKey,
     locale: const Locale('ar'),
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: const [
@@ -32,12 +35,15 @@ Widget _app() {
   );
 }
 
-NavigatorState _navigator(WidgetTester tester) =>
-    tester.state<NavigatorState>(find.byType(Navigator).first);
+NavigatorState _navigator() {
+  final navigator = _navigatorKey.currentState;
+  expect(navigator, isNotNull);
+  expect(navigator!.mounted, isTrue);
+  return navigator;
+}
 
 Future<void> _openAndRapidlyClose(WidgetTester tester) async {
-  final navigator = _navigator(tester);
-  expect(navigator.mounted, isTrue);
+  final navigator = _navigator();
 
   navigator.push(
     MaterialPageRoute(
@@ -80,8 +86,7 @@ void main() {
 
       await _openAndRapidlyClose(tester);
 
-      final navigator = _navigator(tester);
-      expect(navigator.mounted, isTrue);
+      final navigator = _navigator();
       navigator.push(
         MaterialPageRoute(
           builder: (_) => PatientDetailPage(link: _link()),

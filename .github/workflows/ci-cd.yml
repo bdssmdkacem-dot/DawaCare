@@ -6,14 +6,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      publish_to_play_store:
-        description: "Upload the built AAB to Play Store (internal track)"
-        type: boolean
-        default: false
 
 env:
   FLUTTER_VERSION: "3.44.0"
+  SUPABASE_URL_DEFAULT: "https://lwdwlfhytdetziqfbgje.supabase.co"
+  SUPABASE_ANON_KEY_DEFAULT: "sb_publishable_NqPkzToL2OQo5Zs3UOTkYw_vd0HAHdY"
 
 jobs:
   analyze_and_test:
@@ -38,7 +35,7 @@ jobs:
         run: flutter test
 
   build_android:
-    name: Build signed AAB
+    name: Build release APK
     needs: analyze_and_test
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
@@ -89,32 +86,42 @@ jobs:
             echo "GOOGLE_SERVICES_JSON is not configured; skipping Firebase config."
           fi
 
-      - name: Build App Bundle
+      - name: Resolve Supabase build configuration
+        env:
+          SUPABASE_URL_SECRET: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY_SECRET: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          flutter build appbundle --release \
-            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL="${SUPABASE_URL_SECRET:-${SUPABASE_URL_DEFAULT}}"
+          SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY_SECRET:-${SUPABASE_ANON_KEY_DEFAULT}}"
 
-      - name: Build APK (for quick manual testing / GitHub Releases)
+          case "$SUPABASE_URL" in
+            https://*.supabase.co) ;;
+            *)
+              echo "ERROR: SUPABASE_URL must be an absolute https://*.supabase.co URL."
+              exit 1
+              ;;
+          esac
+
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "ERROR: SUPABASE_ANON_KEY is empty."
+            exit 1
+          fi
+
+          {
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+          echo "Supabase URL resolved successfully."
+
+      - name: Build APK
         run: |
           flutter build apk --release \
-            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dawacare-release
-          path: |
-            build/app/outputs/bundle/release/app-release.aab
-            build/app/outputs/flutter-apk/app-release.apk
+          name: dawacare-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
-
-      - name: Publish to Play Store (internal track)
-        if: ${{ github.event.inputs.publish_to_play_store == 'true' }}
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.comptaflow.dawacare
-          releaseFiles: build/app/outputs/bundle/release/app-release.aab
-          track: internal
-          status: draft

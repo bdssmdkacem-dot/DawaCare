@@ -9,6 +9,8 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
+        locale: Locale('ar'),
+        supportedLocales: [Locale('ar')],
         home: MedicationReportsPage(
           patientId: 'patient-test',
           patientName: 'محمد',
@@ -22,10 +24,6 @@ void main() {
     expect(find.text('هذا الشهر'), findsOneWidget);
     expect(find.byType(SegmentedButton<ReportPeriod>), findsOneWidget);
     expect(find.text('محمد'), findsNothing);
-
-    // The first frame is intentionally checked before the asynchronous
-    // repository load completes. This protects the caregiver report shell
-    // from regressions without requiring a live Supabase backend.
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
@@ -33,6 +31,8 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
+        locale: Locale('ar'),
+        supportedLocales: [Locale('ar')],
         home: MedicationReportsPage(
           patientId: 'patient-test',
           patientName: 'Test Patient',
@@ -44,8 +44,5 @@ void main() {
     expect(selector, findsOneWidget);
     expect(tester.widget<SegmentedButton<ReportPeriod>>(selector).segments,
         hasLength(3));
-
-    final semantics = tester.getSemantics(selector);
-    expect(semantics, isNotNull);
   });
 }

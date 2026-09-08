@@ -18,7 +18,6 @@ CaregiverLink _link() => CaregiverLink(
 
 Widget _app(GlobalKey<NavigatorState> navigatorKey) {
   return MaterialApp(
-    navigatorKey: navigatorKey,
     locale: const Locale('ar'),
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: const [
@@ -27,8 +26,13 @@ Widget _app(GlobalKey<NavigatorState> navigatorKey) {
       GlobalCupertinoLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,
     ],
-    home: const Scaffold(
-      body: Center(child: Text('Lifecycle host')),
+    home: Navigator(
+      key: navigatorKey,
+      onGenerateRoute: (_) => MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(
+          body: Center(child: Text('Lifecycle host')),
+        ),
+      ),
     ),
   );
 }
@@ -70,6 +74,7 @@ void main() {
     (tester) async {
       final navigatorKey = GlobalKey<NavigatorState>();
       await tester.pumpWidget(_app(navigatorKey));
+      await tester.pump();
 
       for (var i = 0; i < 5; i++) {
         await _openAndRapidlyClose(tester, navigatorKey);
@@ -86,6 +91,7 @@ void main() {
     (tester) async {
       final navigatorKey = GlobalKey<NavigatorState>();
       await tester.pumpWidget(_app(navigatorKey));
+      await tester.pump();
 
       await _openAndRapidlyClose(tester, navigatorKey);
 

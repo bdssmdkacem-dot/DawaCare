@@ -16,7 +16,7 @@ CaregiverLink _link() => CaregiverLink(
       createdAt: DateTime(2026, 1, 1),
     );
 
-Widget _app(GlobalKey<NavigatorState> navigatorKey) {
+Widget _app({required Widget home}) {
   return MaterialApp(
     locale: const Locale('ar'),
     supportedLocales: AppLocalizations.supportedLocales,
@@ -26,87 +26,61 @@ Widget _app(GlobalKey<NavigatorState> navigatorKey) {
       GlobalCupertinoLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,
     ],
-    home: Navigator(
-      key: navigatorKey,
-      onGenerateRoute: (_) => MaterialPageRoute<void>(
-        builder: (_) => const Scaffold(
-          body: Center(child: Text('Lifecycle host')),
-        ),
+    home: home,
+  );
+}
+
+Widget _page() => _app(
+      home: PatientDetailPage(link: _link()),
+    );
+
+Widget _host() => _app(
+      home: const Scaffold(
+        body: Center(child: Text('Lifecycle host')),
       ),
-    ),
-  );
-}
+    );
 
-NavigatorState _navigator(GlobalKey<NavigatorState> navigatorKey) {
-  final navigator = navigatorKey.currentState;
-  expect(navigator, isNotNull);
-  expect(navigator!.mounted, isTrue);
-  return navigator;
-}
-
-Future<void> _openAndRapidlyClose(
-  WidgetTester tester,
-  GlobalKey<NavigatorState> navigatorKey,
-) async {
-  final navigator = _navigator(navigatorKey);
-
-  navigator.push(
-    MaterialPageRoute(
-      builder: (_) => PatientDetailPage(link: _link()),
-    ),
-  );
+Future<void> _openAndRapidlyClose(WidgetTester tester) async {
+  await tester.pumpWidget(_page());
   await tester.pump();
   expect(find.byType(PatientDetailPage), findsOneWidget);
 
-  // Start the page's post-frame async work, then pop immediately while the
-  // real providers may still be loading.
+  // Let the page start its post-frame async work, then replace the entire
+  // route tree immediately. This exercises State.dispose while providers
+  // may still be loading, without depending on a test Navigator harness.
   await tester.pump(const Duration(milliseconds: 1));
-  navigator.pop();
+  await tester.pumpWidget(_host());
+  await tester.pump();
+  expect(find.byType(PatientDetailPage), findsNothing);
 
-  // Complete route teardown before the next iteration/re-entry.
-  await tester.pumpAndSettle();
+  // Flush PatientDetailPage's deferred notifier disposal callbacks.
+  await tester.pump(const Duration(milliseconds: 50));
   expect(find.byType(PatientDetailPage), findsNothing);
 }
 
 void main() {
   testWidgets(
-    'PatientDetailPage survives rapid push/pop while async loading is in flight',
+    'PatientDetailPage survives rapid replacement while async loading is in flight',
     (tester) async {
-      final navigatorKey = GlobalKey<NavigatorState>();
-      await tester.pumpWidget(_app(navigatorKey));
-      await tester.pump();
-
       for (var i = 0; i < 5; i++) {
-        await _openAndRapidlyClose(tester, navigatorKey);
+        await _openAndRapidlyClose(tester);
       }
-
-      // Flush deferred notifier disposal callbacks and any provider futures.
-      await tester.pump(const Duration(milliseconds: 50));
-      expect(find.byType(PatientDetailPage), findsNothing);
     },
   );
 
   testWidgets(
     'PatientDetailPage can be re-entered immediately after disposal',
     (tester) async {
-      final navigatorKey = GlobalKey<NavigatorState>();
-      await tester.pumpWidget(_app(navigatorKey));
-      await tester.pump();
+      await _openAndRapidlyClose(tester);
 
-      await _openAndRapidlyClose(tester, navigatorKey);
-
-      final navigator = _navigator(navigatorKey);
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => PatientDetailPage(link: _link()),
-        ),
-      );
+      await tester.pumpWidget(_page());
       await tester.pump();
       expect(find.byType(PatientDetailPage), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 1));
-      navigator.pop();
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(_host());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
       expect(find.byType(PatientDetailPage), findsNothing);
     },
   );

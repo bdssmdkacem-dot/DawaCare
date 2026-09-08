@@ -20,7 +20,6 @@ CaregiverLink _link() => CaregiverLink(
 
 Widget _app() {
   return MaterialApp(
-    navigatorKey: _navigatorKey,
     locale: const Locale('ar'),
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: const [
@@ -29,8 +28,13 @@ Widget _app() {
       GlobalCupertinoLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,
     ],
-    home: const Scaffold(
-      body: Center(child: Text('Lifecycle host')),
+    home: Navigator(
+      key: _navigatorKey,
+      onGenerateRoute: (_) => MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(
+          body: Center(child: Text('Lifecycle host')),
+        ),
+      ),
     ),
   );
 }
@@ -53,12 +57,9 @@ Future<void> _openAndRapidlyClose(WidgetTester tester) async {
   await tester.pump();
   expect(find.byType(PatientDetailPage), findsOneWidget);
 
-  // Start the page's post-frame async work, then pop immediately while the
-  // real providers may still be loading.
   await tester.pump(const Duration(milliseconds: 1));
   navigator.pop();
 
-  // Complete route teardown before the next iteration/re-entry.
   await tester.pumpAndSettle();
   expect(find.byType(PatientDetailPage), findsNothing);
 }
@@ -73,7 +74,6 @@ void main() {
         await _openAndRapidlyClose(tester);
       }
 
-      // Flush deferred notifier disposal callbacks and any provider futures.
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.byType(PatientDetailPage), findsNothing);
     },

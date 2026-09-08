@@ -6,7 +6,15 @@ import '../../domain/medication_report.dart';
 enum ReportPeriod { today, week, month }
 
 class MedicationReportProvider extends ChangeNotifier {
-  final MedicationReportRepository _repository = MedicationReportRepository();
+  MedicationReportProvider({MedicationReportRepository? repository})
+      : _repository = repository ?? MedicationReportRepository();
+
+  @visibleForTesting
+  MedicationReportProvider.testLoading() : _repository = null {
+    isLoading = true;
+  }
+
+  final MedicationReportRepository? _repository;
 
   AdherenceReport? report;
   ReportPeriod period = ReportPeriod.week;
@@ -15,6 +23,7 @@ class MedicationReportProvider extends ChangeNotifier {
   String? error;
 
   Future<void> load(String patientId, {ReportPeriod? selectedPeriod, DateTime? selectedAnchor}) async {
+    if (_repository == null) return;
     period = selectedPeriod ?? period;
     anchor = selectedAnchor ?? anchor;
     isLoading = true;
@@ -22,9 +31,9 @@ class MedicationReportProvider extends ChangeNotifier {
     notifyListeners();
     try {
       report = switch (period) {
-        ReportPeriod.today => await _repository.today(patientId),
-        ReportPeriod.week => await _repository.week(patientId, anchor: anchor),
-        ReportPeriod.month => await _repository.month(patientId, anchor: anchor),
+        ReportPeriod.today => await _repository!.today(patientId),
+        ReportPeriod.week => await _repository!.week(patientId, anchor: anchor),
+        ReportPeriod.month => await _repository!.month(patientId, anchor: anchor),
       };
     } catch (_) {
       error = 'تعذّر تحميل تقرير الالتزام.';

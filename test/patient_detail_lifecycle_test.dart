@@ -59,17 +59,17 @@ Future<void> _openAndRapidlyClose(WidgetTester tester) async {
   expect(find.byType(PatientDetailPage), findsNothing);
 }
 
-Future<void> main() async {
+void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // PatientDetailPage constructs providers whose repositories access
-  // Supabase.instance during initState. The lifecycle test does not need a
-  // live backend, but Supabase must be initialized so the real page can mount.
-  await Supabase.initialize(
-    url: 'https://test.supabase.co',
-    publishableKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoianonInRlc3QifQ.test',
-  );
+  // Supabase.initialize creates an HttpClient. It must run inside the test
+  // zone so flutter_test's HTTP override has a current invoker.
+  setUpAll(() async {
+    await Supabase.initialize(
+      url: 'https://test.supabase.co',
+      publishableKey: 'test-publishable-key',
+    );
+  });
 
   testWidgets(
     'PatientDetailPage survives rapid replacement while async loading is in flight',

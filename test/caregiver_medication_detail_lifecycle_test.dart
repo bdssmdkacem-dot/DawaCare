@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 Medication _medication() => Medication(
       id: 'medication-lifecycle-test',
@@ -79,13 +81,21 @@ Future<void> _openAndRapidlyClose(WidgetTester tester) async {
   await tester.pump();
   expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
 
-  // Ensure the old subtree remains gone after the route/page is disposed.
+  // Ensure the old subtree remains gone after the page is disposed.
   await tester.pump(const Duration(milliseconds: 50));
   expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await Supabase.initialize(
+      url: 'https://test.supabase.co',
+      publishableKey: 'test-publishable-key',
+    );
+  });
 
   testWidgets(
     'CaregiverMedicationDetailPage survives rapid replacement while loading',

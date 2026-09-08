@@ -1,9 +1,10 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/notifications/push_notification_service.dart';
 import '../../../../models/user_profile.dart';
-import '../../../../core/notifications/push_registration_service.dart';
 import '../../data/auth_repository.dart';
 
 enum AuthStatus { unknown, signedOut, signedIn }
@@ -47,7 +48,7 @@ class AuthProvider extends ChangeNotifier {
         profile = p;
         status = AuthStatus.signedIn;
         notifyListeners();
-        unawaited(PushRegistrationService.instance.initAndRegister(p.id));
+        unawaited(PushNotificationService.instance.ensureRegistered());
         return;
       }
       await Future.delayed(const Duration(milliseconds: 400));
@@ -74,7 +75,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     final userId = profile?.id;
     if (userId != null) {
-      await PushRegistrationService.instance.unregister(userId);
+      await PushNotificationService.instance.unregister(userId);
     }
     await _repo.signOut();
   }
@@ -97,7 +98,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on AuthException catch (e) {
-      errorMessage = e.message;
+      errorMessage = _authErrorMessage(e);
       isLoading = false;
       notifyListeners();
       return false;
@@ -107,6 +108,20 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  String _authErrorMessage(AuthException error) {
+    final code = error.code?.toLowerCase() ?? '';
+    final message = error.message.toLowerCase();
+    if (error.statusCode == 429 ||
+        code == 'over_request_rate_limit' ||
+        code == 'over_email_send_rate_limit' ||
+        message.contains('too many requests') ||
+        message.contains('too many attempts') ||
+        message.contains('rate limit')) {
+      return 'AUTH_RATE_LIMITED';
+    }
+    return error.message;
   }
 
   @override

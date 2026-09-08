@@ -46,14 +46,16 @@ Future<void> _openAndRapidlyClose(WidgetTester tester) async {
   await tester.pump();
   expect(find.byType(PatientDetailPage), findsOneWidget);
 
-  // Start the page's post-frame async work, then pop immediately while the
-  // real providers may still be loading.
-  await tester.pump(const Duration(milliseconds: 1));
+  // Let the route finish entering and allow the page's post-frame async load
+  // to start. We then pop while the real providers are still expected to load.
+  await tester.pump(const Duration(milliseconds: 300));
+  expect(find.byType(PatientDetailPage), findsOneWidget);
   navigator.pop();
 
   // Complete route teardown before the next iteration/re-entry.
   await tester.pumpAndSettle();
   expect(find.byType(PatientDetailPage), findsNothing);
+  expect(find.text('Lifecycle host'), findsOneWidget);
 }
 
 void main() {
@@ -89,10 +91,12 @@ void main() {
       await tester.pump();
       expect(find.byType(PatientDetailPage), findsOneWidget);
 
-      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(PatientDetailPage), findsOneWidget);
       navigator.pop();
       await tester.pumpAndSettle();
       expect(find.byType(PatientDetailPage), findsNothing);
+      expect(find.text('Lifecycle host'), findsOneWidget);
     },
   );
 }

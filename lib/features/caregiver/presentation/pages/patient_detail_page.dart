@@ -50,8 +50,13 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
 
   @override
   void dispose() {
-    _patientDoseProvider.dispose();
-    _patientMedicationProvider.dispose();
+    // Provider.value exposes existing notifiers and does not own their disposal.
+    // Defer disposal until this frame has finished so Consumer dependents are
+    // removed before the notifiers are disposed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _patientDoseProvider.dispose();
+      _patientMedicationProvider.dispose();
+    });
     super.dispose();
   }
 

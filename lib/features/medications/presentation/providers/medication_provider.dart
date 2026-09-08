@@ -13,6 +13,7 @@ class MedicationProvider extends ChangeNotifier {
   final MedicationRepository _repo = MedicationRepository();
   final DoseRepository _doseRepo = DoseRepository();
   final ReminderPolicyRepository _policyRepo = ReminderPolicyRepository();
+  bool _disposed = false;
 
   String? patientId;
   List<Medication> medications = [];
@@ -21,17 +22,21 @@ class MedicationProvider extends ChangeNotifier {
   String? error;
   final Map<String, Future<String?>> _imageUrlFutures = {};
 
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
   Future<void> load(String forPatientId) async {
     patientId = forPatientId;
     isLoading = true;
     error = null;
     _imageUrlFutures.clear();
-    notifyListeners();
+    _notify();
     try {
       medications = await _repo.fetchMedications(forPatientId);
       schedulesByMedicationId.clear();
       for (final med in medications) {
-        schedulesByMedicationId[med.id] = await _repo.fetchSchedules(med.id);
+        await _repo.fetchSchedules(med.id).then((value) => schedulesByMedicationId[med.id] = value);
       }
       for (final med in medications) {
         try {
@@ -44,7 +49,7 @@ class MedicationProvider extends ChangeNotifier {
       error = 'تعذّر تحميل الأدوية.';
     } finally {
       isLoading = false;
-      notifyListeners();
+      _notify();
     }
   }
 
@@ -66,11 +71,11 @@ class MedicationProvider extends ChangeNotifier {
       await ReminderEngine.syncUpcoming(medicationDoses, policy);
       medications.insert(0, created);
       schedulesByMedicationId[created.id] = [createdSchedule];
-      notifyListeners();
+      _notify();
       return true;
     } catch (_) {
       error = 'تعذّر إضافة الدواء. حاول مرة أخرى.';
-      notifyListeners();
+      _notify();
       return false;
     }
   }
@@ -78,7 +83,7 @@ class MedicationProvider extends ChangeNotifier {
   Future<bool> addMedicationStock({required Medication medication, required double quantity}) async {
     if (quantity <= 0) {
       error = 'يجب أن تكون الكمية أكبر من صفر.';
-      notifyListeners();
+      _notify();
       return false;
     }
     try {
@@ -101,12 +106,12 @@ class MedicationProvider extends ChangeNotifier {
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
         medications[index] = _copyMedication(medications[index], stockEnabled: true, stockQuantity: newQuantity, stockUnit: unit);
-        notifyListeners();
+        _notify();
       }
       return true;
     } catch (_) {
       error = 'تعذّرت إضافة مخزون الدواء.';
-      notifyListeners();
+      _notify();
       return false;
     }
   }
@@ -117,11 +122,11 @@ class MedicationProvider extends ChangeNotifier {
       final updated = Medication.fromMap(row);
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) medications[index] = updated;
-      notifyListeners();
+      _notify();
       return true;
     } catch (_) {
       error = 'تعذّر تحديث إعدادات المخزون.';
-      notifyListeners();
+      _notify();
       return false;
     }
   }
@@ -133,12 +138,12 @@ class MedicationProvider extends ChangeNotifier {
       if (index >= 0) {
         medications[index] = _copyMedication(medications[index], imageUrl: path);
         _imageUrlFutures.remove(medication.imageUrl);
-        notifyListeners();
+        _notify();
       }
       return true;
     } catch (_) {
       error = 'تعذّر تحديث صورة الدواء.';
-      notifyListeners();
+      _notify();
       return false;
     }
   }
@@ -150,12 +155,12 @@ class MedicationProvider extends ChangeNotifier {
       if (index >= 0) {
         medications[index] = _copyMedication(medications[index], imageUrl: null);
         _imageUrlFutures.remove(medication.imageUrl);
-        notifyListeners();
+        _notify();
       }
       return true;
     } catch (_) {
       error = 'تعذّر حذف صورة الدواء.';
-      notifyListeners();
+      _notify();
       return false;
     }
   }
@@ -180,11 +185,11 @@ class MedicationProvider extends ChangeNotifier {
         final index = list.indexWhere((s) => s.id == schedule.id);
         if (index >= 0) list[index] = updated;
       }
-      notifyListeners();
+      _notify();
       return true;
     } catch (_) {
       error = 'تعذّر تعديل توقيت أو جرعة الدواء.';
-      notifyListeners();
+      _notify();
       return false;
     }
   }
@@ -197,7 +202,7 @@ class MedicationProvider extends ChangeNotifier {
   Future<void> deactivate(Medication medication) async {
     await _repo.deactivateMedication(medication.id);
     medications.removeWhere((m) => m.id == medication.id);
-    notifyListeners();
+    _notify();
   }
 
   String _unitForDosageForm(String? form) {
@@ -231,5 +236,11 @@ class MedicationProvider extends ChangeNotifier {
       stockEnabled: stockEnabled ?? medication.stockEnabled, stockQuantity: stockQuantity ?? medication.stockQuantity,
       stockUnit: stockUnit ?? medication.stockUnit, packageQuantity: medication.packageQuantity, lowStockThreshold: medication.lowStockThreshold,
     );
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

@@ -9,7 +9,7 @@ class RichPushNotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
-  static const _channelId = 'caregiver_alerts';
+  static const _channelId = 'caregiver_alerts_v2';
 
   Future<void> init() async {
     if (_initialized) return;

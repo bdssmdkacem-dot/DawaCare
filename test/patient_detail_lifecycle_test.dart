@@ -67,8 +67,8 @@ Future<void> main() async {
   // live backend, but Supabase must be initialized so the real page can mount.
   await Supabase.initialize(
     url: 'https://test.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiJ9.test',
+    publishableKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoianonInRlc3QifQ.test',
   );
 
   testWidgets(

@@ -113,7 +113,8 @@ class AuthProvider extends ChangeNotifier {
   String _authErrorMessage(AuthException error) {
     final code = error.code?.toLowerCase() ?? '';
     final message = error.message.toLowerCase();
-    if (error.statusCode == 429 ||
+    final statusCode = int.tryParse('${error.statusCode}') ?? -1;
+    if (statusCode == 429 ||
         code == 'over_request_rate_limit' ||
         code == 'over_email_send_rate_limit' ||
         message.contains('too many requests') ||

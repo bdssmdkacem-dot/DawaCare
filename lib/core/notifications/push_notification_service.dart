@@ -170,4 +170,35 @@ class PushNotificationService {
 Future<void> dawacareFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint('DawaCare FCM background received: id=${message.messageId} type=${message.data['type']}');
+
+  // Android normally renders notification payloads itself while the app is
+  // backgrounded. This fallback also renders data-only messages, which are
+  // used by some FCM delivery paths and OEM implementations.
+  final type = message.data['type'];
+  if (type != 'VOICE_MESSAGE' && type != 'CAREGIVER_ALERT' && !(type is String && type.startsWith('FAMILY_LINK_'))) {
+    return;
+  }
+
+  try {
+    await NotificationService.instance.init();
+    final notification = message.notification;
+    final title = notification?.title ??
+        (type == 'VOICE_MESSAGE' ? 'رسالة صوتية جديدة 🎙️' : type == 'CAREGIVER_ALERT' ? 'تنبيه من DawaCare' : 'إشعار عائلي جديد');
+    final body = notification?.body ??
+        (type == 'VOICE_MESSAGE'
+            ? '${message.data['sender_name'] ?? 'أحد أفراد العائلة'} أرسل لك رسالة صوتية.'
+            : type == 'CAREGIVER_ALERT'
+                ? 'لديك تنبيه جديد من DawaCare.'
+                : 'لديك تحديث جديد بخصوص المتابعة العائلية.');
+    final payload = type == 'VOICE_MESSAGE' && message.data['voice_message_id'] is String
+        ? 'VOICE_MESSAGE:${message.data['voice_message_id']}'
+        : type == 'CAREGIVER_ALERT' && message.data['alert_id'] is String
+            ? 'CAREGIVER_ALERT:${message.data['alert_id']}'
+            : message.data['request_id'] is String
+                ? 'FAMILY_LINK:${message.data['request_id']}'
+                : null;
+    await NotificationService.instance.showCaregiverAlert(title: title, body: body, payload: payload);
+  } catch (e) {
+    debugPrint('DawaCare background notification fallback failed: $e');
+  }
 }

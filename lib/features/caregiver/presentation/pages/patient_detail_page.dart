@@ -50,9 +50,6 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
 
   @override
   void dispose() {
-    // Provider.value exposes existing notifiers and does not own their disposal.
-    // Defer disposal until this frame has finished so Consumer dependents are
-    // removed before the notifiers are disposed.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _patientDoseProvider.dispose();
       _patientMedicationProvider.dispose();
@@ -222,3 +219,69 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
       onSkip: _canManageDoses ? () => _patientDoseProvider.skip(dose, source: 'CAREGIVER') : null,
     ));
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return MultiProvider(
+      providers: [ChangeNotifierProvider<DoseProvider>.value(value: _patientDoseProvider), ChangeNotifierProvider<MedicationProvider>.value(value: _patientMedicationProvider)],
+      child: Consumer2<DoseProvider, MedicationProvider>(builder: (context, p, medications, _) {
+        final loading = p.isLoading || medications.isLoading;
+        final highlightedDose = widget.initialDoseId == null ? null : p.all.cast<DoseInstance?>().firstWhere((d) => d?.id == widget.initialDoseId, orElse: () => null);
+        final todayDoses = p.todayDoses.where((d) => d.id != widget.initialDoseId).toList();
+        return Scaffold(
+          appBar: AppBar(title: Text(widget.link.patientName)),
+          body: loading && p.all.isEmpty && medications.medications.isEmpty ? const LoadingIndicator() : RefreshIndicator(onRefresh: _loadPatientData, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 14, 16, 32), children: [
+            _patientHero(context),
+            const SizedBox(height: 14),
+            _reportsCard(context),
+            const SizedBox(height: 18),
+            _sectionHeader(context, _tr(context, 'أدوية المريض', 'Patient medications', 'Médicaments du patient'), icon: Icons.medication_rounded),
+            if (medications.medications.isEmpty) Card(child: Padding(padding: const EdgeInsets.all(18), child: Text(l.noScheduledMedicines, textAlign: TextAlign.center))) else ...medications.medications.map(_medicationTile),
+            const SizedBox(height: 10),
+            _sectionHeader(context, _tr(context, 'نسبة الالتزام', 'Medication adherence', 'Observance du traitement'), icon: Icons.insights_rounded),
+            Card(child: Padding(padding: const EdgeInsets.all(16), child: AdherenceChart(stats: AdherenceCalculator.compute(p.all)))),
+            const SizedBox(height: 18),
+            _sectionHeader(context, l.today, icon: Icons.today_rounded),
+            if (highlightedDose != null) _doseCard(highlightedDose),
+            if (todayDoses.isEmpty && highlightedDose == null) Card(child: Padding(padding: const EdgeInsets.all(22), child: Text(l.noScheduledMedicines, textAlign: TextAlign.center))) else ...todayDoses.map(_doseCard),
+            const SizedBox(height: 12),
+            Card(color: AppColors.primary.withValues(alpha: .055), child: ListTile(leading: const CircleAvatar(child: Icon(Icons.mic_rounded)), title: Text(l.sendGeneralVoice, style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text(_tr(context, 'أرسل رسالة صوتية عامة للمريض.', 'Send a general voice message to the patient.', 'Envoyer un message vocal général au patient.')), trailing: const Icon(Icons.chevron_right_rounded), onTap: () => _openVoiceRecorder())),
+            if (_canManageDoses) ...[const SizedBox(height: 8), Center(child: TextButton.icon(onPressed: () => _confirmUnlink(context), icon: const Icon(Icons.link_off_rounded, color: AppColors.danger), label: Text(l.removeLink, style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700))))],
+          ])));
+      }),
+    );
+  }
+
+  Future<void> _confirmUnlink(BuildContext context) async {
+    final l = AppLocalizations.of(context);
+    final caregiverProvider = context.read<CaregiverProvider>();
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      title: Text(l.removeLink),
+      content: Text(_tr(context, 'هل تريد إزالة هذا الارتباط؟', 'Remove this connection?', 'Supprimer cette liaison ?')),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(l.cancel)), FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(l.removeLink))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      await caregiverProvider.unlink(widget.link);
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.pop(this.context);
+  }
+}
+
+String _tr(BuildContext context, String ar, String en, String fr) {
+  switch (Localizations.localeOf(context).languageCode) {
+    case 'en': return en;
+    case 'fr': return fr;
+    default: return ar;
+  }
+}
+
+String _roleLabel(BuildContext context, CaregiverRole role) {
+  switch (role) {
+    case CaregiverRole.viewer: return _tr(context, 'فرد العائلة', 'Family member', 'Membre de la famille');
+    case CaregiverRole.primary: return _tr(context, 'مرافق رئيسي', 'Primary caregiver', 'Accompagnant principal');
+    case CaregiverRole.caregiver: return _tr(context, 'مرافق', 'Caregiver', 'Accompagnant');
+  }
+}

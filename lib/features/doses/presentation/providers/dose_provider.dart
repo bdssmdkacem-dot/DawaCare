@@ -14,6 +14,7 @@ import '../../data/dose_repository.dart';
 class DoseProvider extends ChangeNotifier {
   final DoseRepository _doseRepo = DoseRepository();
   final ReminderPolicyRepository _policyRepo = ReminderPolicyRepository();
+  bool _disposed = false;
 
   String? patientId;
   List<DoseInstance> _doses = [];
@@ -36,6 +37,10 @@ class DoseProvider extends ChangeNotifier {
     return upcoming;
   }
 
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
   /// Loads a rolling window of [today-1, today+2] doses for [patientId].
   /// [scheduleReminders] should be true only for the signed-in user's own
   /// doses — a caregiver viewing a family member's doses shouldn't have
@@ -53,7 +58,7 @@ class DoseProvider extends ChangeNotifier {
     patientId = forPatientId;
     isLoading = true;
     error = null;
-    notifyListeners();
+    _notify();
 
     try {
       await _doseRepo.ensureDosesGenerated(forPatientId);
@@ -71,7 +76,7 @@ class DoseProvider extends ChangeNotifier {
       error = 'تعذّر تحميل الجرعات. تحقق من الاتصال بالإنترنت.';
     } finally {
       isLoading = false;
-      notifyListeners();
+      _notify();
     }
   }
 
@@ -86,7 +91,13 @@ class DoseProvider extends ChangeNotifier {
     final updated = await _doseRepo.updateStatus(dose, status, source: source);
     final idx = _doses.indexWhere((d) => d.id == dose.id);
     if (idx != -1) _doses[idx] = updated;
-    notifyListeners();
+    _notify();
     await ReminderEngine.cancelFor(dose.id);
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../models/caregiver_alert.dart';
@@ -76,9 +78,7 @@ class CaregiverRepository {
       final row = (rows as List).first as Map<String, dynamic>;
       final requestId = row['request_id'] as String?;
       if (requestId != null && requestId.isNotEmpty) {
-        try {
-          await _notifyFamilyLink(requestId, 'REQUESTED');
-        } catch (_) {}
+        await _notifyFamilyLink(requestId, 'REQUESTED');
       }
       return row['patient_name'] as String? ?? 'مريض';
     } on PostgrestException catch (e) {
@@ -102,9 +102,7 @@ class CaregiverRepository {
       });
       final row = (rows as List).first as Map<String, dynamic>;
       final status = row['status'] as String? ?? (approve ? 'APPROVED' : 'REJECTED');
-      try {
-        await _notifyFamilyLink(requestId, approve ? 'APPROVED' : 'REJECTED');
-      } catch (_) {}
+      await _notifyFamilyLink(requestId, approve ? 'APPROVED' : 'REJECTED');
       return status;
     } on PostgrestException catch (e) {
       throw FamilyLinkException(_extractCode(e.message));
@@ -112,12 +110,30 @@ class CaregiverRepository {
   }
 
   Future<void> _notifyFamilyLink(String requestId, String eventType) async {
-    final response = await _client.functions.invoke(
-      'family-link-notify',
-      body: {'request_id': requestId, 'event_type': eventType},
-    );
-    if (response.status < 200 || response.status >= 300) {
-      throw StateError('family-link-notify failed: ${response.status}');
+    try {
+      final response = await _client.functions.invoke(
+        'family-link-notify',
+        body: {'request_id': requestId, 'event_type': eventType},
+      );
+      if (response.status < 200 || response.status >= 300) {
+        developer.log(
+          'family-link-notify failed: status=${response.status} body=${response.data}',
+          name: 'DawaCare.notifications',
+        );
+        throw StateError('family-link-notify failed: ${response.status}');
+      }
+      developer.log(
+        'family-link-notify success: event=$eventType request=$requestId body=${response.data}',
+        name: 'DawaCare.notifications',
+      );
+    } catch (error, stackTrace) {
+      developer.log(
+        'family-link-notify exception: event=$eventType request=$requestId error=$error',
+        name: 'DawaCare.notifications',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 

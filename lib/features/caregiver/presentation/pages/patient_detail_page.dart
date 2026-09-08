@@ -28,22 +28,16 @@ class PatientDetailPage extends StatefulWidget {
 }
 
 class _PatientDetailPageState extends State<PatientDetailPage> {
+  bool _loadScheduled = false;
+
   bool get _canManageDoses =>
       widget.link.role == CaregiverRole.primary ||
       widget.link.role == CaregiverRole.caregiver;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loadPatientData();
-    });
-  }
-
-  Future<void> _loadPatientData() async {
+  Future<void> _loadPatientData(BuildContext providerContext) async {
     if (!mounted) return;
-    final doseProvider = context.read<DoseProvider>();
-    final medicationProvider = context.read<MedicationProvider>();
+    final doseProvider = providerContext.read<DoseProvider>();
+    final medicationProvider = providerContext.read<MedicationProvider>();
     await Future.wait([
       doseProvider.load(widget.link.patientId, scheduleReminders: false),
       medicationProvider.load(widget.link.patientId),
@@ -67,10 +61,7 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
       onBackgroundImageError: hasAvatar ? (_, __) {} : null,
       child: hasAvatar
           ? null
-          : Text(
-              _initials(widget.link.patientName),
-              style: TextStyle(color: Colors.white, fontSize: radius * .55, fontWeight: FontWeight.w900),
-            ),
+          : Text(_initials(widget.link.patientName), style: TextStyle(color: Colors.white, fontSize: radius * .55, fontWeight: FontWeight.w900)),
     );
   }
 
@@ -106,9 +97,8 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     ));
   }
 
-  Medication? _medicationFor(DoseInstance dose) {
-    final medications = context.read<MedicationProvider>().medications;
-    for (final medication in medications) {
+  Medication? _medicationFor(BuildContext providerContext, DoseInstance dose) {
+    for (final medication in providerContext.read<MedicationProvider>().medications) {
       if (medication.id == dose.medicationId) return medication;
     }
     return null;
@@ -120,19 +110,11 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
           Container(
             width: 34,
             height: 34,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: .10),
-              borderRadius: BorderRadius.circular(11),
-            ),
+            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(11)),
             child: Icon(icon, size: 19, color: AppColors.primary),
           ),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-          ),
+          Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
         ]),
       );
 
@@ -152,21 +134,11 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
       child: Row(children: [
         GestureDetector(onTap: () => _showProfile(context), child: _patientAvatar()),
         const SizedBox(width: 15),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              widget.link.patientName,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              relationship != null && relationship.isNotEmpty ? '$relationship · $role' : role,
-              style: TextStyle(color: Colors.white.withValues(alpha: .88), fontWeight: FontWeight.w600),
-            ),
-          ]),
-        ),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(widget.link.patientName, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 5),
+          Text(relationship != null && relationship.isNotEmpty ? '$relationship · $role' : role, style: TextStyle(color: Colors.white.withValues(alpha: .88), fontWeight: FontWeight.w600)),
+        ])),
       ]),
     );
   }
@@ -181,20 +153,13 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            CircleAvatar(
-              radius: 76,
-              backgroundImage: hasAvatar ? NetworkImage(url) : null,
-              child: hasAvatar ? null : Text(_initials(widget.link.patientName), style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w900)),
-            ),
+            CircleAvatar(radius: 76, backgroundImage: hasAvatar ? NetworkImage(url) : null, child: hasAvatar ? null : Text(_initials(widget.link.patientName), style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w900))),
             const SizedBox(height: 16),
             Text(widget.link.patientName, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
             Text(_roleLabel(context, widget.link.role)),
             const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(onPressed: () => Navigator.pop(dialogContext), child: Text(AppLocalizations.of(context).cancel)),
-            ),
+            SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.pop(dialogContext), child: Text(AppLocalizations.of(context).cancel))),
           ]),
         ),
       ),
@@ -209,29 +174,21 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
           child: Padding(
             padding: const EdgeInsets.all(15),
             child: Row(children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(16)),
-                child: const Icon(Icons.analytics_rounded, color: AppColors.primary, size: 27),
-              ),
+              Container(width: 52, height: 52, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.analytics_rounded, color: AppColors.primary, size: 27)),
               const SizedBox(width: 13),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(_tr(context, 'تقارير الالتزام', 'Adherence reports', 'Rapports d’observance'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                  const SizedBox(height: 3),
-                  Text(_tr(context, 'اليوم والأسبوع والشهر ونسبة الالتزام حسب الدواء.', 'Today, week, month and adherence by medication.', 'Jour, semaine, mois et observance par médicament.')),
-                ]),
-              ),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(_tr(context, 'تقارير الالتزام', 'Adherence reports', 'Rapports d’observance'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                const SizedBox(height: 3),
+                Text(_tr(context, 'اليوم والأسبوع والشهر ونسبة الالتزام حسب الدواء.', 'Today, week, month and adherence by medication.', 'Jour, semaine, mois et observance par médicament.')),
+              ])),
               const Icon(Icons.chevron_right_rounded),
             ]),
           ),
         ),
       );
 
-  Widget _medicationTile(Medication medication) {
-    final provider = context.read<MedicationProvider>();
-    final imageFuture = provider.signedMedicationImageUrl(medication.imageUrl);
+  Widget _medicationTile(BuildContext providerContext, Medication medication) {
+    final imageFuture = providerContext.read<MedicationProvider>().signedMedicationImageUrl(medication.imageUrl);
     return Card(
       margin: const EdgeInsets.only(bottom: 9),
       child: InkWell(
@@ -244,29 +201,16 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
               future: imageFuture,
               builder: (context, snapshot) {
                 final url = snapshot.data;
-                return Container(
-                  width: 64,
-                  height: 64,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), borderRadius: BorderRadius.circular(14)),
-                  child: url == null || url.isEmpty
-                      ? const Icon(Icons.medication_rounded, color: AppColors.primary)
-                      : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.medication_rounded, color: AppColors.primary)),
-                );
+                return Container(width: 64, height: 64, clipBehavior: Clip.antiAlias, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), borderRadius: BorderRadius.circular(14)), child: url == null || url.isEmpty ? const Icon(Icons.medication_rounded, color: AppColors.primary) : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.medication_rounded, color: AppColors.primary)));
               },
             ),
             const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(medication.name, style: const TextStyle(fontWeight: FontWeight.w900)),
-                if ((medication.genericName ?? '').trim().isNotEmpty) Text(medication.genericName!.trim(), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text([
-                  if ((medication.strength ?? '').trim().isNotEmpty) medication.strength!.trim(),
-                  if ((medication.dosageForm ?? '').trim().isNotEmpty) medication.dosageForm!.trim(),
-                ].join(' • ')),
-              ]),
-            ),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(medication.name, style: const TextStyle(fontWeight: FontWeight.w900)),
+              if ((medication.genericName ?? '').trim().isNotEmpty) Text(medication.genericName!.trim(), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 4),
+              Text([if ((medication.strength ?? '').trim().isNotEmpty) medication.strength!.trim(), if ((medication.dosageForm ?? '').trim().isNotEmpty) medication.dosageForm!.trim()].join(' • ')),
+            ])),
             const Icon(Icons.chevron_right_rounded),
           ]),
         ),
@@ -274,10 +218,10 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     );
   }
 
-  Widget _doseCard(DoseInstance dose) {
-    final doseProvider = context.read<DoseProvider>();
-    final medicationProvider = context.read<MedicationProvider>();
-    final medication = _medicationFor(dose);
+  Widget _doseCard(BuildContext providerContext, DoseInstance dose) {
+    final doseProvider = providerContext.read<DoseProvider>();
+    final medicationProvider = providerContext.read<MedicationProvider>();
+    final medication = _medicationFor(providerContext, dose);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: DoseCard(
@@ -301,61 +245,59 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
         ChangeNotifierProvider<MedicationProvider>(create: (_) => MedicationProvider()),
       ],
       child: Consumer2<DoseProvider, MedicationProvider>(
-        builder: (context, p, medications, _) {
+        builder: (providerContext, p, medications, _) {
+          if (!_loadScheduled) {
+            _loadScheduled = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _loadPatientData(providerContext);
+            });
+          }
           final loading = p.isLoading || medications.isLoading;
-          final highlightedDose = widget.initialDoseId == null
-              ? null
-              : p.all.cast<DoseInstance?>().firstWhere((d) => d?.id == widget.initialDoseId, orElse: () => null);
+          final highlightedDose = widget.initialDoseId == null ? null : p.all.cast<DoseInstance?>().firstWhere((d) => d?.id == widget.initialDoseId, orElse: () => null);
           final todayDoses = p.todayDoses.where((d) => d.id != widget.initialDoseId).toList();
           return Scaffold(
             appBar: AppBar(title: Text(widget.link.patientName)),
             body: loading && p.all.isEmpty && medications.medications.isEmpty
                 ? const LoadingIndicator()
                 : RefreshIndicator(
-                    onRefresh: _loadPatientData,
+                    onRefresh: () => _loadPatientData(providerContext),
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
                       children: [
-                        _patientHero(context),
+                        _patientHero(providerContext),
                         const SizedBox(height: 14),
-                        _reportsCard(context),
+                        _reportsCard(providerContext),
                         const SizedBox(height: 18),
-                        _sectionHeader(context, _tr(context, 'أدوية المريض', 'Patient medications', 'Médicaments du patient'), icon: Icons.medication_rounded),
+                        _sectionHeader(providerContext, _tr(providerContext, 'أدوية المريض', 'Patient medications', 'Médicaments du patient'), icon: Icons.medication_rounded),
                         if (medications.medications.isEmpty)
                           Card(child: Padding(padding: const EdgeInsets.all(18), child: Text(l.noScheduledMedicines, textAlign: TextAlign.center)))
                         else
-                          ...medications.medications.map(_medicationTile),
+                          ...medications.medications.map((m) => _medicationTile(providerContext, m)),
                         const SizedBox(height: 10),
-                        _sectionHeader(context, _tr(context, 'نسبة الالتزام', 'Medication adherence', 'Observance du traitement'), icon: Icons.insights_rounded),
+                        _sectionHeader(providerContext, _tr(providerContext, 'نسبة الالتزام', 'Medication adherence', 'Observance du traitement'), icon: Icons.insights_rounded),
                         Card(child: Padding(padding: const EdgeInsets.all(16), child: AdherenceChart(stats: AdherenceCalculator.compute(p.all)))),
                         const SizedBox(height: 18),
-                        _sectionHeader(context, l.today, icon: Icons.today_rounded),
-                        if (highlightedDose != null) _doseCard(highlightedDose),
+                        _sectionHeader(providerContext, l.today, icon: Icons.today_rounded),
+                        if (highlightedDose != null) _doseCard(providerContext, highlightedDose),
                         if (todayDoses.isEmpty && highlightedDose == null)
                           Card(child: Padding(padding: const EdgeInsets.all(22), child: Text(l.noScheduledMedicines, textAlign: TextAlign.center)))
                         else
-                          ...todayDoses.map(_doseCard),
+                          ...todayDoses.map((d) => _doseCard(providerContext, d)),
                         const SizedBox(height: 12),
                         Card(
                           color: AppColors.primary.withValues(alpha: .055),
                           child: ListTile(
                             leading: const CircleAvatar(child: Icon(Icons.mic_rounded)),
                             title: Text(l.sendGeneralVoice, style: const TextStyle(fontWeight: FontWeight.w800)),
-                            subtitle: Text(_tr(context, 'أرسل رسالة صوتية عامة للمريض.', 'Send a general voice message to the patient.', 'Envoyer un message vocal général au patient.')),
+                            subtitle: Text(_tr(providerContext, 'أرسل رسالة صوتية عامة للمريض.', 'Send a general voice message to the patient.', 'Envoyer un message vocal général au patient.')),
                             trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: () => _openVoiceRecorder(),
                           ),
                         ),
                         if (_canManageDoses) ...[
                           const SizedBox(height: 8),
-                          Center(
-                            child: TextButton.icon(
-                              onPressed: () => _confirmUnlink(context),
-                              icon: const Icon(Icons.link_off_rounded, color: AppColors.danger),
-                              label: Text(l.removeLink, style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700)),
-                            ),
-                          ),
+                          Center(child: TextButton.icon(onPressed: () => _confirmUnlink(providerContext), icon: const Icon(Icons.link_off_rounded, color: AppColors.danger), label: Text(l.removeLink, style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700)))),
                         ],
                       ],
                     ),
@@ -391,22 +333,16 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
 
 String _tr(BuildContext context, String ar, String en, String fr) {
   switch (Localizations.localeOf(context).languageCode) {
-    case 'en':
-      return en;
-    case 'fr':
-      return fr;
-    default:
-      return ar;
+    case 'en': return en;
+    case 'fr': return fr;
+    default: return ar;
   }
 }
 
 String _roleLabel(BuildContext context, CaregiverRole role) {
   switch (role) {
-    case CaregiverRole.primary:
-      return _tr(context, 'مرافق رئيسي', 'Primary caregiver', 'Accompagnant principal');
-    case CaregiverRole.caregiver:
-      return _tr(context, 'مرافق', 'Caregiver', 'Accompagnant');
-    case CaregiverRole.viewer:
-      return _tr(context, 'فرد العائلة', 'Family member', 'Membre de la famille');
+    case CaregiverRole.primary: return _tr(context, 'مرافق رئيسي', 'Primary caregiver', 'Accompagnant principal');
+    case CaregiverRole.caregiver: return _tr(context, 'مرافق', 'Caregiver', 'Accompagnant');
+    case CaregiverRole.viewer: return _tr(context, 'فرد العائلة', 'Family member', 'Membre de la famille');
   }
 }

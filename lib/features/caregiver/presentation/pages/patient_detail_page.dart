@@ -326,7 +326,7 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     try {
       await caregiverProvider.unlink(widget.link);
     } catch (_) {}
-    if (!mounted) return;
+    if (!context.mounted) return;
     Navigator.pop(context);
   }
 }

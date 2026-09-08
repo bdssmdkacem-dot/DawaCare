@@ -27,9 +27,6 @@ Medication _medication() => Medication(
       createdAt: DateTime(2026, 1, 1),
     );
 
-/// Keeps the real page in its loading state without touching Supabase.
-/// The provider is supplied as an existing dependency because the real
-/// caregiver screen receives it from an ancestor and does not own it.
 class _BlockingMedicationProvider extends MedicationProvider {
   final Completer<void> _loadCompleter = Completer<void>();
 
@@ -52,8 +49,8 @@ Widget _app({required Widget home}) {
 }
 
 Widget _page() => _app(
-      home: Provider<MedicationProvider>.value(
-        value: _BlockingMedicationProvider(),
+      home: ChangeNotifierProvider<MedicationProvider>(
+        create: (_) => _BlockingMedicationProvider(),
         child: CaregiverMedicationDetailPage(
           medication: _medication(),
           patientName: 'مريض الاختبار',
@@ -74,14 +71,11 @@ Future<void> _openAndRapidlyClose(WidgetTester tester) async {
   expect(find.byType(CaregiverMedicationDetailPage), findsOneWidget);
   expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-  // _loadData is deliberately still waiting here. Replace the whole tree
-  // while the page is alive and its async work is in flight.
   await tester.pump(const Duration(milliseconds: 1));
   await tester.pumpWidget(_host());
   await tester.pump();
   expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
 
-  // Ensure the old subtree remains gone after the page is disposed.
   await tester.pump(const Duration(milliseconds: 50));
   expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
 }

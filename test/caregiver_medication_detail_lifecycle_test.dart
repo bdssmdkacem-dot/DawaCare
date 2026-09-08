@@ -28,8 +28,8 @@ Medication _medication() => Medication(
     );
 
 /// Keeps the real page in its loading state without touching Supabase.
-/// The provider is supplied as an existing dependency because the real
-/// caregiver screen receives it from an ancestor and does not own it.
+/// This mirrors PatientDetailPage, which creates the notifier and exposes it
+/// to the pushed medication route with ChangeNotifierProvider.value.
 class _BlockingMedicationProvider extends MedicationProvider {
   final Completer<void> _loadCompleter = Completer<void>();
 
@@ -37,7 +37,7 @@ class _BlockingMedicationProvider extends MedicationProvider {
   Future<void> load(String forPatientId) => _loadCompleter.future;
 }
 
-Widget _app({required Widget home}) {
+Widget _app({required MedicationProvider provider}) {
   return MaterialApp(
     locale: const Locale('ar'),
     supportedLocales: AppLocalizations.supportedLocales,
@@ -47,43 +47,62 @@ Widget _app({required Widget home}) {
       GlobalCupertinoLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,
     ],
-    home: home,
+    home: Scaffold(
+      body: Center(
+        child: ElevatedButton(
+          onPressed: () => Navigator.of(_buttonContext!).push(
+            MaterialPageRoute(
+              builder: (_) => ChangeNotifierProvider<MedicationProvider>.value(
+                value: provider,
+                child: CaregiverMedicationDetailPage(
+                  medication: _medication(),
+                  patientName: 'مريض الاختبار',
+                  canManageDoses: false,
+                ),
+              ),
+            ),
+          ),
+          child: const Text('Open medication'),
+        ),
+      ),
+    ),
   );
 }
 
-Widget _page() => _app(
-      home: Provider<MedicationProvider>.value(
-        value: _BlockingMedicationProvider(),
-        child: CaregiverMedicationDetailPage(
-          medication: _medication(),
-          patientName: 'مريض الاختبار',
-          canManageDoses: false,
-        ),
-      ),
-    );
+BuildContext? _buttonContext;
 
-Widget _host() => _app(
-      home: const Scaffold(
-        body: Center(child: Text('Lifecycle host')),
-      ),
-    );
+Widget _host({required MedicationProvider provider}) {
+  return Builder(
+    builder: (context) {
+      _buttonContext = context;
+      return _app(provider: provider);
+    },
+  );
+}
 
-Future<void> _openAndRapidlyClose(WidgetTester tester) async {
-  await tester.pumpWidget(_page());
+Future<void> _openAndPop(WidgetTester tester) async {
+  final provider = _BlockingMedicationProvider();
+  await tester.pumpWidget(_host(provider: provider));
   await tester.pump();
+
+  await tester.tap(find.text('Open medication'));
+  await tester.pump();
+  await tester.pump();
+
   expect(find.byType(CaregiverMedicationDetailPage), findsOneWidget);
   expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-  // _loadData is deliberately still waiting here. Replace the whole tree
-  // while the page is alive and its async work is in flight.
-  await tester.pump(const Duration(milliseconds: 1));
-  await tester.pumpWidget(_host());
+  // The detail page is a real Navigator route. Pop the route while its
+  // provider load remains pending instead of replacing the whole app tree.
+  await tester.pageBack();
   await tester.pump();
   expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
 
-  // Ensure the old subtree remains gone after the page is disposed.
+  // Give the route teardown and inherited-dependency removal a full frame.
   await tester.pump(const Duration(milliseconds: 50));
   expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
+
+  provider.dispose();
 }
 
 void main() {
@@ -98,29 +117,19 @@ void main() {
   });
 
   testWidgets(
-    'CaregiverMedicationDetailPage survives rapid replacement while loading',
+    'CaregiverMedicationDetailPage survives rapid route replacement while loading',
     (tester) async {
       for (var i = 0; i < 5; i++) {
-        await _openAndRapidlyClose(tester);
+        await _openAndPop(tester);
       }
     },
   );
 
   testWidgets(
-    'CaregiverMedicationDetailPage can be re-entered after disposal',
+    'CaregiverMedicationDetailPage can be re-entered after route disposal',
     (tester) async {
-      await _openAndRapidlyClose(tester);
-
-      await tester.pumpWidget(_page());
-      await tester.pump();
-      expect(find.byType(CaregiverMedicationDetailPage), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-
-      await tester.pump(const Duration(milliseconds: 1));
-      await tester.pumpWidget(_host());
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
-      expect(find.byType(CaregiverMedicationDetailPage), findsNothing);
+      await _openAndPop(tester);
+      await _openAndPop(tester);
     },
   );
 }

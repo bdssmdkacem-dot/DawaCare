@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
             android: {
               priority: 'high',
               notification: {
-                channel_id: 'caregiver_alerts',
+                channel_id: 'caregiver_alerts_v2',
                 sound: 'default',
                 notification_priority: 'PRIORITY_HIGH',
                 ...(image ? { image } : {}),
@@ -152,7 +152,7 @@ async function getAccessToken(a: Account): Promise<string> {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      grant_type: 'urn:ietf:params:oauth:params:oauth:grant-type:jwt-bearer',
       assertion: jwt,
     }),
   });

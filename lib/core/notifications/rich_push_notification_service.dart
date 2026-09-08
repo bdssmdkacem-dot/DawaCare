@@ -16,7 +16,14 @@ class RichPushNotificationService {
     const settings = InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'));
     await _plugin.initialize(settings);
     final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    await android?.createNotificationChannel(const AndroidNotificationChannel(_channelId, 'تنبيهات العائلة', description: 'إشعارات الرسائل وطلبات المتابعة', importance: Importance.high, enableVibration: true));
+    await android?.createNotificationChannel(const AndroidNotificationChannel(
+      _channelId,
+      'تنبيهات العائلة',
+      description: 'إشعارات الرسائل وطلبات المتابعة',
+      importance: Importance.high,
+      enableVibration: true,
+      playSound: true,
+    ));
     _initialized = true;
   }
 
@@ -33,6 +40,8 @@ class RichPushNotificationService {
       importance: Importance.high,
       priority: Priority.high,
       playSound: true,
+      enableVibration: true,
+      sound: null,
       largeIcon: localImage == null ? null : FilePathAndroidBitmap(localImage),
       styleInformation: localImage == null ? null : BigPictureStyleInformation(FilePathAndroidBitmap(localImage), hideExpandedLargeIcon: false, contentTitle: title, summaryText: body),
     );

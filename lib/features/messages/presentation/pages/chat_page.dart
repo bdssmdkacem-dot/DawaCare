@@ -28,9 +28,12 @@ class _ChatPageState extends State<ChatPage> {
   final _db = Supabase.instance.client;
 
   List<ChatMessage> _messages = [];
+  final Map<String, Future<String>> _signedUrls = {};
   bool _loading = true;
   bool _sending = false;
   bool _recording = false;
+  bool _refreshing = false;
+  int _loadGeneration = 0;
   DateTime? _recordStarted;
   String? _playing;
   RealtimeChannel? _channel;
@@ -50,13 +53,16 @@ class _ChatPageState extends State<ChatPage> {
           column: 'patient_id',
           value: widget.patientId,
         ),
-        callback: (_) => _load(),
+        callback: (_) => _load(scrollToBottom: true),
       )
       ..subscribe();
   }
 
   @override
   void dispose() {
+    if (_recording) {
+      unawaited(_service.cancelVoiceRecording());
+    }
     _playerComplete?.cancel();
     _channel?.unsubscribe();
     _text.dispose();
@@ -65,11 +71,24 @@ class _ChatPageState extends State<ChatPage> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool scrollToBottom = false}) async {
+    final me = _db.auth.currentUser?.id;
+    if (me == null) {
+      if (mounted) {
+        setState(() {
+          _messages = [];
+          _loading = false;
+          _refreshing = false;
+        });
+      }
+      return;
+    }
+
+    final generation = ++_loadGeneration;
     try {
-      final me = _db.auth.currentUser?.id;
-      if (me == null) return;
       final rows = await _service.fetch(widget.patientId);
+      if (!mounted || generation != _loadGeneration) return;
+
       final filtered = rows
           .where(
             (m) =>
@@ -77,18 +96,45 @@ class _ChatPageState extends State<ChatPage> {
                 (m.senderId == me && m.recipientId == widget.otherUserId),
           )
           .toList();
-      if (mounted) setState(() => _messages = filtered);
-      for (final m in filtered.where(
+
+      setState(() => _messages = filtered);
+
+      final unread = filtered.where(
         (m) => m.recipientId == me && m.readAt == null,
-      )) {
-        await _service.markRead(m.id);
+      );
+      for (final m in unread) {
+        try {
+          await _service.markRead(m.id);
+        } catch (e) {
+          debugPrint('chat mark-read: $e');
+        }
+      }
+
+      if (scrollToBottom) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _bottom());
       }
     } catch (e) {
       debugPrint('chat load: $e');
+      if (mounted && _messages.isEmpty) {
+        _error('تعذر تحميل المحادثة.');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
-      WidgetsBinding.instance.addPostFrameCallback((_) => _bottom());
+      if (mounted && generation == _loadGeneration) {
+        setState(() {
+          _loading = false;
+          _refreshing = false;
+        });
+      }
+      if (scrollToBottom && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _bottom());
+      }
     }
+  }
+
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    await _load(scrollToBottom: false);
   }
 
   void _bottom() {
@@ -131,7 +177,12 @@ class _ChatPageState extends State<ChatPage> {
     if (_recording) {
       final path = await _service.stopVoiceRecording();
       final started = _recordStarted;
-      if (mounted) setState(() => _recording = false);
+      if (mounted) {
+        setState(() {
+          _recording = false;
+          _recordStarted = null;
+        });
+      }
       if (path != null && started != null) {
         final ms = DateTime.now().difference(started).inMilliseconds;
         if (ms > 0) {
@@ -164,13 +215,15 @@ class _ChatPageState extends State<ChatPage> {
     Future<ChatMessage> Function() action, {
     bool clearText = false,
   }) async {
+    if (!mounted) return;
     setState(() => _sending = true);
     try {
       final m = await action();
       if (mounted) {
         setState(() => _messages = [..._messages, m]);
         if (clearText) _text.clear();
-        _bottom();
+        _signedUrls.remove(m.storagePath);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _bottom());
       }
     } catch (e) {
       debugPrint('chat send: $e');
@@ -186,6 +239,10 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  Future<String> _urlFor(String path) {
+    return _signedUrls.putIfAbsent(path, () => _service.signedUrl(path));
+  }
+
   Future<void> _play(ChatMessage m) async {
     try {
       if (_playing == m.id) {
@@ -194,11 +251,15 @@ class _ChatPageState extends State<ChatPage> {
         return;
       }
       await _playerComplete?.cancel();
-      final url = await _service.signedUrl(m.storagePath!);
+      final url = await _urlFor(m.storagePath!);
       await _player.play(UrlSource(url));
       if (mounted) setState(() => _playing = m.id);
       if (m.readAt == null && m.recipientId == _db.auth.currentUser?.id) {
-        await _service.markRead(m.id);
+        try {
+          await _service.markRead(m.id);
+        } catch (e) {
+          debugPrint('chat voice mark-read: $e');
+        }
       }
       _playerComplete = _player.onPlayerComplete.listen((_) {
         if (mounted && _playing == m.id) setState(() => _playing = null);
@@ -214,19 +275,24 @@ class _ChatPageState extends State<ChatPage> {
       appBar: AppBar(title: Text(widget.otherName)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.all(12),
-                    itemCount: _messages.length,
-                    itemBuilder: (c, i) => _bubble(_messages[i]),
-                  ),
-                ),
-                _composer(),
-              ],
+          : RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView(
+                controller: _scroll,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                children: [
+                  if (_messages.isEmpty)
+                    const SizedBox(
+                      height: 300,
+                      child: Center(child: Text('لا توجد رسائل بعد.')),
+                    )
+                  else
+                    ..._messages.map(_bubble),
+                ],
+              ),
             ),
+      bottomNavigationBar: _composer(),
     );
   }
 
@@ -250,32 +316,55 @@ class _ChatPageState extends State<ChatPage> {
             if (m.type == 'text') Text(m.body!),
             if (m.type == 'image')
               FutureBuilder<String>(
-                future: _service.signedUrl(m.storagePath!),
-                builder: (c, s) => s.hasData
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          s.data!,
+                future: _urlFor(m.storagePath!),
+                builder: (c, s) {
+                  if (s.hasError) {
+                    return const SizedBox(
+                      width: 250,
+                      height: 100,
+                      child: Center(child: Icon(Icons.broken_image_outlined)),
+                    );
+                  }
+                  return s.hasData
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            s.data!,
+                            width: 250,
+                            height: 250,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const SizedBox(
+                              width: 250,
+                              height: 100,
+                              child: Center(
+                                child: Icon(Icons.broken_image_outlined),
+                              ),
+                            ),
+                          ),
+                        )
+                      : const SizedBox(
                           width: 250,
-                          height: 250,
-                          fit: BoxFit.cover,
-                        ),
-                      )
-                    : const SizedBox(
-                        width: 250,
-                        height: 100,
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
+                          height: 100,
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                },
               ),
             if (m.type == 'voice')
-              IconButton(
-                onPressed: () => _play(m),
-                icon: Icon(
-                  _playing == m.id
-                      ? Icons.stop_circle_outlined
-                      : Icons.play_circle_fill_rounded,
-                  size: 38,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: () => _play(m),
+                    icon: Icon(
+                      _playing == m.id
+                          ? Icons.stop_circle_outlined
+                          : Icons.play_circle_fill_rounded,
+                      size: 38,
+                    ),
+                  ),
+                  if (m.durationMs != null)
+                    Text('${(m.durationMs! / 1000).ceil()} ث'),
+                ],
               ),
             Text(
               '${m.createdAt.hour.toString().padLeft(2, '0')}:${m.createdAt.minute.toString().padLeft(2, '0')}',
@@ -294,7 +383,7 @@ class _ChatPageState extends State<ChatPage> {
         child: Row(
           children: [
             IconButton(
-              onPressed: _sending ? null : _sendImage,
+              onPressed: _sending || _recording ? null : _sendImage,
               icon: const Icon(Icons.image_rounded),
             ),
             IconButton(
@@ -308,6 +397,7 @@ class _ChatPageState extends State<ChatPage> {
             Expanded(
               child: TextField(
                 controller: _text,
+                enabled: !_recording,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _sendText(),
                 decoration: const InputDecoration(
@@ -324,7 +414,7 @@ class _ChatPageState extends State<ChatPage> {
             ),
             const SizedBox(width: 5),
             IconButton(
-              onPressed: _sending ? null : _sendText,
+              onPressed: _sending || _recording ? null : _sendText,
               icon: const Icon(Icons.send_rounded),
             ),
           ],

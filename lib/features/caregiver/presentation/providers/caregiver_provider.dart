@@ -41,9 +41,9 @@ class CaregiverProvider extends ChangeNotifier {
       incomingRequests = results[2] as List<FamilyLinkRequest>;
       sentRequests = results[3] as List<FamilyLinkRequest>;
 
-      // Family identity and requests must not wait for potentially slower
-      // per-patient medication/dose summaries. Summaries load independently.
-      loadMemberSummaries(notify: false);
+      // Identity, requests and alerts must not wait for slower per-patient
+      // medication/dose summaries. Summary cards update when those queries finish.
+      loadMemberSummaries();
     } catch (_) {
       error = 'تعذّر تحميل بيانات العائلة.';
     } finally {

@@ -88,6 +88,18 @@ class LocalDatabase {
     );
   }
 
+  Future<void> deleteFutureUnresolvedDosesByMedication(
+    String medicationId,
+    DateTime from,
+  ) async {
+    final db = await database;
+    await db.delete(
+      'cached_doses',
+      where: "medication_id = ? AND scheduled_at >= ? AND status IN ('PENDING', 'REMINDER_SENT', 'SNOOZED', 'MISSED')",
+      whereArgs: [medicationId, from.toIso8601String()],
+    );
+  }
+
   // ---- sync_queue -----------------------------------------------------------
 
   Future<void> enqueue({

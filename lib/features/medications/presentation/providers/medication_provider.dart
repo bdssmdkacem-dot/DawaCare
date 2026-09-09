@@ -178,7 +178,7 @@ class MedicationProvider extends ChangeNotifier {
         await ReminderEngine.cancelFor(dose.id);
       }
       final updated = await _repo.updateSchedule(MedicationSchedule(id: schedule.id, medicationId: schedule.medicationId, type: schedule.type, time: time, daysOfWeek: schedule.daysOfWeek, intervalDays: schedule.intervalDays, doseAmount: doseAmount, startDate: schedule.startDate, endDate: schedule.endDate, timezone: schedule.timezone));
-      await _repo.deleteFuturePendingDoses(schedule.id, from);
+      await _repo.deleteFutureUnresolvedDoses(schedule.id, from);
       await _doseRepo.ensureDosesGenerated(patientId);
       final refreshed = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
       final policy = await _policyRepo.fetch(patientId);

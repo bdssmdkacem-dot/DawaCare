@@ -148,11 +148,10 @@ class _PatientHomePageState extends State<PatientHomePage> {
     final medicationProvider = context.watch<MedicationProvider>();
     final userId = auth.profile?.id;
 
-    if (userId != null && doseProvider.patientId != userId) _ensureOwnDataLoaded();
-    if (userId != null && medicationProvider.patientId != userId) _ensureOwnDataLoaded();
-
     final showingOwnDoses = userId != null && doseProvider.patientId == userId;
     final showingOwnMedications = userId != null && medicationProvider.patientId == userId;
+    final hasOwnData = showingOwnDoses && showingOwnMedications;
+    final hasCachedDoses = doseProvider.all.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -183,7 +182,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
             _loadFollowedPatients(userId),
           ]);
         },
-        child: !showingOwnDoses || !showingOwnMedications || doseProvider.isLoading || medicationProvider.isLoading
+        child: !hasOwnData && !hasCachedDoses
             ? const LoadingIndicator()
             : _buildBody(doseProvider, medicationProvider, l),
       ),
@@ -207,33 +206,51 @@ class _PatientHomePageState extends State<PatientHomePage> {
     }
 
     final today = provider.todayDoses;
-    final hasFollowedDoses = _followedDoses.values.any((doses) => doses.isNotEmpty);
+    final total = today.length;
+    final taken = today.where((d) => d.status == DoseStatus.taken).length;
+    final remaining = total - taken;
     final hasFollowedPatients = _followedPatients.isNotEmpty;
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
       children: [
-        _dayHeader(l),
-        const SizedBox(height: 16),
-        _voiceMessagesButton(l),
+        _dayHeader(l, taken: taken, total: total),
         const SizedBox(height: 20),
-        _sectionTitle('أدويتي', Icons.person_rounded),
-        const SizedBox(height: 10),
-        if (today.isEmpty)
-          _emptySection('لا توجد جرعات مجدولة لك اليوم.')
-        else ..._buildOwnDoses(today, medicationProvider),
+        if (today.isNotEmpty) ...[
+          _sectionTitle('الجرعة الحالية والقادمة', Icons.access_time_rounded),
+          const SizedBox(height: 10),
+          ..._buildOwnDoses(today, medicationProvider),
+        ] else ...[
+          _sectionTitle('جرعاتي اليوم', Icons.medication_rounded),
+          const SizedBox(height: 10),
+          _emptySection('لا توجد جرعات مجدولة لك اليوم.'),
+        ],
         if (_loadingFollowed || hasFollowedPatients) ...[
           const SizedBox(height: 22),
-          _sectionTitle('أدوية الأشخاص الذين أتابعهم', Icons.groups_rounded),
+          _sectionTitle('الأشخاص الذين أتابعهم', Icons.groups_rounded),
           const SizedBox(height: 10),
           if (_loadingFollowed && !hasFollowedPatients)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (_followedError != null && !hasFollowedDoses)
+          else if (_followedError != null && _followedDoses.isEmpty)
             _emptySection(_followedError!)
           else ..._buildFollowedPatients(),
+        ],
+        const SizedBox(height: 22),
+        _voiceMessagesButton(l),
+        if (remaining > 0 && total > 0) ...[
+          const SizedBox(height: 10),
+          Text(
+            '$remaining جرعة متبقية اليوم',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ],
     );
@@ -243,10 +260,13 @@ class _PatientHomePageState extends State<PatientHomePage> {
     List<DoseInstance> doses,
     MedicationProvider medicationProvider,
   ) {
+    final actionableStatuses = {
+      DoseStatus.pending,
+      DoseStatus.reminderSent,
+      DoseStatus.snoozed,
+    };
     final next = doses.firstWhere(
-      (d) => d.status == DoseStatus.pending ||
-          d.status == DoseStatus.reminderSent ||
-          d.status == DoseStatus.snoozed,
+      (d) => actionableStatuses.contains(d.status),
       orElse: () => doses.first,
     );
 
@@ -266,10 +286,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
           imageUrlFuture: medication == null
               ? null
               : medicationProvider.signedMedicationImageUrl(medication.imageUrl),
-          compact: dose.id != next.id &&
-              !(dose.status == DoseStatus.pending ||
-                  dose.status == DoseStatus.reminderSent ||
-                  dose.status == DoseStatus.snoozed),
+          compact: dose.id != next.id && !actionableStatuses.contains(dose.status),
           onConfirm: () => context.read<DoseProvider>().confirm(dose),
           onSnooze: () => context.read<DoseProvider>().snooze(dose),
           onSkip: () => _confirmSkip(dose),
@@ -282,13 +299,18 @@ class _PatientHomePageState extends State<PatientHomePage> {
     final widgets = <Widget>[];
     for (final link in _followedPatients) {
       final doses = _followedDoses[link.patientId] ?? const <DoseInstance>[];
-      if (doses.isEmpty) {
-        widgets.add(_patientHeader(link, subtitle: 'لا توجد جرعات مجدولة اليوم'));
-        continue;
-      }
+      final taken = doses.where((d) => d.status == DoseStatus.taken).length;
+      final summary = doses.isEmpty
+          ? 'لا توجد جرعات مجدولة اليوم'
+          : '$taken / ${doses.length} مكتملة';
 
-      widgets.add(_patientHeader(link, subtitle: '${doses.length} جرعة اليوم'));
+      widgets.add(_patientHeader(link, subtitle: summary));
+
+      if (doses.isEmpty) continue;
+
       final medications = _followedMedications[link.patientId] ?? const <Medication>[];
+      final canManage = link.role == CaregiverRole.primary ||
+          link.role == CaregiverRole.caregiver;
       for (final dose in doses) {
         Medication? medication;
         for (final item in medications) {
@@ -297,8 +319,6 @@ class _PatientHomePageState extends State<PatientHomePage> {
             break;
           }
         }
-        final canManage = link.role == CaregiverRole.primary ||
-            link.role == CaregiverRole.caregiver;
         widgets.add(
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -355,7 +375,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
     final text = switch (role) {
       CaregiverRole.primary => 'مرافق أساسي',
       CaregiverRole.caregiver => 'مرافق',
-      CaregiverRole.viewer => 'فرد من العائلة',
+      CaregiverRole.viewer => 'مشاهد',
     };
     return Chip(
       label: Text(text),
@@ -403,8 +423,13 @@ class _PatientHomePageState extends State<PatientHomePage> {
         ),
       );
 
-  Widget _dayHeader(AppLocalizations l) {
+  Widget _dayHeader(
+    AppLocalizations l, {
+    required int taken,
+    required int total,
+  }) {
     final date = DateTime.now();
+    final progress = total == 0 ? 0.0 : (taken / total).clamp(0.0, 1.0);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
@@ -422,29 +447,58 @@ class _PatientHomePageState extends State<PatientHomePage> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .14),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.calendar_today_rounded, color: Colors.white),
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.calendar_today_rounded, color: Colors.white),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.today, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(DateTimeUtils.relativeDayLabel(date), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.medication_rounded, color: Colors.white, size: 28),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l.today, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(DateTimeUtils.relativeDayLabel(date), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-              ],
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Text(
+                '$taken / $total',
+                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'جرعات مكتملة',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 7,
+              backgroundColor: Colors.white.withValues(alpha: .20),
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
-          const Icon(Icons.medication_rounded, color: Colors.white, size: 28),
         ],
       ),
     );
@@ -491,7 +545,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
   }
 
   String _initials(String value) {
-    final parts = value.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = value.split(RegExp(r'\\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     if (value.length >= 2) return value.substring(0, 2).toUpperCase();
     return value.isEmpty ? '?' : value[0].toUpperCase();

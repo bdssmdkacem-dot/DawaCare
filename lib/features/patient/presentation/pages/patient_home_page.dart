@@ -545,7 +545,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
   }
 
   String _initials(String value) {
-    final parts = value.split(RegExp(r'\\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = value.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     if (value.length >= 2) return value.substring(0, 2).toUpperCase();
     return value.isEmpty ? '?' : value[0].toUpperCase();

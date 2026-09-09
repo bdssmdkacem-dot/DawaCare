@@ -75,7 +75,12 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     final userId = profile?.id;
     if (userId != null) {
-      await PushNotificationService.instance.unregister(userId);
+      try {
+        await PushNotificationService.instance.unregister(userId);
+      } catch (e) {
+        // Push cleanup must never prevent the user from signing out.
+        debugPrint('DawaCare sign out: push unregister failed: $e');
+      }
     }
     await _repo.signOut();
   }

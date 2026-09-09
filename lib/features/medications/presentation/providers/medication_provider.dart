@@ -21,35 +21,62 @@ class MedicationProvider extends ChangeNotifier {
   bool isLoading = false;
   String? error;
   final Map<String, Future<String?>> _imageUrlFutures = {};
+  int _loadGeneration = 0;
 
   void _notify() {
     if (!_disposed) notifyListeners();
   }
 
   Future<void> load(String forPatientId) async {
+    final generation = ++_loadGeneration;
     patientId = forPatientId;
     isLoading = true;
     error = null;
     _imageUrlFutures.clear();
     _notify();
+
     try {
-      medications = await _repo.fetchMedications(forPatientId);
-      schedulesByMedicationId.clear();
-      for (final med in medications) {
-        schedulesByMedicationId[med.id] = await _repo.fetchSchedules(med.id);
-      }
-      for (final med in medications) {
-        try {
-          await StockAlertService.instance.checkMedication(med);
-        } catch (_) {
-          // Stock alerts are non-critical and must never block medication loading.
-        }
-      }
-    } catch (_) {
-      error = 'تعذّر تحميل الأدوية.';
-    } finally {
-      isLoading = false;
+      final loadedMedications = await _repo.fetchMedications(forPatientId);
+      if (_disposed || generation != _loadGeneration) return;
+
+      final scheduleEntries = await Future.wait(
+        loadedMedications.map(
+          (medication) async => MapEntry(
+            medication.id,
+            await _repo.fetchSchedules(medication.id),
+          ),
+        ),
+      );
+      if (_disposed || generation != _loadGeneration) return;
+
+      final scheduleMap = <String, List<MedicationSchedule>>{
+        for (final entry in scheduleEntries) entry.key: entry.value,
+      };
+
+      medications = loadedMedications;
+      schedulesByMedicationId
+        ..clear()
+        ..addAll(scheduleMap);
       _notify();
+
+      await Future.wait(
+        loadedMedications.map((medication) async {
+          try {
+            await StockAlertService.instance.checkMedication(medication);
+          } catch (_) {
+            // Stock alerts are non-critical and must never block medication loading.
+          }
+        }),
+      );
+    } catch (_) {
+      if (!_disposed && generation == _loadGeneration) {
+        error = 'تعذّر تحميل الأدوية.';
+      }
+    } finally {
+      if (!_disposed && generation == _loadGeneration) {
+        isLoading = false;
+        _notify();
+      }
     }
   }
 

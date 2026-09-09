@@ -120,6 +120,20 @@ class MedicationRepository {
     return MedicationSchedule.fromMap(row);
   }
 
+  /// Removes only future, unresolved dose occurrences for a schedule.
+  /// Resolved history (TAKEN/SKIPPED/CANCELLED) is intentionally preserved.
+  Future<void> deleteFutureUnresolvedDoses(String scheduleId, DateTime from) async {
+    final fromUtc = from.toUtc().toIso8601String();
+    for (final status in const ['PENDING', 'REMINDER_SENT', 'SNOOZED', 'MISSED']) {
+      await _client
+          .from('dose_instances')
+          .delete()
+          .eq('schedule_id', scheduleId)
+          .eq('status', status)
+          .gte('scheduled_at', fromUtc);
+    }
+  }
+
   Future<void> deleteFuturePendingDoses(String scheduleId, DateTime from) async {
     await _client.from('dose_instances').delete().eq('schedule_id', scheduleId).eq('status', 'PENDING').gte('scheduled_at', from.toUtc().toIso8601String());
   }

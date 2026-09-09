@@ -90,6 +90,19 @@ class DoseRepository {
     }
   }
 
+  Future<void> clearFutureUnresolvedDosesByMedication(String medicationId, DateTime from) async {
+    final fromUtc = from.toUtc().toIso8601String();
+    for (final status in const ['PENDING', 'REMINDER_SENT', 'SNOOZED', 'MISSED']) {
+      await _client
+          .from('dose_instances')
+          .delete()
+          .eq('medication_id', medicationId)
+          .eq('status', status)
+          .gte('scheduled_at', fromUtc);
+    }
+    await _local.deleteFutureUnresolvedDosesByMedication(medicationId, from);
+  }
+
   Future<DoseInstance> updateStatus(
     DoseInstance dose,
     DoseStatus newStatus, {

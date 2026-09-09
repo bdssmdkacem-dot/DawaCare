@@ -203,8 +203,25 @@ class MedicationProvider extends ChangeNotifier {
   }
 
   Future<void> deactivate(Medication medication) async {
+    final now = DateTime.now();
+    final from = DateTime(now.year, now.month, now.day);
+    final to = from.add(const Duration(days: 14));
+    final futureDoses = await _doseRepo.fetchDosesForRange(
+      medication.patientId,
+      from: from,
+      to: to,
+    );
+
+    for (final dose in futureDoses.where(
+      (d) => d.medicationId == medication.id && !isResolvedStatus(d.status),
+    )) {
+      await ReminderEngine.cancelFor(dose.id);
+    }
+
     await _repo.deactivateMedication(medication.id);
+    await _doseRepo.clearFutureUnresolvedDosesByMedication(medication.id, from);
     medications.removeWhere((m) => m.id == medication.id);
+    schedulesByMedicationId.remove(medication.id);
     _notify();
   }
 

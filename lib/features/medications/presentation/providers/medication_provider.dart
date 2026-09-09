@@ -133,11 +133,13 @@ class MedicationProvider extends ChangeNotifier {
 
   Future<bool> updateMedicationImage(Medication medication, Uint8List bytes) async {
     try {
+      final oldImagePath = medication.imageUrl;
       final path = await _repo.updateMedicationImage(medication: medication, bytes: bytes);
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
         medications[index] = _copyMedication(medications[index], imageUrl: path);
-        _imageUrlFutures.remove(medication.imageUrl);
+        if (oldImagePath != null) _imageUrlFutures.remove(oldImagePath);
+        _imageUrlFutures.remove(path);
         _notify();
       }
       return true;
@@ -150,11 +152,12 @@ class MedicationProvider extends ChangeNotifier {
 
   Future<bool> removeMedicationImage(Medication medication) async {
     try {
+      final oldImagePath = medication.imageUrl;
       await _repo.removeMedicationImage(medication);
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
-        medications[index] = _copyMedication(medications[index], imageUrl: null);
-        _imageUrlFutures.remove(medication.imageUrl);
+        medications[index] = _copyMedication(medications[index], imageUrl: null, clearImage: true);
+        if (oldImagePath != null) _imageUrlFutures.remove(oldImagePath);
         _notify();
       }
       return true;
@@ -227,14 +230,33 @@ class MedicationProvider extends ChangeNotifier {
     }
   }
 
-  Medication _copyMedication(Medication medication, {String? imageUrl, bool? stockEnabled, double? stockQuantity, String? stockUnit}) {
+  Medication _copyMedication(
+    Medication medication, {
+    String? imageUrl,
+    bool clearImage = false,
+    bool? stockEnabled,
+    double? stockQuantity,
+    String? stockUnit,
+  }) {
     return Medication(
-      id: medication.id, patientId: medication.patientId, name: medication.name, genericName: medication.genericName,
-      strength: medication.strength, dosageForm: medication.dosageForm, instructions: medication.instructions,
-      imageUrl: imageUrl ?? medication.imageUrl, startDate: medication.startDate, endDate: medication.endDate,
-      active: medication.active, createdBy: medication.createdBy, createdAt: medication.createdAt,
-      stockEnabled: stockEnabled ?? medication.stockEnabled, stockQuantity: stockQuantity ?? medication.stockQuantity,
-      stockUnit: stockUnit ?? medication.stockUnit, packageQuantity: medication.packageQuantity, lowStockThreshold: medication.lowStockThreshold,
+      id: medication.id,
+      patientId: medication.patientId,
+      name: medication.name,
+      genericName: medication.genericName,
+      strength: medication.strength,
+      dosageForm: medication.dosageForm,
+      instructions: medication.instructions,
+      imageUrl: clearImage ? null : (imageUrl ?? medication.imageUrl),
+      startDate: medication.startDate,
+      endDate: medication.endDate,
+      active: medication.active,
+      createdBy: medication.createdBy,
+      createdAt: medication.createdAt,
+      stockEnabled: stockEnabled ?? medication.stockEnabled,
+      stockQuantity: stockQuantity ?? medication.stockQuantity,
+      stockUnit: stockUnit ?? medication.stockUnit,
+      packageQuantity: medication.packageQuantity,
+      lowStockThreshold: medication.lowStockThreshold,
     );
   }
 

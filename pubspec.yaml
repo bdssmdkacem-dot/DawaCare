@@ -45,6 +45,9 @@ dependencies:
   record: 6.2.1
   audioplayers: ^6.8.1
 
+  # Ads
+  google_mobile_ads: ^9.1.0
+
   # Utilities
   intl: ^0.20.2
   uuid: ^4.5.1

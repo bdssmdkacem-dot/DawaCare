@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/notifications/notification_service.dart';
 import '../../../../core/utils/date_time_utils.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../../models/reminder_policy.dart';
@@ -95,8 +96,16 @@ class DoseProvider extends ChangeNotifier {
   Future<void> confirm(DoseInstance dose, {String source = 'PATIENT'}) =>
       _updateStatus(dose, DoseStatus.taken, source: source);
 
-  Future<void> snooze(DoseInstance dose, {String source = 'PATIENT'}) =>
-      _updateStatus(dose, DoseStatus.snoozed, source: source);
+  Future<void> snooze(DoseInstance dose, {String source = 'PATIENT'}) async {
+    final updated = await NotificationService.instance.snoozeDose(
+      dose,
+      source: source,
+    );
+    if (updated == null) return;
+    final idx = _doses.indexWhere((d) => d.id == dose.id);
+    if (idx != -1) _doses[idx] = updated;
+    _notify();
+  }
 
   Future<void> skip(DoseInstance dose, {String source = 'PATIENT'}) =>
       _updateStatus(dose, DoseStatus.skipped, source: source);

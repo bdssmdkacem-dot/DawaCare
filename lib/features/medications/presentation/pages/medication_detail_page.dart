@@ -9,6 +9,7 @@ import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
 import '../../../doses/data/dose_repository.dart';
+import '../../domain/stock_intelligence.dart';
 import '../providers/medication_provider.dart';
 
 class MedicationDetailPage extends StatefulWidget {
@@ -36,11 +37,7 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
 
   void _reload() {
     final now = DateTime.now();
-    _dosesFuture = _doseRepository.fetchDosesForRange(
-      widget.medication.patientId,
-      from: now.subtract(const Duration(days: 30)),
-      to: now.add(const Duration(days: 14)),
-    );
+    _dosesFuture = _doseRepository.fetchDosesForRange(widget.medication.patientId, from: now.subtract(const Duration(days: 30)), to: now.add(const Duration(days: 14)));
     _stockFuture = context.read<MedicationProvider>().fetchStockTransactions(widget.medication.id);
   }
 
@@ -58,13 +55,7 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(med.name),
-        actions: [
-          IconButton(
-            tooltip: _tr('تحديث', 'Refresh', 'Actualiser'),
-            onPressed: () => setState(_reload),
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
+        actions: [IconButton(tooltip: _tr('تحديث', 'Refresh', 'Actualiser'), onPressed: () => setState(_reload), icon: const Icon(Icons.refresh_rounded))],
       ),
       body: RefreshIndicator(
         onRefresh: () async => setState(_reload),
@@ -77,9 +68,7 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
             FutureBuilder<List<DoseInstance>>(
               future: _dosesFuture,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(padding: EdgeInsets.all(20), child: LoadingIndicator());
-                }
+                if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(20), child: LoadingIndicator());
                 final doses = (snapshot.data ?? const <DoseInstance>[]).where((d) => d.medicationId == med.id).toList();
                 return _nextDoseAndTodayCard(context, doses);
               },
@@ -92,8 +81,7 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
             _sectionTitle(context, Icons.schedule_rounded, _tr('جدول الجرعات', 'Dose schedule', 'Planning des doses')),
             const SizedBox(height: 8),
             ..._schedules.map((schedule) => _scheduleCard(context, schedule)),
-            if (_schedules.isEmpty)
-              _infoCard(context, Icons.info_outline_rounded, _tr('لا يوجد جدول نشط لهذا الدواء.', 'No active schedule for this medicine.', 'Aucun planning actif pour ce médicament.')),
+            if (_schedules.isEmpty) _infoCard(context, Icons.info_outline_rounded, _tr('لا يوجد جدول نشط لهذا الدواء.', 'No active schedule for this medicine.', 'Aucun planning actif pour ce médicament.')),
             const SizedBox(height: 16),
             _sectionTitle(context, Icons.insights_rounded, _tr('متابعة العلاج', 'Treatment progress', 'Suivi du traitement')),
             const SizedBox(height: 8),
@@ -132,10 +120,7 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
               onPressed: _confirmDeactivate,
               icon: const Icon(Icons.stop_circle_outlined),
               label: Text(AppLocalizations.of(context).deactivateMedicine),
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.errorContainer, foregroundColor: Theme.of(context).colorScheme.onErrorContainer),
             ),
           ],
         ),
@@ -148,48 +133,35 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FutureBuilder<String?>(
-                  future: context.read<MedicationProvider>().signedMedicationImageUrl(med.imageUrl),
-                  builder: (context, snapshot) {
-                    final url = snapshot.data;
-                    return Container(
-                      width: 76,
-                      height: 76,
-                      decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), borderRadius: BorderRadius.circular(20)),
-                      clipBehavior: Clip.antiAlias,
-                      child: url == null
-                          ? const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 38)
-                          : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 38)),
-                    );
-                  },
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(med.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
-                      if (med.genericName?.trim().isNotEmpty == true) Text(med.genericName!.trim(), style: Theme.of(context).textTheme.bodySmall),
-                      const SizedBox(height: 7),
-                      Wrap(spacing: 6, runSpacing: 6, children: [
-                        if (med.strength?.trim().isNotEmpty == true) _tag(med.strength!.trim()),
-                        if (med.dosageForm?.trim().isNotEmpty == true) _tag(AppLocalizations.of(context).dosageFormLabel(med.dosageForm!.trim())),
-                      ]),
-                    ],
-                  ),
-                ),
-              ],
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            FutureBuilder<String?>(
+              future: context.read<MedicationProvider>().signedMedicationImageUrl(med.imageUrl),
+              builder: (context, snapshot) {
+                final url = snapshot.data;
+                return Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), borderRadius: BorderRadius.circular(20)),
+                  clipBehavior: Clip.antiAlias,
+                  child: url == null ? const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 38) : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 38)),
+                );
+              },
             ),
-            const SizedBox(height: 16),
-            _doseSummary(context),
-          ],
-        ),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(med.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+              if (med.genericName?.trim().isNotEmpty == true) Text(med.genericName!.trim(), style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 7),
+              Wrap(spacing: 6, runSpacing: 6, children: [
+                if (med.strength?.trim().isNotEmpty == true) _tag(med.strength!.trim()),
+                if (med.dosageForm?.trim().isNotEmpty == true) _tag(AppLocalizations.of(context).dosageFormLabel(med.dosageForm!.trim())),
+              ]),
+            ])),
+          ]),
+          const SizedBox(height: 16),
+          _doseSummary(context),
+        ]),
       ),
     );
   }
@@ -198,58 +170,33 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
     final l = AppLocalizations.of(context);
     final active = _schedules.where((s) => s.type != ScheduleType.prn).toList();
     if (active.isEmpty) return _tag(_tr('عند الحاجة PRN', 'As needed (PRN)', 'Si besoin (PRN)'));
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(_tr('الجرعة', 'Dose', 'Dose'), style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
-        const SizedBox(height: 5),
-        ...active.take(4).map((s) => Padding(
-          padding: const EdgeInsets.only(bottom: 3),
-          child: Text('• ${s.doseAmount} · ${_describeSchedule(s, l)}', style: const TextStyle(fontWeight: FontWeight.w700)),
-        )),
-        if (active.length > 4) Text('+ ${active.length - 4} ${_tr('مواعيد أخرى', 'more times', 'autres horaires')}'),
-      ],
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(_tr('الجرعة', 'Dose', 'Dose'), style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+      const SizedBox(height: 5),
+      ...active.take(4).map((s) => Padding(padding: const EdgeInsets.only(bottom: 3), child: Text('• ${s.doseAmount} · ${_describeSchedule(s, l)}', style: const TextStyle(fontWeight: FontWeight.w700)))),
+      if (active.length > 4) Text('+ ${active.length - 4} ${_tr('مواعيد أخرى', 'more times', 'autres horaires')}'),
+    ]);
   }
 
   Widget _nextDoseAndTodayCard(BuildContext context, List<DoseInstance> doses) {
     final now = DateTime.now();
-    final upcoming = doses.where((d) => !isResolvedStatus(d.status) && !d.scheduledAt.isBefore(now)).toList()
-      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    final upcoming = doses.where((d) => !isResolvedStatus(d.status) && !d.scheduledAt.isBefore(now)).toList()..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
     final next = upcoming.isEmpty ? null : upcoming.first;
-    final today = doses.where((d) => DateTimeUtils.isSameDate(d.scheduledAt, now)).toList()
-      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.notifications_active_rounded, color: AppColors.primary),
-            const SizedBox(width: 8),
-            Text(_tr('الجرعة القادمة', 'Next dose', 'Prochaine dose'), style: const TextStyle(fontWeight: FontWeight.w900)),
-          ]),
-          const SizedBox(height: 8),
-          if (next == null)
-            Text(_schedules.any((s) => s.type == ScheduleType.prn)
-                ? _tr('عند الحاجة — لا توجد جرعة مجدولة تلقائيًا.', 'As needed — no automatic dose scheduled.', 'Si besoin — aucune dose automatique.')
-                : _tr('لا توجد جرعة قادمة في الفترة الحالية.', 'No upcoming dose in the current window.', 'Aucune dose à venir dans la période.'))
-          else
-            Row(children: [
-              Text(DateTimeUtils.formatShortDate(next.scheduledAt), style: const TextStyle(fontWeight: FontWeight.w900)),
-              const SizedBox(width: 8),
-              Text(_time(next.scheduledAt), style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
-              const Spacer(),
-              _tag(next.status == DoseStatus.taken ? _tr('تم أخذها', 'Taken', 'Prise') : next.doseAmount),
-            ]),
-          if (today.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Text(_tr('اليوم', 'Today', 'Aujourd’hui'), style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900)),
-            const SizedBox(height: 7),
-            Wrap(spacing: 7, runSpacing: 7, children: today.map((d) => _dosePill(context, d)).toList()),
-          ],
-        ]),
-      ),
-    );
+    final today = doses.where((d) => DateTimeUtils.isSameDate(d.scheduledAt, now)).toList()..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    return Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [const Icon(Icons.notifications_active_rounded, color: AppColors.primary), const SizedBox(width: 8), Text(_tr('الجرعة القادمة', 'Next dose', 'Prochaine dose'), style: const TextStyle(fontWeight: FontWeight.w900))]),
+      const SizedBox(height: 8),
+      if (next == null)
+        Text(_schedules.any((s) => s.type == ScheduleType.prn) ? _tr('عند الحاجة — لا توجد جرعة مجدولة تلقائيًا.', 'As needed — no automatic dose scheduled.', 'Si besoin — aucune dose automatique.') : _tr('لا توجد جرعة قادمة في الفترة الحالية.', 'No upcoming dose in the current window.', 'Aucune dose à venir dans la période.'))
+      else
+        Row(children: [Text(DateTimeUtils.formatShortDate(next.scheduledAt), style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(width: 8), Text(_time(next.scheduledAt), style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)), const Spacer(), _tag(next.status == DoseStatus.taken ? _tr('تم أخذها', 'Taken', 'Prise') : next.doseAmount)]),
+      if (today.isNotEmpty) ...[
+        const SizedBox(height: 14),
+        Text(_tr('اليوم', 'Today', 'Aujourd’hui'), style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900)),
+        const SizedBox(height: 7),
+        Wrap(spacing: 7, runSpacing: 7, children: today.map((d) => _dosePill(context, d)).toList()),
+      ],
+    ])));
   }
 
   Widget _dosePill(BuildContext context, DoseInstance dose) {
@@ -257,10 +204,7 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
     final missed = dose.status == DoseStatus.missed;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: (taken ? Colors.green : missed ? Theme.of(context).colorScheme.error : AppColors.primary).withValues(alpha: .10),
-        borderRadius: BorderRadius.circular(16),
-      ),
+      decoration: BoxDecoration(color: (taken ? Colors.green : missed ? Theme.of(context).colorScheme.error : AppColors.primary).withValues(alpha: .10), borderRadius: BorderRadius.circular(16)),
       child: Text('${_time(dose.scheduledAt)}  ${taken ? '✓' : missed ? '!' : '○'}', style: const TextStyle(fontWeight: FontWeight.w800)),
     );
   }
@@ -268,52 +212,36 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
   Widget _stockCard(BuildContext context) {
     final med = widget.medication;
     if (!med.stockEnabled) {
-      return Card(child: ListTile(leading: const Icon(Icons.inventory_outlined), title: Text(_tr('تتبع المخزون غير مفعّل', 'Stock tracking is off', 'Suivi du stock désactivé')), subtitle: Text(_tr('فعّله من زر المخزون في القائمة.', 'Enable it from the stock action on the list.', 'Activez-le depuis la liste.'))));
+      return Card(child: ListTile(
+        leading: const Icon(Icons.inventory_outlined),
+        title: Text(_tr('تتبع المخزون غير مفعّل', 'Stock tracking is off', 'Suivi du stock désactivé')),
+        subtitle: Text(_tr('فعّله من زر المخزون في القائمة.', 'Enable it from the stock action on the list.', 'Activez-le depuis la liste.')),
+      ));
     }
-    final daily = _dailyConsumption();
-    final days = daily == null || daily <= 0 ? null : med.stockQuantity / daily;
-    final ratio = med.lowStockThreshold <= 0 ? (med.stockQuantity > 0 ? 1.0 : 0.0) : (med.stockQuantity / (med.stockQuantity + med.lowStockThreshold)).clamp(0.0, 1.0);
-    final empty = med.stockQuantity <= 0;
-    final low = !empty && med.stockQuantity <= med.lowStockThreshold;
-    final status = empty ? _tr('يحتاج إعادة شراء', 'Needs refill', 'À renouveler') : low ? _tr('قريب من النفاد', 'Low stock', 'Stock faible') : _tr('كافٍ', 'Enough', 'Suffisant');
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(child: Text('${_formatNumber(med.stockQuantity)} ${_unitLabel(med.stockUnit)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900))),
-            _statusChip(context, status, empty || low),
-          ]),
-          const SizedBox(height: 9),
-          ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: ratio, minHeight: 8)),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: Text(days == null ? _tr('الاستهلاك اليومي غير محسوب', 'Daily use cannot be calculated', 'Consommation quotidienne non calculable') : '${_tr('يكفي تقريبًا', 'About', 'Environ')} ${_formatDays(days)} ${_tr('يومًا', 'days', 'jours')}')),
-            Text('${_tr('الحد', 'Threshold', 'Seuil')}: ${_formatNumber(med.lowStockThreshold)}', style: Theme.of(context).textTheme.bodySmall),
-          ]),
-        ]),
-      ),
-    );
-  }
 
-  double? _dailyConsumption() {
-    double total = 0;
-    var found = false;
-    for (final s in _schedules) {
-      if (s.type == ScheduleType.prn) continue;
-      final amount = double.tryParse(s.doseAmount.trim().replaceAll(',', '.'));
-      if (amount == null || amount <= 0) continue;
-      found = true;
-      switch (s.type) {
-        case ScheduleType.daily:
-        case ScheduleType.once: total += amount; break;
-        case ScheduleType.weekly:
-        case ScheduleType.specificDays: total += amount * (s.daysOfWeek.isEmpty ? 1 : s.daysOfWeek.length) / 7; break;
-        case ScheduleType.interval: total += amount / (s.intervalDays ?? 1).clamp(1, 365); break;
-        case ScheduleType.prn: break;
-      }
-    }
-    return found && total > 0 ? total : null;
+    final daily = StockIntelligence.dailyConsumption(medication: med, schedules: _schedules);
+    final days = StockIntelligence.daysRemaining(medication: med, schedules: _schedules);
+    final empty = StockIntelligence.isOutOfStock(med);
+    final low = StockIntelligence.isLowStock(med);
+    final status = empty ? _tr('يحتاج إعادة شراء', 'Needs refill', 'À renouveler') : low ? _tr('قريب من النفاد', 'Low stock', 'Stock faible') : _tr('كافٍ', 'Enough', 'Suffisant');
+    final ratio = med.lowStockThreshold <= 0 ? (med.stockQuantity > 0 ? 1.0 : 0.0) : (med.stockQuantity / (med.stockQuantity + med.lowStockThreshold)).clamp(0.0, 1.0).toDouble();
+
+    return Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Expanded(child: Text('${_formatNumber(med.stockQuantity)} ${_unitLabel(med.stockUnit)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900))), _statusChip(context, status, empty || low)]),
+      const SizedBox(height: 9),
+      ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: ratio, minHeight: 8)),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(child: Text(days == null ? _tr('الاستهلاك اليومي غير محسوب', 'Daily use cannot be calculated', 'Consommation quotidienne non calculable') : '${_tr('يكفي تقريبًا', 'About', 'Environ')} ${_formatDays(days)} ${_tr('يومًا', 'days', 'jours')}')),
+        Text('${_tr('الاستهلاك', 'Use', 'Usage')}: ${_formatNumber(daily)}/${_unitLabel(med.stockUnit)}', style: Theme.of(context).textTheme.bodySmall),
+      ]),
+      const SizedBox(height: 4),
+      Text('${_tr('الحد', 'Threshold', 'Seuil')}: ${_formatNumber(med.lowStockThreshold)} ${_unitLabel(med.stockUnit)}', style: Theme.of(context).textTheme.bodySmall),
+      if (days != null && days > 0) ...[
+        const SizedBox(height: 4),
+        Text('${_tr('متوقع النفاد', 'Expected depletion', 'Épuisement prévu')}: ${DateTimeUtils.formatShortDate(StockIntelligence.depletionDate(medication: med, schedules: _schedules)!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
+      ],
+    ])));
   }
 
   Widget _progressCard(BuildContext context, List<DoseInstance> doses) {
@@ -325,17 +253,9 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
     final skipped = history.where((d) => d.status == DoseStatus.skipped).length;
     final pending = todayDoses.where((d) => !isResolvedStatus(d.status) && d.status != DoseStatus.missed).length;
     return Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [
-      Row(children: [
-        Expanded(child: _metric(context, Icons.today_rounded, _tr('اليوم', 'Today', 'Aujourd’hui'), '${todayDoses.length}')),
-        Expanded(child: _metric(context, Icons.check_circle_outline_rounded, _tr('تم أخذها', 'Taken', 'Prises'), '$taken')),
-        Expanded(child: _metric(context, Icons.warning_amber_rounded, _tr('فاتت', 'Missed', 'Manquées'), '$missed')),
-      ]),
+      Row(children: [Expanded(child: _metric(context, Icons.today_rounded, _tr('اليوم', 'Today', 'Aujourd’hui'), '${todayDoses.length}')), Expanded(child: _metric(context, Icons.check_circle_outline_rounded, _tr('تم أخذها', 'Taken', 'Prises'), '$taken')), Expanded(child: _metric(context, Icons.warning_amber_rounded, _tr('فاتت', 'Missed', 'Manquées'), '$missed'))]),
       const SizedBox(height: 12),
-      Row(children: [
-        Expanded(child: _metric(context, Icons.schedule_rounded, _tr('متبقية اليوم', 'Remaining', 'Restantes'), '$pending')),
-        Expanded(child: _metric(context, Icons.skip_next_rounded, _tr('متخطاة', 'Skipped', 'Ignorées'), '$skipped')),
-        Expanded(child: _metric(context, Icons.history_rounded, _tr('السجل', 'History', 'Historique'), '${history.length}')),
-      ]),
+      Row(children: [Expanded(child: _metric(context, Icons.schedule_rounded, _tr('متبقية اليوم', 'Remaining', 'Restantes'), '$pending')), Expanded(child: _metric(context, Icons.skip_next_rounded, _tr('متخطاة', 'Skipped', 'Ignorées'), '$skipped')), Expanded(child: _metric(context, Icons.history_rounded, _tr('السجل', 'History', 'Historique'), '${history.length}'))]),
     ])));
   }
 
@@ -403,16 +323,28 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
 
   Widget _stockHistory(BuildContext context, List<Map<String, dynamic>> rows) => Card(child: Column(children: rows.map((row) {
     final qty = (row['quantity'] as num?)?.toDouble() ?? 0;
-    final type = '${row['transaction_type'] ?? ''}';
+    final type = '${row['transaction_type'] ?? ''}'.toUpperCase();
     final date = row['created_at'] == null ? null : DateTime.tryParse('${row['created_at']}')?.toLocal();
-    final positive = !type.toUpperCase().contains('DOSE') && !type.toUpperCase().contains('REMOVE');
-    final label = type == 'INITIAL' ? _tr('بداية المخزون', 'Initial stock', 'Stock initial') : type == 'ADD' ? _tr('إضافة مخزون', 'Stock added', 'Ajout de stock') : type;
+    final isTaken = type == 'TAKEN';
+    final isAdjustment = type == 'ADJUSTMENT';
+    final positive = type == 'INITIAL' || type == 'ADD' || isAdjustment;
+    final label = switch (type) {
+      'INITIAL' => _tr('بداية المخزون', 'Initial stock', 'Stock initial'),
+      'ADD' => _tr('إضافة مخزون', 'Stock added', 'Ajout de stock'),
+      'TAKEN' => _tr('جرعة مأخوذة', 'Dose taken', 'Dose prise'),
+      'ADJUSTMENT' => _tr('عكس/تعديل المخزون', 'Stock reversal/adjustment', 'Ajustement du stock'),
+      _ => _tr('حركة مخزون', 'Stock movement', 'Mouvement de stock'),
+    };
+    final icon = isTaken ? Icons.medication_rounded : isAdjustment ? Icons.undo_rounded : positive ? Icons.add_circle_outline_rounded : Icons.remove_circle_outline_rounded;
+    final color = isTaken ? Theme.of(context).colorScheme.error : positive ? Colors.green : Theme.of(context).colorScheme.error;
+    final sign = positive ? '+' : '-';
+    final time = date == null ? '' : '${DateTimeUtils.formatShortDate(date)} · ${_time(date)}';
     return ListTile(
       dense: true,
-      leading: Icon(positive ? Icons.add_circle_outline_rounded : Icons.remove_circle_outline_rounded, color: positive ? Colors.green : Theme.of(context).colorScheme.error),
+      leading: Icon(icon, color: color),
       title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: Text(date == null ? '' : DateTimeUtils.formatShortDate(date)),
-      trailing: Text('${positive ? '+' : '-'}${_formatNumber(qty)}', style: const TextStyle(fontWeight: FontWeight.w900)),
+      subtitle: Text(time),
+      trailing: Text('$sign${_formatNumber(qty)} ${_unitLabel(widget.medication.stockUnit)}', style: TextStyle(fontWeight: FontWeight.w900, color: color)),
     );
   }).toList()));
 
@@ -423,6 +355,7 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
       case 'ml': return 'مل';
       case 'drop': return 'قطرة';
       case 'injection': return 'حقنة';
+      case 'spoon': return 'ملعقة';
       default: return 'وحدة';
     }
   }
@@ -432,8 +365,8 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
   Widget _sectionTitle(BuildContext context, IconData icon, String title) => Row(children: [Icon(icon, color: AppColors.primary), const SizedBox(width: 8), Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900))]);
   Widget _infoCard(BuildContext context, IconData icon, String text) => Card(child: ListTile(leading: Icon(icon, color: AppColors.primary), title: Text(text)));
   String _time(DateTime value) => '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-  String _formatNumber(double value) => value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(1);
-  String _formatDays(double value) => value < 1 ? '<1' : value < 10 ? value.toStringAsFixed(1) : value.round().toString();
+  String _formatNumber(double value) => value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+  String _formatDays(double value) => value < 1 ? '<1' : value < 10 ? value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '') : value.round().toString();
 
   Future<void> _confirmDeactivate() async {
     final l = AppLocalizations.of(context);

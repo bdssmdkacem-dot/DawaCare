@@ -114,7 +114,14 @@ class DoseProvider extends ChangeNotifier {
     final idx = _doses.indexWhere((d) => d.id == dose.id);
     if (idx != -1) _doses[idx] = updated;
     _notify();
-    await ReminderEngine.cancelFor(dose.id);
+
+    if (status == DoseStatus.snoozed) {
+      // Snooze moves only the local reminder. The prescription occurrence in
+      // the database keeps its original scheduledAt for history/stock logic.
+      await ReminderEngine.snoozeFor(updated);
+    } else {
+      await ReminderEngine.cancelFor(dose.id);
+    }
   }
 
   @override

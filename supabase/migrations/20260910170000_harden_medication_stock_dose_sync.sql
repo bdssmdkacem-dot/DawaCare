@@ -2,9 +2,9 @@
 --
 -- Goals:
 --  * support decimal doses written with either `2.5` or `2,5`;
---  * prefer the quantity immediately associated with the medication stock unit
---    (for example `2.5 ml`) instead of accidentally treating strength such as
---    `500 mg` as the consumed inventory quantity;
+--  * prefer the quantity associated with the configured stock unit
+--    (for example `2.5 ml` or `500 mg, 2 tablets`) instead of accidentally
+--    treating medication strength as consumed inventory;
 --  * keep stock changes idempotent per dose;
 --  * preserve the existing Taken -> stock deduction / reversal behavior.
 
@@ -23,6 +23,8 @@ declare
   v_delta numeric;
   v_stock_unit text;
   v_dose_text text;
+  v_unit_pos integer;
+  v_before_unit text;
 begin
   select m.stock_unit
     into v_stock_unit
@@ -36,21 +38,23 @@ begin
 
   v_dose_text := trim(coalesce(new.dose_amount, ''));
 
-  -- Prefer a number directly associated with the configured stock unit.
-  -- This avoids interpreting `500 mg` as 500 tablets when stock_unit=tablet.
-  if v_stock_unit <> '' then
+  -- Prefer the number immediately before the configured inventory unit.
+  -- Examples:
+  --   `2.5 ml`          -> 2.5
+  --   `2,5 ml`          -> 2.5
+  --   `500 mg, 2 tablets` with stock_unit=tablet -> 2
+  v_unit_pos := strpos(lower(v_dose_text), lower(trim(v_stock_unit)));
+  if v_unit_pos > 0 then
+    v_before_unit := trim(substr(v_dose_text, 1, v_unit_pos - 1));
     v_amount := replace(
-      substring(
-        v_dose_text
-        from '([0-9]+(?:[.,][0-9]+)?)\s*' || regexp_replace(lower(v_stock_unit), '([\\.\\+\\*\\?\\[\\]\\(\\)\\{\\}\\|\\^\\$\\\\])', '\\\\1', 'g') || '\\b'
-      ),
+      substring(v_before_unit from '([0-9]+(?:[.,][0-9]+)?)\s*$'),
       ',',
       '.'
     )::numeric;
   end if;
 
-  -- If the configured unit is not present in the dose text, keep the legacy
-  -- behavior as a fallback. Decimal comma is normalized here as well.
+  -- Backward-compatible fallback when the configured unit is absent from the
+  -- dose text. This keeps existing simple values such as `1` working.
   if v_amount is null then
     v_amount := replace(
       substring(v_dose_text from '([0-9]+(?:[.,][0-9]+)?)'),

@@ -74,6 +74,20 @@ class LocalDatabase {
     await db.insert('cached_doses', row, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  /// Returns one cached dose by id, including the medication name stored with
+  /// the cached dose. This is used by notification actions when Supabase is
+  /// temporarily unavailable, so Taken/Snooze can still work offline.
+  Future<Map<String, dynamic>?> doseById(String doseId) async {
+    final db = await database;
+    final rows = await db.query(
+      'cached_doses',
+      where: 'id = ?',
+      whereArgs: [doseId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
   Future<List<Map<String, dynamic>>> dosesForPatient(
     String patientId, {
     required DateTime from,

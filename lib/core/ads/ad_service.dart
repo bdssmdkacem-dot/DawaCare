@@ -20,18 +20,23 @@ class AdService {
   static const String _testInterstitialId =
       'ca-app-pub-3940256099942544/1033173712';
 
+  // Keep test ads on by default for development/APK testing. Production ads
+  // are enabled explicitly with --dart-define=DAWACARE_TEST_ADS=false.
+  static const bool useTestAds = bool.fromEnvironment(
+    'DAWACARE_TEST_ADS',
+    defaultValue: true,
+  );
+
   InterstitialAd? _interstitialAd;
   bool _loadingInterstitial = false;
   DateTime? _lastInterstitialShown;
 
-  String get bannerTestId => _testBannerId;
-
   String bannerUnitId(String productionId) {
-    return kDebugMode ? _testBannerId : productionId;
+    return useTestAds ? _testBannerId : productionId;
   }
 
   String get interstitialUnitId =>
-      kDebugMode ? _testInterstitialId : navigationInterstitialId;
+      useTestAds ? _testInterstitialId : navigationInterstitialId;
 
   Future<void> initialize() async {
     await MobileAds.instance.initialize();

@@ -1,8 +1,10 @@
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/date_time_utils.dart';
@@ -13,26 +15,725 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/medication_schedule_service.dart';
 import '../providers/medication_provider.dart';
 
-const _forms=['قرص','كبسولة','شراب','قطرة','حقنة','كريم/مرهم','بخاخ','أخرى'];
-const _units={'قرص':'tablet','كبسولة':'capsule','شراب':'ml','قطرة':'drop','حقنة':'injection','كريم/مرهم':'unit','بخاخ':'unit','أخرى':'unit'};
-enum _Frequency{daily,timesPerDay,everyHours,specificDays,once,prn}
-class AddMedicationPage extends StatefulWidget{const AddMedicationPage({super.key});@override State<AddMedicationPage> createState()=>_AddMedicationPageState();}
-class _AddMedicationPageState extends State<AddMedicationPage>{
- final _formKey=GlobalKey<FormState>();
- final _name=TextEditingController(),_strength=TextEditingController(),_dose=TextEditingController(text:'1'),_times=TextEditingController(text:'3'),_hours=TextEditingController(text:'8'),_stock=TextEditingController(text:'0'),_pack=TextEditingController(),_threshold=TextEditingController(text:'5'),_instructions=TextEditingController();
- final _picker=ImagePicker();final _scheduleService=MedicationScheduleService();Uint8List? _image;String? _form;String _unit='unit';bool _stockEnabled=false,_submitting=false;_Frequency _frequency=_Frequency.daily;TimeOfDay _time=const TimeOfDay(hour:8,minute:0);final Set<int> _days={};DateTime _start=DateTime.now();DateTime? _end;int _maxPrn=4,_minPrnHours=6;
- @override void dispose(){for(final c in [_name,_strength,_dose,_times,_hours,_stock,_pack,_threshold,_instructions])c.dispose();super.dispose();}
- double? _number(String v)=>double.tryParse(v.trim().replaceAll(',','.'));
- String _timeValue(TimeOfDay t)=>'${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}';
- String _unitLabel(String u)=>{'tablet':'قرص','capsule':'كبسولة','ml':'مل','drop':'قطرة','injection':'حقنة','unit':'وحدة'}[u]??'وحدة';
- Future<void> _pickImage()async{final source=await showModalBottomSheet<ImageSource>(context:context,builder:(c)=>SafeArea(child:Wrap(children:[ListTile(leading:const Icon(Icons.camera_alt_rounded),title:Text(AppLocalizations.of(c).cameraMedicine),onTap:()=>Navigator.pop(c,ImageSource.camera)),ListTile(leading:const Icon(Icons.photo_library_rounded),title:Text(AppLocalizations.of(c).galleryMedicine),onTap:()=>Navigator.pop(c,ImageSource.gallery))])));if(source==null)return;final f=await _picker.pickImage(source:source,maxWidth:1200,maxHeight:1200,imageQuality:82);if(f!=null){final b=await f.readAsBytes();if(mounted)setState(()=>_image=b);}}
- Future<void> _pickTime()async{final t=await showTimePicker(context:context,initialTime:_time);if(t!=null&&mounted)setState(()=>_time=t);}
- Future<void> _pickDate(bool start)async{final d=await showDatePicker(context:context,initialDate:start?_start:(_end??_start),firstDate:DateTime.now().subtract(const Duration(days:365)),lastDate:DateTime.now().add(const Duration(days:1095)));if(d!=null&&mounted)setState(()=>start?_start=d:_end=d);}
- List<TimeOfDay> _buildTimes(){if(_frequency==_Frequency.timesPerDay){final n=int.tryParse(_times.text)??1;if(n<=1)return[_time];final step=24~/n;return List.generate(n,(i)=>TimeOfDay(hour:(_time.hour+i*step)%24,minute:_time.minute));}if(_frequency==_Frequency.everyHours){final h=int.tryParse(_hours.text)??8;if(h<=0||24%h!=0)return[_time];return List.generate(24~/h,(i)=>TimeOfDay(hour:(_time.hour+i*h)%24,minute:_time.minute));}return[_time];}
- Future<void> _submit()async{final l=AppLocalizations.of(context);if(!_formKey.currentState!.validate())return;if(_frequency==_Frequency.specificDays&&_days.isEmpty){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(l.chooseAtLeastOneDay)));return;}final auth=context.read<AuthProvider>();final patientId=auth.profile?.id;if(patientId==null)return;final dose=_number(_dose.text);if(dose==null||dose<=0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('الجرعة يجب أن تكون أكبر من صفر.')));return;}final stock=_number(_stock.text)??0;final pack=_pack.text.trim().isEmpty?null:_number(_pack.text);final threshold=_number(_threshold.text)??5;if(_stockEnabled&&(stock<0||(pack!=null&&pack<=0)||threshold<0)){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تحقق من قيم المخزون.')));return;}final h=int.tryParse(_hours.text)??0;if(_frequency==_Frequency.everyHours&&(h<=0||24%h!=0)){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('الفاصل بالساعات يجب أن يقسم 24، مثل 4 أو 6 أو 8 أو 12.')));return;}setState(()=>_submitting=true);const uuid=Uuid();final medicationId=uuid.v4();final medication=Medication(id:medicationId,patientId:patientId,name:_name.text.trim(),strength:_strength.text.trim().isEmpty?null:_strength.text.trim(),dosageForm:_form,instructions:_instructions.text.trim().isEmpty?null:_instructions.text.trim(),imageUrl:null,startDate:_start,endDate:_end,active:true,createdBy:patientId,createdAt:DateTime.now(),stockEnabled:_stockEnabled,stockQuantity:_stockEnabled?stock:0,stockUnit:_unit,packageQuantity:_stockEnabled?pack:null,lowStockThreshold:_stockEnabled?threshold:5);final times=_buildTimes();final type=_frequency==_Frequency.prn?ScheduleType.prn:_frequency==_Frequency.once?ScheduleType.once:_frequency==_Frequency.specificDays?ScheduleType.specificDays:ScheduleType.daily;final base=MedicationSchedule(id:uuid.v4(),medicationId:medicationId,type:type,time:_timeValue(times.first),daysOfWeek:_frequency==_Frequency.specificDays?(_days.toList()..sort()):const[],intervalDays:null,doseAmount:_dose.text.trim(),startDate:_start,endDate:_end,timezone:auth.profile?.timezone??'Africa/Casablanca');var ok=await context.read<MedicationProvider>().addMedication(medication:medication,schedule:base,imageBytes:_image);if(ok&&times.length>1){final extras=times.skip(1).map((t)=>MedicationSchedule(id:uuid.v4(),medicationId:medicationId,type:ScheduleType.daily,time:_timeValue(t),doseAmount:_dose.text.trim(),startDate:_start,endDate:_end,timezone:auth.profile?.timezone??'Africa/Casablanca')).toList();try{await _scheduleService.createSchedules(medicationId:medicationId,patientId:patientId,schedules:extras);}catch(_){}}if(!mounted)return;setState(()=>_submitting=false);if(ok)Navigator.pop(context,true);else ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(context.read<MedicationProvider>().error??l.unexpectedError)));}
- @override Widget build(BuildContext context){final l=AppLocalizations.of(context);return Scaffold(appBar:AppBar(title:Text(l.newMedicine)),body:SafeArea(child:Form(key:_formKey,child:ListView(padding:const EdgeInsets.fromLTRB(20,16,20,28),children:[_imageCard(),const SizedBox(height:22),_header('1','ما شكل الدواء؟'),const SizedBox(height:10),Wrap(spacing:8,runSpacing:8,children:_forms.map((f)=>ChoiceChip(label:Text(f),selected:_form==f,onSelected:(_){setState((){_form=f;_unit=_units[f]!;});})).toList()),const SizedBox(height:18),TextFormField(controller:_name,decoration:InputDecoration(labelText:l.medicineName,prefixIcon:const Icon(Icons.medication_rounded)),validator:(v)=>v==null||v.trim().isEmpty?l.enterMedicineName:null),const SizedBox(height:12),TextFormField(controller:_strength,decoration:InputDecoration(labelText:l.strength,prefixIcon:const Icon(Icons.science_rounded))),const SizedBox(height:22),_header('2','كيف وصف الطبيب الجرعة؟'),const SizedBox(height:10),Wrap(spacing:8,runSpacing:8,children:[_freq('مرة يوميًا',_Frequency.daily),_freq('مرات في اليوم',_Frequency.timesPerDay),_freq('كل X ساعات',_Frequency.everyHours),_freq('أيام محددة',_Frequency.specificDays),_freq('مرة واحدة',_Frequency.once),_freq('عند الحاجة PRN',_Frequency.prn)]),const SizedBox(height:14),Row(children:[Expanded(child:TextFormField(controller:_dose,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:InputDecoration(labelText:'الجرعة',prefixIcon:const Icon(Icons.exposure_plus_1_rounded),suffixText:_unitLabel(_unit)),validator:(v)=>_number(v??'')==null?'أدخل جرعة صحيحة':null)),if(_frequency==_Frequency.timesPerDay)...[const SizedBox(width:12),Expanded(child:TextFormField(controller:_times,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'عدد المرات')))],if(_frequency==_Frequency.everyHours)...[const SizedBox(width:12),Expanded(child:TextFormField(controller:_hours,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'كل كم ساعة؟')))] ]),if(_frequency!=_Frequency.prn)...[const SizedBox(height:12),Card(child:ListTile(leading:const Icon(Icons.access_time_rounded),title:const Text('وقت البداية'),trailing:Text(_time.format(context),style:const TextStyle(fontWeight:FontWeight.w800)),onTap:_pickTime))],if(_frequency==_Frequency.specificDays)...[const SizedBox(height:10),Wrap(spacing:6,children:List.generate(7,(i){final d=i+1;return FilterChip(label:Text(l.weekdayLabel(d)),selected:_days.contains(d),onSelected:(v)=>setState(()=>v?_days.add(d):_days.remove(d)));}))],if(_frequency==_Frequency.prn)...[const SizedBox(height:12),Card(child:Padding(padding:const EdgeInsets.all(12),child:Row(children:[Expanded(child:DropdownButtonFormField<int>(initialValue:_maxPrn,decoration:const InputDecoration(labelText:'الحد الأقصى / 24 ساعة'),items:[2,3,4,6,8].map((v)=>DropdownMenuItem(value:v,child:Text('$v جرعات'))).toList(),onChanged:(v)=>setState(()=>_maxPrn=v!))),const SizedBox(width:12),Expanded(child:DropdownButtonFormField<int>(initialValue:_minPrnHours,decoration:const InputDecoration(labelText:'أقل فترة'),items:[2,4,6,8,12].map((v)=>DropdownMenuItem(value:v,child:Text('$v ساعات'))).toList(),onChanged:(v)=>setState(()=>_minPrnHours=v!)))]))),const SizedBox(height:22),_header('3','المخزون المتوقع'),const SizedBox(height:8),SwitchListTile.adaptive(contentPadding:EdgeInsets.zero,title:const Text('تتبع المخزون',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:const Text('سيحسب التطبيق الاستهلاك والأيام المتبقية تلقائيًا.'),value:_stockEnabled,onChanged:(v)=>setState(()=>_stockEnabled=v)),if(_stockEnabled)...[Row(children:[Expanded(child:TextFormField(controller:_stock,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:InputDecoration(labelText:'الكمية الحالية',suffixText:_unitLabel(_unit)))),const SizedBox(width:12),Expanded(child:TextFormField(controller:_pack,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'محتوى العبوة')))]),const SizedBox(height:10),TextFormField(controller:_threshold,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'حد المخزون المنخفض'))],const SizedBox(height:22),_header('4','مدة العلاج'),const SizedBox(height:8),_dateTile('تاريخ البدء',DateTimeUtils.formatShortDate(_start),()=>_pickDate(true)),_dateTile('تاريخ الانتهاء',_end==null?'—':DateTimeUtils.formatShortDate(_end!),()=>_pickDate(false)),const SizedBox(height:12),TextFormField(controller:_instructions,maxLines:2,decoration:InputDecoration(labelText:l.instructionsOptional,prefixIcon:const Icon(Icons.notes_rounded))),const SizedBox(height:24),PrimaryButton(label:l.saveMedicine,onPressed:_submit,loading:_submitting)])));}
- Widget _header(String n,String text)=>Row(children:[CircleAvatar(radius:15,backgroundColor:AppColors.primary,child:Text(n,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900))),const SizedBox(width:9),Text(text,style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900))]);
- Widget _freq(String text,_Frequency f)=>ChoiceChip(label:Text(text),selected:_frequency==f,onSelected:(_){setState(()=>_frequency=f);});
- Widget _dateTile(String t,String v,VoidCallback tap)=>Card(child:ListTile(leading:const Icon(Icons.event_rounded),title:Text(t),trailing:Text(v,style:const TextStyle(fontWeight:FontWeight.w700)),onTap:tap));
- Widget _imageCard()=>InkWell(onTap:_pickImage,borderRadius:BorderRadius.circular(22),child:Container(height:150,decoration:BoxDecoration(borderRadius:BorderRadius.circular(22),color:AppColors.primary.withValues(alpha:.07),border:Border.all(color:Theme.of(context).colorScheme.outlineVariant)),child:_image==null?const Column(mainAxisAlignment:MainAxisAlignment.center,children:[Icon(Icons.add_a_photo_rounded,size:38,color:AppColors.primary),SizedBox(height:8),Text('إضافة صورة الدواء',style:TextStyle(fontWeight:FontWeight.w800))]):ClipRRect(borderRadius:BorderRadius.circular(22),child:Image.memory(_image!,fit:BoxFit.cover,width:double.infinity))));
+const _forms = <String>[
+  'قرص',
+  'كبسولة',
+  'شراب',
+  'قطرة',
+  'حقنة',
+  'كريم/مرهم',
+  'بخاخ',
+  'أخرى',
+];
+
+const _units = <String, String>{
+  'قرص': 'tablet',
+  'كبسولة': 'capsule',
+  'شراب': 'ml',
+  'قطرة': 'drop',
+  'حقنة': 'injection',
+  'كريم/مرهم': 'unit',
+  'بخاخ': 'unit',
+  'أخرى': 'unit',
+};
+
+enum _Frequency { daily, timesPerDay, everyHours, specificDays, once, prn }
+
+class AddMedicationPage extends StatefulWidget {
+  const AddMedicationPage({super.key});
+
+  @override
+  State<AddMedicationPage> createState() => _AddMedicationPageState();
+}
+
+class _AddMedicationPageState extends State<AddMedicationPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _strength = TextEditingController();
+  final _dose = TextEditingController(text: '1');
+  final _times = TextEditingController(text: '3');
+  final _hours = TextEditingController(text: '8');
+  final _stock = TextEditingController(text: '0');
+  final _pack = TextEditingController();
+  final _threshold = TextEditingController(text: '5');
+  final _instructions = TextEditingController();
+
+  final _picker = ImagePicker();
+  final _scheduleService = MedicationScheduleService();
+
+  Uint8List? _image;
+  String? _form;
+  String _unit = 'unit';
+  bool _stockEnabled = false;
+  bool _submitting = false;
+  _Frequency _frequency = _Frequency.daily;
+  TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
+  final Set<int> _days = <int>{};
+  DateTime _start = DateTime.now();
+  DateTime? _end;
+  int _maxPrn = 4;
+  int _minPrnHours = 6;
+
+  @override
+  void dispose() {
+    for (final controller in [
+      _name,
+      _strength,
+      _dose,
+      _times,
+      _hours,
+      _stock,
+      _pack,
+      _threshold,
+      _instructions,
+    ]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  double? _number(String value) =>
+      double.tryParse(value.trim().replaceAll(',', '.'));
+
+  String _timeValue(TimeOfDay time) =>
+      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+  String _unitLabel(String unit) => <String, String>{
+        'tablet': 'قرص',
+        'capsule': 'كبسولة',
+        'ml': 'مل',
+        'drop': 'قطرة',
+        'injection': 'حقنة',
+        'unit': 'وحدة',
+      }[unit] ?? 'وحدة';
+
+  Future<void> _pickImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: Text(AppLocalizations.of(context).cameraMedicine),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: Text(AppLocalizations.of(context).galleryMedicine),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) {
+      return;
+    }
+
+    final file = await _picker.pickImage(
+      source: source,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 82,
+    );
+    if (file != null) {
+      final bytes = await file.readAsBytes();
+      if (mounted) {
+        setState(() => _image = bytes);
+      }
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _time,
+    );
+    if (time != null && mounted) {
+      setState(() => _time = time);
+    }
+  }
+
+  Future<void> _pickDate(bool start) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: start ? _start : (_end ?? _start),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 1095)),
+    );
+    if (date != null && mounted) {
+      setState(() {
+        if (start) {
+          _start = date;
+        } else {
+          _end = date;
+        }
+      });
+    }
+  }
+
+  List<TimeOfDay> _buildTimes() {
+    if (_frequency == _Frequency.timesPerDay) {
+      final count = int.tryParse(_times.text) ?? 1;
+      if (count <= 1) {
+        return [_time];
+      }
+      final step = 24 ~/ count;
+      return List.generate(
+        count,
+        (index) => TimeOfDay(
+          hour: (_time.hour + index * step) % 24,
+          minute: _time.minute,
+        ),
+      );
+    }
+
+    if (_frequency == _Frequency.everyHours) {
+      final hours = int.tryParse(_hours.text) ?? 8;
+      if (hours <= 0 || 24 % hours != 0) {
+        return [_time];
+      }
+      return List.generate(
+        24 ~/ hours,
+        (index) => TimeOfDay(
+          hour: (_time.hour + index * hours) % 24,
+          minute: _time.minute,
+        ),
+      );
+    }
+
+    return [_time];
+  }
+
+  Future<void> _submit() async {
+    final localizations = AppLocalizations.of(context);
+
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_frequency == _Frequency.specificDays && _days.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(localizations.chooseAtLeastOneDay)),
+      );
+      return;
+    }
+
+    final auth = context.read<AuthProvider>();
+    final patientId = auth.profile?.id;
+    if (patientId == null) {
+      return;
+    }
+
+    final dose = _number(_dose.text);
+    if (dose == null || dose <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('الجرعة يجب أن تكون أكبر من صفر.')),
+      );
+      return;
+    }
+
+    final stock = _number(_stock.text) ?? 0;
+    final pack = _pack.text.trim().isEmpty ? null : _number(_pack.text);
+    final threshold = _number(_threshold.text) ?? 5;
+    if (_stockEnabled &&
+        (stock < 0 || (pack != null && pack <= 0) || threshold < 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تحقق من قيم المخزون.')),
+      );
+      return;
+    }
+
+    final hours = int.tryParse(_hours.text) ?? 0;
+    if (_frequency == _Frequency.everyHours &&
+        (hours <= 0 || 24 % hours != 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'الفاصل بالساعات يجب أن يقسم 24، مثل 4 أو 6 أو 8 أو 12.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+
+    const uuid = Uuid();
+    final medicationId = uuid.v4();
+    final medication = Medication(
+      id: medicationId,
+      patientId: patientId,
+      name: _name.text.trim(),
+      strength: _strength.text.trim().isEmpty ? null : _strength.text.trim(),
+      dosageForm: _form,
+      instructions: _instructions.text.trim().isEmpty
+          ? null
+          : _instructions.text.trim(),
+      imageUrl: null,
+      startDate: _start,
+      endDate: _end,
+      active: true,
+      createdBy: patientId,
+      createdAt: DateTime.now(),
+      stockEnabled: _stockEnabled,
+      stockQuantity: _stockEnabled ? stock : 0,
+      stockUnit: _unit,
+      packageQuantity: _stockEnabled ? pack : null,
+      lowStockThreshold: _stockEnabled ? threshold : 5,
+    );
+
+    final times = _buildTimes();
+    final type = _frequency == _Frequency.prn
+        ? ScheduleType.prn
+        : _frequency == _Frequency.once
+            ? ScheduleType.once
+            : _frequency == _Frequency.specificDays
+                ? ScheduleType.specificDays
+                : ScheduleType.daily;
+
+    final timezone = auth.profile?.timezone ?? 'Africa/Casablanca';
+    final base = MedicationSchedule(
+      id: uuid.v4(),
+      medicationId: medicationId,
+      type: type,
+      time: _timeValue(times.first),
+      daysOfWeek: _frequency == _Frequency.specificDays
+          ? (_days.toList()..sort())
+          : const [],
+      intervalDays: null,
+      doseAmount: _dose.text.trim(),
+      startDate: _start,
+      endDate: _end,
+      timezone: timezone,
+    );
+
+    final ok = await context.read<MedicationProvider>().addMedication(
+          medication: medication,
+          schedule: base,
+          imageBytes: _image,
+        );
+
+    if (ok && times.length > 1) {
+      final extras = times
+          .skip(1)
+          .map(
+            (time) => MedicationSchedule(
+              id: uuid.v4(),
+              medicationId: medicationId,
+              type: ScheduleType.daily,
+              time: _timeValue(time),
+              doseAmount: _dose.text.trim(),
+              startDate: _start,
+              endDate: _end,
+              timezone: timezone,
+            ),
+          )
+          .toList();
+
+      try {
+        await _scheduleService.createSchedules(
+          medicationId: medicationId,
+          patientId: patientId,
+          schedules: extras,
+        );
+      } catch (_) {
+        // The primary medication has already been created. The next sync
+        // will reconcile schedules/reminders when the user retries.
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _submitting = false);
+    if (ok) {
+      Navigator.pop(context, true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.read<MedicationProvider>().error ??
+                localizations.unexpectedError,
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+
+    return Scaffold(
+      appBar: AppBar(title: Text(localizations.newMedicine)),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            children: [
+              _imageCard(),
+              const SizedBox(height: 22),
+              _header('1', 'ما شكل الدواء؟'),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _forms
+                    .map(
+                      (form) => ChoiceChip(
+                        label: Text(form),
+                        selected: _form == form,
+                        onSelected: (_) {
+                          setState(() {
+                            _form = form;
+                            _unit = _units[form]!;
+                          });
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 18),
+              TextFormField(
+                controller: _name,
+                decoration: InputDecoration(
+                  labelText: localizations.medicineName,
+                  prefixIcon: const Icon(Icons.medication_rounded),
+                ),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty
+                        ? localizations.enterMedicineName
+                        : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _strength,
+                decoration: InputDecoration(
+                  labelText: localizations.strength,
+                  prefixIcon: const Icon(Icons.science_rounded),
+                ),
+              ),
+              const SizedBox(height: 22),
+              _header('2', 'كيف وصف الطبيب الجرعة؟'),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _freq('مرة يوميًا', _Frequency.daily),
+                  _freq('مرات في اليوم', _Frequency.timesPerDay),
+                  _freq('كل X ساعات', _Frequency.everyHours),
+                  _freq('أيام محددة', _Frequency.specificDays),
+                  _freq('مرة واحدة', _Frequency.once),
+                  _freq('عند الحاجة PRN', _Frequency.prn),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _dose,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'الجرعة',
+                        prefixIcon: const Icon(Icons.exposure_plus_1_rounded),
+                        suffixText: _unitLabel(_unit),
+                      ),
+                      validator: (value) => _number(value ?? '') == null
+                          ? 'أدخل جرعة صحيحة'
+                          : null,
+                    ),
+                  ),
+                  if (_frequency == _Frequency.timesPerDay) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _times,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'عدد المرات',
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (_frequency == _Frequency.everyHours) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _hours,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'كل كم ساعة؟',
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              if (_frequency != _Frequency.prn) ...[
+                const SizedBox(height: 12),
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.access_time_rounded),
+                    title: const Text('وقت البداية'),
+                    trailing: Text(
+                      _time.format(context),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    onTap: _pickTime,
+                  ),
+                ),
+              ],
+              if (_frequency == _Frequency.specificDays) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  children: List.generate(7, (index) {
+                    final day = index + 1;
+                    return FilterChip(
+                      label: Text(localizations.weekdayLabel(day)),
+                      selected: _days.contains(day),
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _days.add(day);
+                          } else {
+                            _days.remove(day);
+                          }
+                        });
+                      },
+                    );
+                  }),
+                ),
+              ],
+              if (_frequency == _Frequency.prn) ...[
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            initialValue: _maxPrn,
+                            decoration: const InputDecoration(
+                              labelText: 'الحد الأقصى / 24 ساعة',
+                            ),
+                            items: [2, 3, 4, 6, 8]
+                                .map(
+                                  (value) => DropdownMenuItem(
+                                    value: value,
+                                    child: Text('$value جرعات'),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _maxPrn = value);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            initialValue: _minPrnHours,
+                            decoration: const InputDecoration(
+                              labelText: 'أقل فترة',
+                            ),
+                            items: [2, 4, 6, 8, 12]
+                                .map(
+                                  (value) => DropdownMenuItem(
+                                    value: value,
+                                    child: Text('$value ساعات'),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _minPrnHours = value);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 22),
+              _header('3', 'المخزون المتوقع'),
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'تتبع المخزون',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: const Text(
+                  'سيحسب التطبيق الاستهلاك والأيام المتبقية تلقائيًا.',
+                ),
+                value: _stockEnabled,
+                onChanged: (value) => setState(() => _stockEnabled = value),
+              ),
+              if (_stockEnabled) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _stock,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'الكمية الحالية',
+                          suffixText: _unitLabel(_unit),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _pack,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'محتوى العبوة',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _threshold,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'حد المخزون المنخفض',
+                  ),
+                ),
+              ],
+              const SizedBox(height: 22),
+              _header('4', 'مدة العلاج'),
+              const SizedBox(height: 8),
+              _dateTile(
+                'تاريخ البدء',
+                DateTimeUtils.formatShortDate(_start),
+                () => _pickDate(true),
+              ),
+              _dateTile(
+                'تاريخ الانتهاء',
+                _end == null ? '—' : DateTimeUtils.formatShortDate(_end!),
+                () => _pickDate(false),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _instructions,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: localizations.instructionsOptional,
+                  prefixIcon: const Icon(Icons.notes_rounded),
+                ),
+              ),
+              const SizedBox(height: 24),
+              PrimaryButton(
+                label: localizations.saveMedicine,
+                onPressed: _submit,
+                loading: _submitting,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _header(String number, String text) => Row(
+        children: [
+          CircleAvatar(
+            radius: 15,
+            backgroundColor: AppColors.primary,
+            child: Text(
+              number,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: 9),
+          Text(
+            text,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+        ],
+      );
+
+  Widget _freq(String text, _Frequency frequency) => ChoiceChip(
+        label: Text(text),
+        selected: _frequency == frequency,
+        onSelected: (_) => setState(() => _frequency = frequency),
+      );
+
+  Widget _dateTile(String title, String value, VoidCallback tap) => Card(
+        child: ListTile(
+          leading: const Icon(Icons.event_rounded),
+          title: Text(title),
+          trailing: Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          onTap: tap,
+        ),
+      );
+
+  Widget _imageCard() => InkWell(
+        onTap: _pickImage,
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          height: 150,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            color: AppColors.primary.withValues(alpha: .07),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: _image == null
+              ? const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_a_photo_rounded,
+                      size: 38,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'إضافة صورة الدواء',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                )
+              : ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: Image.memory(
+                    _image!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                  ),
+                ),
+        ),
+      );
 }

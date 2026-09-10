@@ -113,6 +113,10 @@ class MedicationScheduleCalculator {
   }
 
   /// Parses an inventory dose using the canonical stock parser.
+  ///
+  /// The legacy calculator API returns a non-null quantity, so an invalid or
+  /// missing dose is represented as zero while [StockIntelligence] remains
+  /// nullable for callers that need to distinguish an unparsable value.
   static double parseDose(String value, {String? stockUnit}) =>
-      StockIntelligence.parseDoseQuantity(value, stockUnit);
+      StockIntelligence.parseDoseQuantity(value, stockUnit) ?? 0;
 }

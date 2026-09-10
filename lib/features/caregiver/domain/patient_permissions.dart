@@ -12,18 +12,24 @@ class PatientPermissions {
 
   bool get canView => role != null;
 
-  bool get canEditMedication =>
+  /// Clinical/data editing permission.
+  bool get canEdit =>
       role == CaregiverRole.primary || role == CaregiverRole.caregiver;
 
-  bool get canEditSchedule => canEditMedication;
+  bool get canEditMedication => canEdit;
+  bool get canEditSchedule => canEdit;
+  bool get canManageStock => canEdit;
+  bool get canManageDose => canEdit;
 
-  bool get canManageStock => canEditMedication;
+  /// Caregiver-management is reserved for the primary caregiver.
+  bool get canManageCaregivers => role == CaregiverRole.primary;
 
-  bool get canManageDose => canEditMedication;
+  /// Messaging is available to every linked role. Patient-level contact
+  /// restrictions remain a separate link-level/server concern.
+  bool get canContact => role != null;
+  bool get canSendMessage => canContact;
 
   bool get canUnlink => role == CaregiverRole.primary;
-
-  bool get canSendMessage => role != null;
 
   bool get isViewer => role == CaregiverRole.viewer;
 

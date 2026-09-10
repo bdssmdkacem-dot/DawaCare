@@ -33,7 +33,11 @@ class CaregiverRepository {
     final start = DateTime(now.year, now.month, now.day);
     final end = start.add(const Duration(days: 1));
     final results = await Future.wait([
-      _client.from('medications').select('id').eq('patient_id', patientId).eq('active', true),
+      _client
+          .from('medications')
+          .select('id, stock_enabled, stock_quantity, low_stock_threshold')
+          .eq('patient_id', patientId)
+          .eq('active', true),
       _client
           .from('dose_instances')
           .select('*')
@@ -47,9 +51,34 @@ class CaregiverRepository {
     final doses = doseRows
         .map((row) => DoseInstance.fromMap(Map<String, dynamic>.from(row as Map)))
         .toList();
+
+    final futurePending = doses
+        .where((dose) =>
+            dose.scheduledAt.isAfter(now) &&
+            dose.status != DoseStatus.taken &&
+            dose.status != DoseStatus.missed)
+        .toList()
+      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+
+    var lowStock = 0;
+    var outOfStock = 0;
+    for (final row in medicationRows) {
+      if (row['stock_enabled'] != true) continue;
+      final quantity = (row['stock_quantity'] as num?)?.toDouble() ?? 0;
+      final threshold = (row['low_stock_threshold'] as num?)?.toDouble() ?? 5;
+      if (quantity <= 0) {
+        outOfStock++;
+      } else if (quantity <= threshold) {
+        lowStock++;
+      }
+    }
+
     return FamilyMemberSummary.fromDoses(
       activeMedicationCount: medicationRows.length,
       todayDoses: doses,
+      nextDoseAt: futurePending.isEmpty ? null : futurePending.first.scheduledAt,
+      lowStockMedicationCount: lowStock,
+      outOfStockMedicationCount: outOfStock,
     );
   }
 

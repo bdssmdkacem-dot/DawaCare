@@ -39,15 +39,18 @@ class MedicationScheduleCalculator {
     return next;
   }
 
-  /// Average units consumed per calendar day.
+  /// Average inventory units consumed per calendar day.
   ///
   /// PRN and once-only schedules are intentionally excluded: neither defines
-  /// an ongoing daily consumption rate. This prevents a one-time dose from
-  /// making the stock appear to run down every day.
-  static double dailyConsumption(List<MedicationSchedule> schedules) {
+  /// an ongoing daily consumption rate. When [stockUnit] is known, a dose such
+  /// as `500 mg, 2 tablets` consumes 2 tablets rather than 500 mg of stock.
+  static double dailyConsumption(
+    List<MedicationSchedule> schedules, {
+    String? stockUnit,
+  }) {
     var total = 0.0;
     for (final schedule in schedules) {
-      final dose = parseDose(schedule.doseAmount);
+      final dose = parseDose(schedule.doseAmount, stockUnit: stockUnit);
       if (dose <= 0) continue;
       switch (schedule.type) {
         case ScheduleType.daily:
@@ -82,7 +85,7 @@ class MedicationScheduleCalculator {
     if (!medication.stockEnabled) return null;
     if (medication.stockQuantity <= 0) return 0;
 
-    final daily = dailyConsumption(schedules);
+    final daily = dailyConsumption(schedules, stockUnit: medication.stockUnit);
     if (daily <= 0) return null;
 
     var days = medication.stockQuantity / daily;
@@ -123,8 +126,29 @@ class MedicationScheduleCalculator {
     return MedicationStatus.active;
   }
 
-  static double parseDose(String value) {
-    final match = RegExp(r'([0-9]+(?:[.,][0-9]+)?)').firstMatch(value);
+  /// Parses the quantity consumed from a dose description.
+  ///
+  /// If [stockUnit] is present in the description, prefer the number directly
+  /// before that unit. This keeps strength (`500 mg`) separate from inventory
+  /// quantity (`2 tablets`). Decimal comma is supported for Moroccan/French
+  /// input (`2,5 ml`).
+  static double parseDose(String value, {String? stockUnit}) {
+    final normalized = value.trim();
+    if (stockUnit != null && stockUnit.trim().isNotEmpty) {
+      final escapedUnit = RegExp.escape(stockUnit.trim());
+      final unitMatch = RegExp(
+        r'([0-9]+(?:[.,][0-9]+)?)\s*' + escapedUnit + r'\b',
+        caseSensitive: false,
+      ).firstMatch(normalized);
+      if (unitMatch != null) {
+        return double.tryParse(
+              unitMatch.group(1)!.replaceAll(',', '.'),
+            ) ??
+            0;
+      }
+    }
+
+    final match = RegExp(r'([0-9]+(?:[.,][0-9]+)?)').firstMatch(normalized);
     return match == null
         ? 0
         : double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;

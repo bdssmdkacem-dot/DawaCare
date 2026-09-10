@@ -12,8 +12,11 @@ DoseInstance dose({
     patientId: 'patient',
     medicationId: 'medication',
     scheduleId: 'schedule-$id',
+    medicationName: 'دواء',
+    doseAmount: '1',
     scheduledAt: at,
     status: status,
+    updatedAt: at,
   );
 }
 

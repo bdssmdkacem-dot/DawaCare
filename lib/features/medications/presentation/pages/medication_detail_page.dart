@@ -239,11 +239,11 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
               const SizedBox(width: 8),
               Text(_time(next.scheduledAt), style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
               const Spacer(),
-              _tag(next.status == DoseStatus.taken ? _tr('تم أخذها', 'Taken', 'Prise') : '${next.doseAmount}'),
+              _tag(next.status == DoseStatus.taken ? _tr('تم أخذها', 'Taken', 'Prise') : next.doseAmount),
             ]),
           if (today.isNotEmpty) ...[
             const SizedBox(height: 14),
-            Text(_tr('اليوم', 'Today', "Aujourd’hui"), style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900)),
+            Text(_tr('اليوم', 'Today', 'Aujourd’hui'), style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900)),
             const SizedBox(height: 7),
             Wrap(spacing: 7, runSpacing: 7, children: today.map((d) => _dosePill(context, d)).toList()),
           ],

@@ -31,13 +31,12 @@ class StockIntelligence {
 
     var total = 0.0;
     for (final schedule in schedules) {
-      if (schedule.type == ScheduleType.prn) continue;
+      if (schedule.type == ScheduleType.prn || schedule.type == ScheduleType.once) continue;
       final amount = parseDoseQuantity(schedule.doseAmount, medication.stockUnit);
       if (amount == null || amount <= 0) continue;
 
       switch (schedule.type) {
         case ScheduleType.daily:
-        case ScheduleType.once:
           total += amount;
           break;
         case ScheduleType.weekly:
@@ -50,6 +49,7 @@ class StockIntelligence {
           final interval = schedule.intervalDays;
           if (interval != null && interval > 0) total += amount / interval;
           break;
+        case ScheduleType.once:
         case ScheduleType.prn:
           break;
       }

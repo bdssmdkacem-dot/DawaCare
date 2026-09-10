@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/local_database.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../models/dose_instance.dart';
+import '../../../models/medication.dart';
 import '../../../models/medication_schedule.dart';
 import '../../medications/data/medication_repository.dart';
 import '../../medications/data/stock_alert_service.dart';
@@ -136,8 +137,6 @@ class DoseRepository {
 
         // The stock trigger runs as part of the status update. Refresh the
         // medication after that transaction and evaluate its alert state.
-        // Alert delivery is deliberately non-critical: a notification failure
-        // must never turn a successful dose action into an error.
         try {
           final medication = await _client
               .from('medications')
@@ -150,7 +149,7 @@ class DoseRepository {
             );
           }
         } catch (_) {
-          // Stock alert failure must not affect dose status persistence.
+          // Alert delivery must never affect successful dose persistence.
         }
 
         return updated;

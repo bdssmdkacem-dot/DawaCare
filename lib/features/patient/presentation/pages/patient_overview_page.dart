@@ -199,6 +199,6 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
 
   Widget _avatar(String? url, double radius) {
     final has = url != null && url.isNotEmpty;
-    return CircleAvatar(radius: radius, backgroundColor: AppColors.primary.withValues(alpha: .12), backgroundImage: has ? NetworkImage(url!) : null, child: has ? null : Icon(Icons.person_rounded, color: AppColors.primary, size: radius * 1.15));
+    return CircleAvatar(radius: radius, backgroundColor: AppColors.primary.withValues(alpha: .12), backgroundImage: has ? NetworkImage(url) : null, child: has ? null : Icon(Icons.person_rounded, color: AppColors.primary, size: radius * 1.15));
   }
 }

@@ -18,6 +18,13 @@ class ReminderEngine {
     final horizon = now.add(_schedulingHorizon);
 
     for (final dose in doses) {
+      // Snoozed doses use a dedicated notification at index 99. Their
+      // scheduledAt is intentionally unchanged, so normal synchronization
+      // must not cancel the active snooze alarm or recreate the old reminder.
+      if (dose.status == DoseStatus.snoozed) {
+        continue;
+      }
+
       final withinHorizon = dose.scheduledAt.isAfter(now.subtract(const Duration(minutes: 5))) &&
           dose.scheduledAt.isBefore(horizon);
       final unresolved = !isResolvedStatus(dose.status);

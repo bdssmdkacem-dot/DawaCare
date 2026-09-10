@@ -7,10 +7,8 @@ import '../../../reminders/data/reminder_policy_repository.dart';
 import '../../../reminders/domain/reminder_engine.dart';
 import '../../data/dose_repository.dart';
 
-/// Drives the Today screen (and, when pointed at a different patientId, the
-/// caregiver's per-patient view). Owns the load → generate → fetch → local
-/// notification sync pipeline described in the architecture doc's
-/// "Dose Lifecycle" diagram.
+/// Drives the Today screen and owns the load → generate → reconcile → fetch
+/// → reminder synchronization pipeline.
 class DoseProvider extends ChangeNotifier {
   final DoseRepository _doseRepo = DoseRepository();
   final ReminderPolicyRepository _policyRepo = ReminderPolicyRepository();
@@ -25,14 +23,20 @@ class DoseProvider extends ChangeNotifier {
   List<DoseInstance> get all => _doses;
 
   List<DoseInstance> get todayDoses {
-    final today = _doses.where((d) => DateTimeUtils.isSameDate(d.scheduledAt, DateTime.now())).toList();
+    final today = _doses
+        .where((d) => DateTimeUtils.isSameDate(d.scheduledAt, DateTime.now()))
+        .toList();
     today.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
     return today;
   }
 
   List<DoseInstance> get upcomingDoses {
     final now = DateTime.now();
-    final upcoming = _doses.where((d) => d.scheduledAt.isAfter(now) && !DateTimeUtils.isSameDate(d.scheduledAt, now)).toList();
+    final upcoming = _doses
+        .where((d) =>
+            d.scheduledAt.isAfter(now) &&
+            !DateTimeUtils.isSameDate(d.scheduledAt, now))
+        .toList();
     upcoming.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
     return upcoming;
   }
@@ -41,15 +45,10 @@ class DoseProvider extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  /// Loads a rolling window of [today-1, today+2] doses for [patientId].
-  /// [scheduleReminders] should be true only for the signed-in user's own
-  /// doses — a caregiver viewing a family member's doses shouldn't have
-  /// alarms fire on their own phone for someone else's medication.
+  /// Loads a rolling window and keeps dose statuses/reminders synchronized.
   Future<void> load(String forPatientId, {bool scheduleReminders = true}) async {
     final switchingPatient = patientId != null && patientId != forPatientId;
 
-    // DoseProvider is shared by the patient and caregiver flows. Never keep
-    // the previous patient's doses visible while loading a different patient.
     if (switchingPatient) {
       _doses = [];
       policy = const ReminderPolicy(patientId: '');
@@ -61,12 +60,25 @@ class DoseProvider extends ChangeNotifier {
     _notify();
 
     try {
+      // Generation is idempotent and intentionally happens before fetching.
       await _doseRepo.ensureDosesGenerated(forPatientId);
-      final now = DateTime.now();
-      final from = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
-      final to = DateTime(now.year, now.month, now.day).add(const Duration(days: 2, hours: 23));
 
-      _doses = await _doseRepo.fetchDosesForRange(forPatientId, from: from, to: to);
+      // Resolve overdue doses before the UI and reminder engine consume them.
+      // The five-minute grace period lives in DoseRepository so all callers
+      // use the same definition of "missed".
+      await _doseRepo.reconcileMissedDoses(forPatientId);
+
+      final now = DateTime.now();
+      final from = DateTime(now.year, now.month, now.day)
+          .subtract(const Duration(days: 1));
+      final to = DateTime(now.year, now.month, now.day)
+          .add(const Duration(days: 2, hours: 23));
+
+      _doses = await _doseRepo.fetchDosesForRange(
+        forPatientId,
+        from: from,
+        to: to,
+      );
       policy = await _policyRepo.fetch(forPatientId);
 
       if (scheduleReminders) {
@@ -82,13 +94,23 @@ class DoseProvider extends ChangeNotifier {
 
   Future<void> confirm(DoseInstance dose, {String source = 'PATIENT'}) =>
       _updateStatus(dose, DoseStatus.taken, source: source);
+
   Future<void> snooze(DoseInstance dose, {String source = 'PATIENT'}) =>
       _updateStatus(dose, DoseStatus.snoozed, source: source);
+
   Future<void> skip(DoseInstance dose, {String source = 'PATIENT'}) =>
       _updateStatus(dose, DoseStatus.skipped, source: source);
 
-  Future<void> _updateStatus(DoseInstance dose, DoseStatus status, {String source = 'PATIENT'}) async {
-    final updated = await _doseRepo.updateStatus(dose, status, source: source);
+  Future<void> _updateStatus(
+    DoseInstance dose,
+    DoseStatus status, {
+    String source = 'PATIENT',
+  }) async {
+    final updated = await _doseRepo.updateStatus(
+      dose,
+      status,
+      source: source,
+    );
     final idx = _doses.indexWhere((d) => d.id == dose.id);
     if (idx != -1) _doses[idx] = updated;
     _notify();

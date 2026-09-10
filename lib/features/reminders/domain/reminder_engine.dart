@@ -14,14 +14,11 @@ class ReminderEngine {
     final horizon = now.add(_schedulingHorizon);
 
     for (final dose in doses) {
-      // A snoozed dose has a new reminder anchored to updatedAt. Its original
-      // scheduledAt may already be in the past, so it must not be treated as
-      // an expired dose by the normal upcoming window.
       if (dose.status == DoseStatus.snoozed) {
         final snoozeAt = dose.updatedAt.add(_snoozeDuration);
         if (snoozeAt.isAfter(now.subtract(const Duration(seconds: 30))) &&
             snoozeAt.isBefore(horizon)) {
-          await NotificationService.instance.scheduleSnoozeReminder(dose: dose, at: snoozeAt);
+          await snoozeFor(dose);
         } else {
           await NotificationService.instance.cancelDoseReminders(dose.id);
         }
@@ -44,11 +41,26 @@ class ReminderEngine {
     }
   }
 
-  static Future<void> snoozeFor(DoseInstance dose) =>
-      NotificationService.instance.scheduleSnoozeReminder(
-        dose: dose,
-        at: dose.updatedAt.add(_snoozeDuration),
-      );
+  /// Reuses the normal notification path with a temporary scheduledAt. The
+  /// database keeps the original prescription occurrence; only the local
+  /// reminder is moved by ten minutes.
+  static Future<void> snoozeFor(DoseInstance dose) async {
+    final snoozedDose = DoseInstance(
+      id: dose.id,
+      medicationId: dose.medicationId,
+      scheduleId: dose.scheduleId,
+      patientId: dose.patientId,
+      medicationName: dose.medicationName,
+      doseAmount: dose.doseAmount,
+      scheduledAt: dose.updatedAt.add(_snoozeDuration),
+      status: DoseStatus.snoozed,
+      updatedAt: dose.updatedAt,
+    );
+    await NotificationService.instance.scheduleDoseReminders(
+      dose: snoozedDose,
+      policy: const ReminderPolicy(patientId: ''),
+    );
+  }
 
   static Future<void> cancelFor(String doseId) =>
       NotificationService.instance.cancelDoseReminders(doseId);

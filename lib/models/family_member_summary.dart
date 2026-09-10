@@ -12,6 +12,9 @@ class FamilyMemberSummary {
   final int todayDoseCount;
   final int takenDoseCount;
   final int missedDoseCount;
+  final DateTime? nextDoseAt;
+  final int lowStockMedicationCount;
+  final int outOfStockMedicationCount;
   final DateTime? lastActivityAt;
 
   const FamilyMemberSummary({
@@ -19,6 +22,9 @@ class FamilyMemberSummary {
     required this.todayDoseCount,
     required this.takenDoseCount,
     required this.missedDoseCount,
+    required this.nextDoseAt,
+    required this.lowStockMedicationCount,
+    required this.outOfStockMedicationCount,
     required this.lastActivityAt,
   });
 
@@ -27,6 +33,9 @@ class FamilyMemberSummary {
         todayDoseCount = 0,
         takenDoseCount = 0,
         missedDoseCount = 0,
+        nextDoseAt = null,
+        lowStockMedicationCount = 0,
+        outOfStockMedicationCount = 0,
         lastActivityAt = null;
 
   double get adherence {
@@ -38,6 +47,9 @@ class FamilyMemberSummary {
   static FamilyMemberSummary fromDoses({
     required int activeMedicationCount,
     required List<DoseInstance> todayDoses,
+    DateTime? nextDoseAt,
+    int lowStockMedicationCount = 0,
+    int outOfStockMedicationCount = 0,
   }) {
     DateTime? last;
     for (final dose in todayDoses) {
@@ -46,8 +58,13 @@ class FamilyMemberSummary {
     return FamilyMemberSummary(
       activeMedicationCount: activeMedicationCount,
       todayDoseCount: todayDoses.length,
-      takenDoseCount: todayDoses.where((d) => d.status == DoseStatus.taken).length,
-      missedDoseCount: todayDoses.where((d) => d.status == DoseStatus.missed).length,
+      takenDoseCount:
+          todayDoses.where((d) => d.status == DoseStatus.taken).length,
+      missedDoseCount:
+          todayDoses.where((d) => d.status == DoseStatus.missed).length,
+      nextDoseAt: nextDoseAt,
+      lowStockMedicationCount: lowStockMedicationCount,
+      outOfStockMedicationCount: outOfStockMedicationCount,
       lastActivityAt: last,
     );
   }

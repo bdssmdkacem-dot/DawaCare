@@ -118,5 +118,5 @@ class MedicationScheduleCalculator {
   /// missing dose is represented as zero while [StockIntelligence] remains
   /// nullable for callers that need to distinguish an unparsable value.
   static double parseDose(String value, {String? stockUnit}) =>
-      StockIntelligence.parseDoseQuantity(value, stockUnit) ?? 0;
+      StockIntelligence.parseDoseQuantity(value, stockUnit ?? 'unit') ?? 0;
 }

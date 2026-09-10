@@ -10,26 +10,17 @@ import '../../medications/data/medication_repository.dart';
 import '../domain/dose_engine.dart';
 
 /// Offline-first data access for dose instances.
-///
-/// Reads try Supabase first and always refresh the local cache; if the
-/// network call fails (or the device is offline), it falls back to the
-/// local sqlite cache so the Today screen never shows a blank error state.
-///
-/// Writes (confirm / snooze / skip) update the local cache immediately
-/// (optimistic UI), then either write straight to Supabase when online, or
-/// drop into [LocalDatabase]'s `sync_queue` for [SyncEngine] to replay later.
 class DoseRepository {
   final SupabaseClient _client = Supabase.instance.client;
   final LocalDatabase _local = LocalDatabase.instance;
   final MedicationRepository _medicationRepo = MedicationRepository();
   final Uuid _uuid = const Uuid();
 
-  /// Generates (idempotently) `dose_instances` rows for every active
-  /// medication schedule of [patientId], covering `[today, today+daysAhead]`.
-  /// Safe to call often — the `unique(schedule_id, scheduled_at)` DB
-  /// constraint makes overlapping calls a no-op.
+  /// Generates (idempotently) dose rows for active medication schedules.
+  /// Safe to call repeatedly because the database enforces
+  /// `unique(schedule_id, scheduled_at)`.
   Future<void> ensureDosesGenerated(String patientId, {int daysAhead = 14}) async {
-    if (!ConnectivityService.instance.isOnline) return; // needs the DB round-trip
+    if (!ConnectivityService.instance.isOnline) return;
 
     final medications = await _medicationRepo.fetchMedications(patientId);
     final now = DateTime.now();
@@ -65,6 +56,28 @@ class DoseRepository {
             );
       }
     }
+  }
+
+  /// Marks unresolved doses as MISSED once their scheduled time has passed.
+  ///
+  /// A five-minute grace period prevents a dose from becoming missed while
+  /// the notification is still actionable. Resolved doses are never changed.
+  Future<void> reconcileMissedDoses(
+    String patientId, {
+    Duration gracePeriod = const Duration(minutes: 5),
+  }) async {
+    if (!ConnectivityService.instance.isOnline) return;
+
+    final cutoff = DateTime.now().toUtc().subtract(gracePeriod).toIso8601String();
+    await _client
+        .from('dose_instances')
+        .update({
+          'status': 'MISSED',
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('patient_id', patientId)
+        .inFilter('status', const ['PENDING', 'REMINDER_SENT', 'SNOOZED'])
+        .lt('scheduled_at', cutoff);
   }
 
   Future<List<DoseInstance>> fetchDosesForRange(
@@ -128,7 +141,7 @@ class DoseRepository {
         });
         return updated;
       } catch (_) {
-        // network blip after the connectivity check — fall through to queue
+        // network blip after the connectivity check — queue the write
       }
     }
 

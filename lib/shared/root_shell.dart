@@ -10,7 +10,7 @@ import '../features/caregiver/presentation/pages/caregiver_home_page.dart';
 import '../features/caregiver/presentation/providers/caregiver_provider.dart';
 import '../features/medications/presentation/pages/medication_list_page.dart';
 import '../features/messages/presentation/pages/chat_list_page.dart';
-import '../features/patient/presentation/pages/patient_home_page.dart';
+import '../features/patient/presentation/pages/patient_overview_page.dart';
 import '../features/settings/presentation/pages/settings_page.dart';
 
 class RootShell extends StatefulWidget {
@@ -46,7 +46,7 @@ class _RootShellState extends State<RootShell> {
       body: IndexedStack(
         index: _index,
         children: const [
-          PatientHomePage(),
+          PatientOverviewPage(),
           MedicationListPage(),
           ChatListPage(),
           CaregiverHomePage(),

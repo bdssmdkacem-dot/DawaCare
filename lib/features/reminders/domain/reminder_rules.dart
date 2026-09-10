@@ -13,6 +13,7 @@ class ReminderRules {
     required DoseInstance dose,
     required DateTime now,
   }) {
+    if (dose.status == DoseStatus.missed) return false;
     if (dose.status == DoseStatus.snoozed) return false;
     if (isResolvedStatus(dose.status)) return false;
 

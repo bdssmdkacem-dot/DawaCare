@@ -6,7 +6,6 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/date_time_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
-import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -40,9 +39,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
     if (_loadedOnce) return;
     _loadedOnce = true;
     final userId = context.read<AuthProvider>().profile?.id;
-    if (userId != null) {
-      context.read<MedicationProvider>().load(userId);
-    }
+    if (userId != null) context.read<MedicationProvider>().load(userId);
   }
 
   Future<void> _changeImage(Medication medication) async {
@@ -115,14 +112,10 @@ class _MedicationListPageState extends State<MedicationListPage> {
 
   Future<void> _openDetails(Medication medication) async {
     final provider = context.read<MedicationProvider>();
-    final schedules = provider.schedulesByMedicationId[medication.id] ??
-        const <MedicationSchedule>[];
+    final schedules = provider.schedulesByMedicationId[medication.id] ?? const <MedicationSchedule>[];
     final changed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => MedicationDetailPage(
-          medication: medication,
-          schedules: schedules,
-        ),
+        builder: (_) => MedicationDetailPage(medication: medication, schedules: schedules),
       ),
     );
     if (!mounted || changed != true) return;
@@ -132,14 +125,10 @@ class _MedicationListPageState extends State<MedicationListPage> {
 
   Future<void> _editMedication(Medication medication) async {
     final provider = context.read<MedicationProvider>();
-    final schedules = provider.schedulesByMedicationId[medication.id] ??
-        const <MedicationSchedule>[];
+    final schedules = provider.schedulesByMedicationId[medication.id] ?? const <MedicationSchedule>[];
     final changed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => EditMedicationPage(
-          medication: medication,
-          schedules: schedules,
-        ),
+        builder: (_) => EditMedicationPage(medication: medication, schedules: schedules),
       ),
     );
     if (!mounted || changed != true) return;
@@ -149,14 +138,10 @@ class _MedicationListPageState extends State<MedicationListPage> {
 
   Future<void> _openStockDetails(Medication medication) async {
     final provider = context.read<MedicationProvider>();
-    final schedules = provider.schedulesByMedicationId[medication.id] ??
-        const <MedicationSchedule>[];
+    final schedules = provider.schedulesByMedicationId[medication.id] ?? const <MedicationSchedule>[];
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => MedicationStockDetailPage(
-          medication: medication,
-          schedules: schedules,
-        ),
+        builder: (_) => MedicationStockDetailPage(medication: medication, schedules: schedules),
       ),
     );
     if (!mounted) return;
@@ -179,26 +164,15 @@ class _MedicationListPageState extends State<MedicationListPage> {
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
-            labelText: medication.stockEnabled
-                ? 'الكمية المضافة'
-                : 'الكمية الموجودة الآن',
-            suffixText: _unitLabel(
-              medication.stockEnabled
-                  ? medication.stockUnit
-                  : medication.dosageForm,
-            ),
+            labelText: medication.stockEnabled ? 'الكمية المضافة' : 'الكمية الموجودة الآن',
+            suffixText: _unitLabel(medication.stockEnabled ? medication.stockUnit : medication.dosageForm),
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(AppLocalizations.of(ctx).cancel),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(ctx).cancel)),
           FilledButton(
             onPressed: () {
-              final value = double.tryParse(
-                controller.text.trim().replaceAll(',', '.'),
-              );
+              final value = double.tryParse(controller.text.trim().replaceAll(',', '.'));
               if (value != null && value > 0) Navigator.pop(ctx, value);
             },
             child: const Text('حفظ'),
@@ -214,11 +188,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
         );
     if (!mounted || ok) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          context.read<MedicationProvider>().error ?? 'تعذر تحديث المخزون',
-        ),
-      ),
+      SnackBar(content: Text(context.read<MedicationProvider>().error ?? 'تعذر تحديث المخزون')),
     );
   }
 
@@ -246,18 +216,13 @@ class _MedicationListPageState extends State<MedicationListPage> {
 
   bool _matches(Medication medication, _MedicationInsights info) {
     final q = _query.trim().toLowerCase();
-    final searchable = '${medication.name} ${medication.genericName ?? ''} '
-        '${medication.strength ?? ''} ${medication.dosageForm ?? ''}'
-        .toLowerCase();
+    final searchable = '${medication.name} ${medication.genericName ?? ''} ${medication.strength ?? ''} ${medication.dosageForm ?? ''}'.toLowerCase();
     if (q.isNotEmpty && !searchable.contains(q)) return false;
-
     switch (_filter) {
       case _MedicationFilter.all:
         return true;
       case _MedicationFilter.attention:
-        return info.status == _MedicationStatus.lowStock ||
-            info.status == _MedicationStatus.outOfStock ||
-            info.status == _MedicationStatus.endingSoon;
+        return info.status != _MedicationStatus.active;
       case _MedicationFilter.lowStock:
         return info.status == _MedicationStatus.lowStock;
       case _MedicationFilter.outOfStock:
@@ -272,8 +237,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
   List<_MedicationItem> _buildItems(MedicationProvider provider) {
     final now = DateTime.now();
     final items = provider.medications.map((medication) {
-      final schedules = provider.schedulesByMedicationId[medication.id] ??
-          const <MedicationSchedule>[];
+      final schedules = provider.schedulesByMedicationId[medication.id] ?? const <MedicationSchedule>[];
       return _MedicationItem(
         medication: medication,
         schedules: schedules,
@@ -284,21 +248,13 @@ class _MedicationListPageState extends State<MedicationListPage> {
     items.sort((a, b) {
       switch (_sort) {
         case _MedicationSort.name:
-          return a.medication.name.toLowerCase().compareTo(
-                b.medication.name.toLowerCase(),
-              );
+          return a.medication.name.toLowerCase().compareTo(b.medication.name.toLowerCase());
         case _MedicationSort.stock:
-          return b.medication.stockQuantity.compareTo(
-                a.medication.stockQuantity,
-              );
+          return b.medication.stockQuantity.compareTo(a.medication.stockQuantity);
         case _MedicationSort.daysRemaining:
-          final ad = a.info.daysRemaining ?? double.infinity;
-          final bd = b.info.daysRemaining ?? double.infinity;
-          return ad.compareTo(bd);
+          return (a.info.daysRemaining ?? double.infinity).compareTo(b.info.daysRemaining ?? double.infinity);
         case _MedicationSort.nextDose:
-          final an = a.info.nextDose ?? DateTime(9999);
-          final bn = b.info.nextDose ?? DateTime(9999);
-          return an.compareTo(bn);
+          return (a.info.nextDose ?? DateTime(9999)).compareTo(b.info.nextDose ?? DateTime(9999));
       }
     });
     return items;
@@ -311,8 +267,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
     final userId = context.read<AuthProvider>().profile?.id;
     final items = _buildItems(provider);
     final allItems = provider.medications.map((m) {
-      final schedules = provider.schedulesByMedicationId[m.id] ??
-          const <MedicationSchedule>[];
+      final schedules = provider.schedulesByMedicationId[m.id] ?? const <MedicationSchedule>[];
       return _MedicationInsights.from(m, schedules, DateTime.now());
     }).toList();
     final low = allItems.where((i) => i.status == _MedicationStatus.lowStock).length;
@@ -339,44 +294,22 @@ class _MedicationListPageState extends State<MedicationListPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final added = await Navigator.of(context).push<bool>(
-            MaterialPageRoute(builder: (_) => const AddMedicationPage()),
-          );
+          final added = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const AddMedicationPage()));
           if (!mounted || added != true || userId == null) return;
           await provider.load(userId);
         },
         icon: const Icon(Icons.add_rounded),
         label: Text(l.newMedicine),
       ),
-      body: _buildBody(
-        provider,
-        items,
-        total: provider.medications.length,
-        low: low,
-        out: out,
-        ending: ending,
-      ),
+      body: _buildBody(provider, items, total: provider.medications.length, low: low, out: out, ending: ending),
     );
   }
 
-  Widget _buildBody(
-    MedicationProvider provider,
-    List<_MedicationItem> items, {
-    required int total,
-    required int low,
-    required int out,
-    required int ending,
-  }) {
-    if (provider.isLoading && provider.medications.isEmpty) {
-      return const LoadingIndicator();
-    }
+  Widget _buildBody(MedicationProvider provider, List<_MedicationItem> items, {required int total, required int low, required int out, required int ending}) {
+    if (provider.isLoading && provider.medications.isEmpty) return const LoadingIndicator();
     if (provider.medications.isEmpty) {
       final l = AppLocalizations.of(context);
-      return EmptyState(
-        icon: Icons.medication_outlined,
-        title: l.noMedicinesYet,
-        subtitle: l.addMedicineHint,
-      );
+      return EmptyState(icon: Icons.medication_outlined, title: l.noMedicinesYet, subtitle: l.addMedicineHint);
     }
 
     final userId = context.read<AuthProvider>().profile?.id;
@@ -395,12 +328,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search_rounded),
               hintText: 'ابحث باسم الدواء أو التركيز أو الشكل',
-              suffixIcon: _query.isEmpty
-                  ? null
-                  : IconButton(
-                      onPressed: () => setState(() => _query = ''),
-                      icon: const Icon(Icons.clear_rounded),
-                    ),
+              suffixIcon: _query.isEmpty ? null : IconButton(onPressed: () => setState(() => _query = ''), icon: const Icon(Icons.clear_rounded)),
             ),
           ),
           const SizedBox(height: 10),
@@ -418,11 +346,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
                 const SizedBox(width: 8),
                 _filterChip('ينتهي قريبًا', _MedicationFilter.endingSoon, ending),
                 const SizedBox(width: 8),
-                _filterChip(
-                  'بدون تتبع',
-                  _MedicationFilter.noStock,
-                  provider.medications.where((m) => !m.stockEnabled).length,
-                ),
+                _filterChip('بدون تتبع', _MedicationFilter.noStock, provider.medications.where((m) => !m.stockEnabled).length),
               ],
             ),
           ),
@@ -435,12 +359,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
                   children: [
                     const Icon(Icons.search_off_rounded, size: 42),
                     const SizedBox(height: 10),
-                    Text(
-                      'لا توجد أدوية مطابقة',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
+                    Text('لا توجد أدوية مطابقة', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                     const SizedBox(height: 5),
                     const Text('جرّب تغيير البحث أو الفلتر.'),
                   ],
@@ -453,15 +372,11 @@ class _MedicationListPageState extends State<MedicationListPage> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _SmartMedicationTile(
                   item: item,
-                  imageUrlFuture: provider.signedMedicationImageUrl(
-                    item.medication.imageUrl,
-                  ),
+                  imageUrlFuture: provider.signedMedicationImageUrl(item.medication.imageUrl),
                   onTap: () => _openDetails(item.medication),
                   onEdit: () => _editMedication(item.medication),
                   onChangeImage: () => _changeImage(item.medication),
-                  onRemoveImage: item.medication.imageUrl == null
-                      ? null
-                      : () => _removeImage(item.medication),
+                  onRemoveImage: item.medication.imageUrl == null ? null : () => _removeImage(item.medication),
                   onDeactivate: () => _confirmDeactivate(item.medication),
                   onAddStock: () => _addStock(item.medication),
                   onStockDetails: () => _openStockDetails(item.medication),
@@ -474,11 +389,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
   }
 
   Widget _filterChip(String label, _MedicationFilter filter, int count) {
-    return FilterChip(
-      label: Text('$label ($count)'),
-      selected: _filter == filter,
-      onSelected: (_) => setState(() => _filter = filter),
-    );
+    return FilterChip(label: Text('$label ($count)'), selected: _filter == filter, onSelected: (_) => setState(() => _filter = filter));
   }
 
   Future<void> _confirmDeactivate(Medication medication) async {
@@ -489,14 +400,8 @@ class _MedicationListPageState extends State<MedicationListPage> {
         title: Text(l.deactivateMedicineTitle),
         content: Text(l.deactivateMedicineBody(medication.name)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l.stop),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l.stop)),
         ],
       ),
     );
@@ -510,11 +415,7 @@ class _MedicationItem {
   final List<MedicationSchedule> schedules;
   final _MedicationInsights info;
 
-  const _MedicationItem({
-    required this.medication,
-    required this.schedules,
-    required this.info,
-  });
+  const _MedicationItem({required this.medication, required this.schedules, required this.info});
 }
 
 enum _MedicationStatus { active, lowStock, outOfStock, endingSoon }
@@ -525,30 +426,15 @@ class _MedicationInsights {
   final double dailyConsumption;
   final _MedicationStatus status;
 
-  const _MedicationInsights({
-    required this.nextDose,
-    required this.daysRemaining,
-    required this.dailyConsumption,
-    required this.status,
-  });
+  const _MedicationInsights({required this.nextDose, required this.daysRemaining, required this.dailyConsumption, required this.status});
 
-  factory _MedicationInsights.from(
-    Medication medication,
-    List<MedicationSchedule> schedules,
-    DateTime now,
-  ) {
+  factory _MedicationInsights.from(Medication medication, List<MedicationSchedule> schedules, DateTime now) {
     DateTime? next;
     final windowEnd = now.add(const Duration(days: 30));
     for (final schedule in schedules) {
-      final occurrences = DoseEngine.computeOccurrences(
-        schedule: schedule,
-        windowStart: now,
-        windowEnd: windowEnd,
-      );
+      final occurrences = DoseEngine.computeOccurrences(schedule: schedule, windowStart: now, windowEnd: windowEnd);
       for (final occurrence in occurrences) {
-        if (!occurrence.isBefore(now) && (next == null || occurrence.isBefore(next))) {
-          next = occurrence;
-        }
+        if (!occurrence.isBefore(now) && (next == null || occurrence.isBefore(next))) next = occurrence;
       }
     }
 
@@ -585,27 +471,18 @@ class _MedicationInsights {
         ? _MedicationStatus.endingSoon
         : medication.stockEnabled && medication.stockQuantity <= 0
             ? _MedicationStatus.outOfStock
-            : medication.stockEnabled &&
-                    medication.stockQuantity <= medication.lowStockThreshold
+            : medication.stockEnabled && medication.stockQuantity <= medication.lowStockThreshold
                 ? _MedicationStatus.lowStock
-                : medication.endDate != null &&
-                        medication.endDate!.difference(now).inDays <= 7
+                : medication.endDate != null && medication.endDate!.difference(now).inDays <= 7
                     ? _MedicationStatus.endingSoon
                     : _MedicationStatus.active;
 
-    return _MedicationInsights(
-      nextDose: next,
-      daysRemaining: daysRemaining,
-      dailyConsumption: daily,
-      status: status,
-    );
+    return _MedicationInsights(nextDose: next, daysRemaining: daysRemaining, dailyConsumption: daily, status: status);
   }
 
   static double _parseDose(String value) {
     final match = RegExp(r'([0-9]+(?:[.,][0-9]+)?)').firstMatch(value);
-    return match == null
-        ? 0
-        : double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
+    return match == null ? 0 : double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
   }
 }
 
@@ -615,12 +492,7 @@ class _SmartOverview extends StatelessWidget {
   final int out;
   final int ending;
 
-  const _SmartOverview({
-    required this.total,
-    required this.low,
-    required this.out,
-    required this.ending,
-  });
+  const _SmartOverview({required this.total, required this.low, required this.out, required this.ending});
 
   @override
   Widget build(BuildContext context) {
@@ -652,12 +524,7 @@ class _SmartOverview extends StatelessWidget {
   }
 
   Widget _divider(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 42,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      color: Theme.of(context).dividerColor,
-    );
+    return Container(width: 1, height: 42, margin: const EdgeInsets.symmetric(horizontal: 4), color: Theme.of(context).dividerColor);
   }
 }
 
@@ -710,21 +577,14 @@ class _SmartMedicationTile extends StatelessWidget {
                       return Container(
                         width: 64,
                         height: 64,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: .09),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), borderRadius: BorderRadius.circular(16)),
                         clipBehavior: Clip.antiAlias,
                         child: image == null
                             ? const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 30)
                             : Image.network(
                                 image,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.medication_liquid_rounded,
-                                  color: AppColors.primary,
-                                  size: 30,
-                                ),
+                                errorBuilder: (_, __, ___) => const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 30),
                               ),
                       );
                     },
@@ -750,24 +610,16 @@ class _SmartMedicationTile extends StatelessWidget {
                         ),
                         if (medication.genericName != null && medication.genericName!.trim().isNotEmpty) ...[
                           const SizedBox(height: 2),
-                          Text(
-                            medication.genericName!.trim(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall,
-                          ),
+                          Text(medication.genericName!.trim(), maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
                         ],
                         const SizedBox(height: 5),
                         Wrap(
                           spacing: 5,
                           runSpacing: 4,
                           children: [
-                            if (medication.strength != null && medication.strength!.trim().isNotEmpty)
-                              _chip(medication.strength!.trim()),
-                            if (medication.dosageForm != null && medication.dosageForm!.trim().isNotEmpty)
-                              _chip(l.dosageFormLabel(medication.dosageForm!.trim())),
-                            if (item.schedules.isNotEmpty)
-                              _chip(_scheduleLabel(item.schedules.length)),
+                            if (medication.strength != null && medication.strength!.trim().isNotEmpty) _chip(medication.strength!.trim()),
+                            if (medication.dosageForm != null && medication.dosageForm!.trim().isNotEmpty) _chip(l.dosageFormLabel(medication.dosageForm!.trim())),
+                            if (item.schedules.isNotEmpty) _chip('${item.schedules.length} ${item.schedules.length == 1 ? 'جدول' : 'جداول'}'),
                           ],
                         ),
                       ],
@@ -794,8 +646,7 @@ class _SmartMedicationTile extends StatelessWidget {
                     itemBuilder: (_) => [
                       const PopupMenuItem(value: 'edit', child: Text('تعديل الدواء')),
                       PopupMenuItem(value: 'change_image', child: Text(l.changeMedicineImage)),
-                      if (onRemoveImage != null)
-                        PopupMenuItem(value: 'remove_image', child: Text(l.deleteMedicineImage)),
+                      if (onRemoveImage != null) PopupMenuItem(value: 'remove_image', child: Text(l.deleteMedicineImage)),
                       PopupMenuItem(value: 'deactivate', child: Text(l.deactivateMedicine)),
                     ],
                   ),
@@ -808,6 +659,7 @@ class _SmartMedicationTile extends StatelessWidget {
                 medication: medication,
                 daysRemaining: info.daysRemaining,
                 dailyConsumption: info.dailyConsumption,
+                schedules: item.schedules,
                 onAdd: onAddStock,
                 onDetails: onStockDetails,
               ),
@@ -818,15 +670,10 @@ class _SmartMedicationTile extends StatelessWidget {
     );
   }
 
-  String _scheduleLabel(int count) => '$count ${count == 1 ? 'جدول' : 'جداول'}';
-
   Widget _chip(String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: .10),
-        borderRadius: BorderRadius.circular(18),
-      ),
+      decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(18)),
       child: Text(text, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
     );
   }
@@ -851,15 +698,8 @@ class _NextDoseRow extends StatelessWidget {
       );
     }
     if (nextDose == null) {
-      return Row(
-        children: [
-          const Icon(Icons.event_busy_rounded, size: 19),
-          const SizedBox(width: 7),
-          Text('لا توجد جرعة قادمة', style: theme.textTheme.bodyMedium),
-        ],
-      );
+      return Row(children: [const Icon(Icons.event_busy_rounded, size: 19), const SizedBox(width: 7), Text('لا توجد جرعة قادمة', style: theme.textTheme.bodyMedium)]);
     }
-
     final now = DateTime.now();
     final sameDay = DateTimeUtils.isSameDate(nextDose!, now);
     final date = DateTimeUtils.formatShortDate(nextDose!);
@@ -869,14 +709,7 @@ class _NextDoseRow extends StatelessWidget {
       children: [
         const Icon(Icons.schedule_rounded, size: 19),
         const SizedBox(width: 7),
-        Expanded(
-          child: Text(
-            'الجرعة التالية: $label',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
-        ),
+        Expanded(child: Text('الجرعة التالية: $label', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800))),
       ],
     );
   }
@@ -886,47 +719,26 @@ class _StockSummary extends StatelessWidget {
   final Medication medication;
   final double? daysRemaining;
   final double dailyConsumption;
+  final List<MedicationSchedule> schedules;
   final VoidCallback onAdd;
   final VoidCallback onDetails;
 
-  const _StockSummary({
-    required this.medication,
-    required this.daysRemaining,
-    required this.dailyConsumption,
-    required this.onAdd,
-    required this.onDetails,
-  });
+  const _StockSummary({required this.medication, required this.daysRemaining, required this.dailyConsumption, required this.schedules, required this.onAdd, required this.onDetails});
 
   @override
   Widget build(BuildContext context) {
     if (!medication.stockEnabled) {
-      return MedicationStockBadge(
-        medication: medication,
-        schedules: const [],
-        onAdd: onAdd,
-        onDetails: onDetails,
-      );
+      return MedicationStockBadge(medication: medication, schedules: schedules, onAdd: onAdd, onDetails: onDetails);
     }
-
     final unit = _unit(medication.stockUnit);
     final stock = _format(medication.stockQuantity);
-    final days = daysRemaining == null
-        ? 'غير محسوب'
-        : daysRemaining! <= 0
-            ? 'نفد'
-            : daysRemaining! < 1
-                ? '< يوم'
-                : '${daysRemaining!.floor()} يوم';
-
+    final days = daysRemaining == null ? 'غير محسوب' : daysRemaining! <= 0 ? 'نفد' : daysRemaining! < 1 ? '< يوم' : '${daysRemaining!.floor()} يوم';
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: onDetails,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .55),
-          borderRadius: BorderRadius.circular(14),
-        ),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .55), borderRadius: BorderRadius.circular(14)),
         child: Row(
           children: [
             const Icon(Icons.inventory_2_outlined, size: 20),
@@ -937,20 +749,11 @@ class _StockSummary extends StatelessWidget {
                 children: [
                   Text('المخزون: $stock $unit', style: const TextStyle(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 2),
-                  Text(
-                    dailyConsumption > 0
-                        ? 'يكفي تقريبًا $days · استهلاك ${_format(dailyConsumption)}/يوم'
-                        : 'لا يمكن تقدير الاستهلاك اليومي',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  Text(dailyConsumption > 0 ? 'يكفي تقريبًا $days · استهلاك ${_format(dailyConsumption)}/يوم' : 'لا يمكن تقدير الاستهلاك اليومي', style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
-            IconButton(
-              tooltip: 'إضافة مخزون',
-              onPressed: onAdd,
-              icon: const Icon(Icons.add_box_outlined),
-            ),
+            IconButton(tooltip: 'إضافة مخزون', onPressed: onAdd, icon: const Icon(Icons.add_box_outlined)),
           ],
         ),
       ),
@@ -992,18 +795,8 @@ class _StatusChip extends StatelessWidget {
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14),
-          const SizedBox(width: 3),
-          Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
-        ],
-      ),
+      decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(14)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 14), const SizedBox(width: 3), Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800))]),
     );
   }
 }

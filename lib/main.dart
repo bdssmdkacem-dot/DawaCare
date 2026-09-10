@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
+import 'core/ads/ad_service.dart';
 import 'core/config/supabase_config.dart';
 import 'core/localization/locale_controller.dart';
 import 'core/notifications/notification_service.dart';
@@ -60,6 +61,12 @@ Future<void> _initializeServices(LocaleController localeController) async {
     await localeController.load();
   } catch (e) {
     debugPrint('DawaCare startup: locale initialization failed: $e');
+  }
+
+  try {
+    await AdService.instance.initialize();
+  } catch (e) {
+    debugPrint('DawaCare startup: ads initialization failed: $e');
   }
 
   try {

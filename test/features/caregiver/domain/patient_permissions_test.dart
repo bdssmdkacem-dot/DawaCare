@@ -1,12 +1,12 @@
-import 'package:dawacare/features/caregiver/data/caregiver_repository.dart';
 import 'package:dawacare/features/caregiver/domain/patient_permissions.dart';
+import 'package:dawacare/models/caregiver_link.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('PatientPermissions', () {
     test('primary caregiver can manage patient medication flow', () {
       final permissions =
-          PatientPermissions.forRole(CaregiverRole.primaryCaregiver);
+          PatientPermissions.forRole(CaregiverRole.primary);
 
       expect(permissions.canView, isTrue);
       expect(permissions.canEditMedication, isTrue);

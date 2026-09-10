@@ -90,6 +90,9 @@ void main() {
       todayDoseCount: 6,
       takenDoseCount: 5,
       missedDoseCount: 1,
+      nextDoseAt: null,
+      lowStockMedicationCount: 0,
+      outOfStockMedicationCount: 0,
       lastActivityAt: null,
     );
 

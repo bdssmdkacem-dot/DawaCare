@@ -1,4 +1,4 @@
-import '../data/caregiver_repository.dart';
+import '../../../models/caregiver_link.dart';
 
 /// Centralizes patient/caregiver authorization decisions used by the UI.
 ///
@@ -13,8 +13,7 @@ class PatientPermissions {
   bool get canView => role != null;
 
   bool get canEditMedication =>
-      role == CaregiverRole.primaryCaregiver ||
-      role == CaregiverRole.caregiver;
+      role == CaregiverRole.primary || role == CaregiverRole.caregiver;
 
   bool get canEditSchedule => canEditMedication;
 
@@ -22,7 +21,7 @@ class PatientPermissions {
 
   bool get canManageDose => canEditMedication;
 
-  bool get canUnlink => role == CaregiverRole.primaryCaregiver;
+  bool get canUnlink => role == CaregiverRole.primary;
 
   bool get canSendMessage => role != null;
 

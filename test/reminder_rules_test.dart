@@ -69,5 +69,14 @@ void main() {
       expect(ReminderRules.shouldSchedule(dose: dose, now: now), isFalse);
       expect(ReminderRules.shouldCancel(dose: dose, now: now), isTrue);
     });
+
+    test('never reschedules a missed dose, even if its timestamp is future', () {
+      final dose = _dose(
+        scheduledAt: now.add(const Duration(hours: 1)),
+        status: DoseStatus.missed,
+      );
+      expect(ReminderRules.shouldSchedule(dose: dose, now: now), isFalse);
+      expect(ReminderRules.shouldCancel(dose: dose, now: now), isTrue);
+    });
   });
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../app/theme/app_colors.dart';
+import '../core/ads/ad_banner.dart';
+import '../core/ads/ad_service.dart';
 import '../core/localization/app_localizations.dart';
 import '../core/notifications/push_notification_service.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
@@ -21,12 +23,24 @@ class RootShell extends StatefulWidget {
 class _RootShellState extends State<RootShell> {
   int _index = 0;
 
+  String? get _bannerAdUnitId {
+    switch (_index) {
+      case 0:
+        return AdService.homeBannerId;
+      case 1:
+        return AdService.medicinesBannerId;
+      default:
+        return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final caregiver = context.watch<CaregiverProvider>();
     final userId = context.read<AuthProvider>().profile?.id;
     final l10n = AppLocalizations.of(context);
     final unread = caregiver.unreadAlertCount + caregiver.pendingApprovalCount;
+    final bannerId = _bannerAdUnitId;
 
     return Scaffold(
       body: IndexedStack(
@@ -39,53 +53,65 @@ class _RootShellState extends State<RootShell> {
           SettingsPage(),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        height: 76,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        indicatorColor: AppColors.primary.withValues(alpha: .12),
-        onDestinationSelected: (i) {
-          setState(() => _index = i);
-          if (i == 3 && userId != null) {
-            caregiver.load(userId);
-          }
-          if (i == 2) {
-            PushNotificationService.instance.ensureRegistered();
-          }
-        },
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.today_outlined),
-            selectedIcon: const Icon(Icons.today_rounded),
-            label: l10n.today,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.medication_outlined),
-            selectedIcon: const Icon(Icons.medication_rounded),
-            label: l10n.medicines,
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline_rounded),
-            selectedIcon: Icon(Icons.chat_bubble_rounded),
-            label: 'المحادثات',
-          ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: unread > 0,
-              label: Text('$unread'),
-              child: const Icon(Icons.family_restroom_outlined),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (bannerId != null)
+            DawaCareBanner(
+              key: ValueKey(bannerId),
+              productionAdUnitId: bannerId,
             ),
-            selectedIcon: Badge(
-              isLabelVisible: unread > 0,
-              label: Text('$unread'),
-              child: const Icon(Icons.family_restroom_rounded),
-            ),
-            label: l10n.family,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.settings_outlined),
-            selectedIcon: const Icon(Icons.settings_rounded),
-            label: l10n.settings,
+          NavigationBar(
+            selectedIndex: _index,
+            height: 76,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            indicatorColor: AppColors.primary.withValues(alpha: .12),
+            onDestinationSelected: (i) {
+              if (i == _index) return;
+              setState(() => _index = i);
+              if (i == 3 && userId != null) {
+                caregiver.load(userId);
+              }
+              if (i == 2) {
+                PushNotificationService.instance.ensureRegistered();
+              }
+              AdService.instance.showNavigationInterstitial();
+            },
+            destinations: [
+              NavigationDestination(
+                icon: const Icon(Icons.today_outlined),
+                selectedIcon: const Icon(Icons.today_rounded),
+                label: l10n.today,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.medication_outlined),
+                selectedIcon: const Icon(Icons.medication_rounded),
+                label: l10n.medicines,
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.chat_bubble_outline_rounded),
+                selectedIcon: Icon(Icons.chat_bubble_rounded),
+                label: 'المحادثات',
+              ),
+              NavigationDestination(
+                icon: Badge(
+                  isLabelVisible: unread > 0,
+                  label: Text('$unread'),
+                  child: const Icon(Icons.family_restroom_outlined),
+                ),
+                selectedIcon: Badge(
+                  isLabelVisible: unread > 0,
+                  label: Text('$unread'),
+                  child: const Icon(Icons.family_restroom_rounded),
+                ),
+                label: l10n.family,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.settings_outlined),
+                selectedIcon: const Icon(Icons.settings_rounded),
+                label: l10n.settings,
+              ),
+            ],
           ),
         ],
       ),

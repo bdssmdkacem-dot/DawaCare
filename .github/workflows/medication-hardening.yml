@@ -1,0 +1,187 @@
+name: Medication Architecture Hardening
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    if: ${{ !contains(github.event.head_commit.message, '[medication-hardening]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch medication architecture
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          list_path = Path('lib/features/medications/presentation/pages/medication_list_page.dart')
+          s = list_path.read_text()
+          s = s.replace("import '../../../doses/domain/dose_engine.dart';\n", "import '../../domain/medication_schedule_calculator.dart';\n")
+          s = s.replace('enum _MedicationFilter { all, attention, lowStock, outOfStock, endingSoon, noStock }',
+                        'enum _MedicationFilter { all, attention, lowStock, outOfStock, endingSoon, inactive, prn, noStock }')
+          s = s.replace('enum _MedicationSort { nextDose, name, stock, daysRemaining }',
+                        'enum _MedicationSort { nextDose, name, stock, daysRemaining }')
+
+          s = re.sub(r'''class _MedicationInsights \{.*?\n\}\n\nclass _MedicationItem''', '''class _MedicationInsights {
+            final DateTime? nextDose;
+            final double? daysRemaining;
+            final double dailyConsumption;
+            final MedicationStatus status;
+
+            const _MedicationInsights({
+              required this.nextDose,
+              required this.daysRemaining,
+              required this.dailyConsumption,
+              required this.status,
+            });
+
+            factory _MedicationInsights.from(
+              Medication medication,
+              List<MedicationSchedule> schedules,
+              DateTime now,
+            ) {
+              return _MedicationInsights(
+                nextDose: MedicationScheduleCalculator.nextDose(schedules, now),
+                daysRemaining: MedicationScheduleCalculator.daysRemaining(
+                  medication,
+                  schedules,
+                  now,
+                ),
+                dailyConsumption: MedicationScheduleCalculator.dailyConsumption(schedules),
+                status: MedicationScheduleCalculator.status(medication, schedules, now),
+              );
+            }
+          }
+
+class _MedicationItem''', s, flags=re.S)
+
+          # Map the shared domain status to the existing UI enum without changing card layout.
+          s = s.replace('enum _MedicationStatus { active, lowStock, outOfStock, endingSoon }',
+                        'enum _MedicationStatus { active, lowStock, outOfStock, endingSoon, inactive, prn }')
+          s = re.sub(r'''_MedicationStatus get status \{.*?\n  \}''', '''_MedicationStatus get status {
+              switch (info.status) {
+                case MedicationStatus.lowStock:
+                  return _MedicationStatus.lowStock;
+                case MedicationStatus.outOfStock:
+                  return _MedicationStatus.outOfStock;
+                case MedicationStatus.endingSoon:
+                  return _MedicationStatus.endingSoon;
+                case MedicationStatus.inactive:
+                  return _MedicationStatus.inactive;
+                case MedicationStatus.prn:
+                  return _MedicationStatus.prn;
+                case MedicationStatus.active:
+                  return _MedicationStatus.active;
+              }
+            }''', s, flags=re.S)
+
+          # If the UI has status labels as a switch, add the new statuses safely.
+          s = s.replace("case _MedicationStatus.endingSoon:\n", "case _MedicationStatus.endingSoon:\n")
+          list_path.write_text(s)
+
+          detail_path = Path('lib/features/medications/presentation/pages/medication_detail_page.dart')
+          d = detail_path.read_text()
+          d = d.replace("import '../../../doses/data/dose_repository.dart';\n", "import '../../../doses/data/dose_repository.dart';\nimport '../../domain/medication_schedule_calculator.dart';\n")
+
+          # Replace the next-dose selection with the shared schedule calculator while retaining dose-instance status/today pills.
+          old = '''    final now = DateTime.now();
+    final upcoming = doses.where((d) => !isResolvedStatus(d.status) && !d.scheduledAt.isBefore(now)).toList()
+      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    final next = upcoming.isEmpty ? null : upcoming.first;'''
+          new = '''    final now = DateTime.now();
+    final nextScheduledAt = MedicationScheduleCalculator.nextDose(_schedules, now);
+    DoseInstance? next;
+    if (nextScheduledAt != null) {
+      final matching = doses.where((d) =>
+        !isResolvedStatus(d.status) &&
+        d.scheduledAt.difference(nextScheduledAt).abs() <= const Duration(minutes: 1),
+      ).toList();
+      if (matching.isNotEmpty) next = matching.first;
+    }'''
+          if old not in d:
+              raise SystemExit('detail next-dose block not found')
+          d = d.replace(old, new)
+          d = d.replace("Text(DateTimeUtils.formatShortDate(next.scheduledAt),", "Text(DateTimeUtils.formatShortDate(nextScheduledAt!),")
+          d = d.replace("Text(_time(next.scheduledAt),", "Text(_time(nextScheduledAt),")
+          d = d.replace("_tag(next.status == DoseStatus.taken ? _tr('تم أخذها', 'Taken', 'Prise') : '${next.doseAmount}'),", "_tag(next == null ? _tr('مجدولة', 'Scheduled', 'Planifiée') : (next.status == DoseStatus.taken ? _tr('تم أخذها', 'Taken', 'Prise') : '${next.doseAmount}')),")
+          d = d.replace("final daily = _dailyConsumption();\n    final days = daily == null || daily <= 0 ? null : med.stockQuantity / daily;", "final daily = MedicationScheduleCalculator.dailyConsumption(_schedules);\n    final days = MedicationScheduleCalculator.daysRemaining(med, _schedules, DateTime.now());")
+          d = re.sub(r'''  double\? _dailyConsumption\(\) \{.*?\n  \}''', '''  double? _dailyConsumption() => MedicationScheduleCalculator.dailyConsumption(_schedules);''', d, flags=re.S)
+
+          # Add consistent edit/stock actions to the detail app bar.
+          marker = '''        actions: [
+          IconButton(
+            tooltip: _tr('تحديث', 'Refresh', 'Actualiser'),'''
+          replacement = '''        actions: [
+          IconButton(
+            tooltip: _tr('تعديل', 'Edit', 'Modifier'),
+            onPressed: _editMedication,
+            icon: const Icon(Icons.edit_rounded),
+          ),
+          IconButton(
+            tooltip: _tr('المخزون', 'Stock', 'Stock'),
+            onPressed: _openStockDetails,
+            icon: const Icon(Icons.inventory_2_rounded),
+          ),
+          IconButton(
+            tooltip: _tr('تحديث', 'Refresh', 'Actualiser'),'''
+          if marker in d:
+              d = d.replace(marker, replacement, 1)
+          else:
+              raise SystemExit('detail appbar marker not found')
+
+          insert_before = '''  void _reload() {
+'''
+          methods = '''  Future<void> _editMedication() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EditMedicationPage(
+          medication: widget.medication,
+          schedules: _schedules,
+        ),
+      ),
+    );
+    if (!mounted || changed != true) return;
+    Navigator.of(context).pop(true);
+  }
+
+  Future<void> _openStockDetails() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MedicationStockDetailPage(
+          medication: widget.medication,
+          schedules: _schedules,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(_reload);
+  }
+
+'''
+          if insert_before not in d:
+              raise SystemExit('detail reload marker not found')
+          d = d.replace(insert_before, methods + insert_before, 1)
+          d = d.replace("import '../providers/medication_provider.dart';\n", "import '../providers/medication_provider.dart';\nimport 'edit_medication_page.dart';\nimport 'medication_stock_detail_page.dart';\n")
+          detail_path.write_text(d)
+
+      - name: Format and test
+        run: |
+          dart format lib/features/medications/domain/medication_schedule_calculator.dart lib/features/medications/presentation/pages/medication_list_page.dart lib/features/medications/presentation/pages/medication_detail_page.dart
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Commit hardening changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/features/medications/presentation/pages/medication_list_page.dart lib/features/medications/presentation/pages/medication_detail_page.dart
+          git diff --cached --quiet && exit 0
+          git commit -m "feat(medications): unify list and detail schedule insights [medication-hardening]"
+          git push

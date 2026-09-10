@@ -6,6 +6,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/date_time_utils.dart';
 import '../../../../core/widgets/loading_indicator.dart';
+import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -13,10 +14,12 @@ import '../../../doses/domain/dose_engine.dart';
 import '../providers/medication_provider.dart';
 import '../widgets/medication_stock_badge.dart';
 import 'add_edit_medication_page.dart';
+import 'edit_medication_page.dart';
 import 'medication_detail_page.dart';
 import 'medication_stock_detail_page.dart';
 
-enum _MedicationFilter { all, lowStock, outOfStock, noStock }
+enum _MedicationFilter { all, attention, lowStock, outOfStock, endingSoon, noStock }
+enum _MedicationSort { nextDose, name, stock, daysRemaining }
 
 class MedicationListPage extends StatefulWidget {
   const MedicationListPage({super.key});
@@ -28,6 +31,7 @@ class MedicationListPage extends StatefulWidget {
 class _MedicationListPageState extends State<MedicationListPage> {
   bool _loadedOnce = false;
   _MedicationFilter _filter = _MedicationFilter.all;
+  _MedicationSort _sort = _MedicationSort.nextDose;
   String _query = '';
 
   @override
@@ -126,6 +130,23 @@ class _MedicationListPageState extends State<MedicationListPage> {
     if (userId != null) await provider.load(userId);
   }
 
+  Future<void> _editMedication(Medication medication) async {
+    final provider = context.read<MedicationProvider>();
+    final schedules = provider.schedulesByMedicationId[medication.id] ??
+        const <MedicationSchedule>[];
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EditMedicationPage(
+          medication: medication,
+          schedules: schedules,
+        ),
+      ),
+    );
+    if (!mounted || changed != true) return;
+    final userId = context.read<AuthProvider>().profile?.id;
+    if (userId != null) await provider.load(userId);
+  }
+
   Future<void> _openStockDetails(Medication medication) async {
     final provider = context.read<MedicationProvider>();
     final schedules = provider.schedulesByMedicationId[medication.id] ??
@@ -178,9 +199,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
               final value = double.tryParse(
                 controller.text.trim().replaceAll(',', '.'),
               );
-              if (value != null && value > 0) {
-                Navigator.pop(ctx, value);
-              }
+              if (value != null && value > 0) Navigator.pop(ctx, value);
             },
             child: const Text('حفظ'),
           ),
@@ -225,7 +244,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
     }
   }
 
-  bool _matches(Medication medication) {
+  bool _matches(Medication medication, _MedicationInsights info) {
     final q = _query.trim().toLowerCase();
     final searchable = '${medication.name} ${medication.genericName ?? ''} '
         '${medication.strength ?? ''} ${medication.dosageForm ?? ''}'
@@ -235,15 +254,54 @@ class _MedicationListPageState extends State<MedicationListPage> {
     switch (_filter) {
       case _MedicationFilter.all:
         return true;
+      case _MedicationFilter.attention:
+        return info.status == _MedicationStatus.lowStock ||
+            info.status == _MedicationStatus.outOfStock ||
+            info.status == _MedicationStatus.endingSoon;
       case _MedicationFilter.lowStock:
-        return medication.stockEnabled &&
-            medication.stockQuantity > 0 &&
-            medication.stockQuantity <= medication.lowStockThreshold;
+        return info.status == _MedicationStatus.lowStock;
       case _MedicationFilter.outOfStock:
-        return medication.stockEnabled && medication.stockQuantity <= 0;
+        return info.status == _MedicationStatus.outOfStock;
+      case _MedicationFilter.endingSoon:
+        return info.status == _MedicationStatus.endingSoon;
       case _MedicationFilter.noStock:
         return !medication.stockEnabled;
     }
+  }
+
+  List<_MedicationItem> _buildItems(MedicationProvider provider) {
+    final now = DateTime.now();
+    final items = provider.medications.map((medication) {
+      final schedules = provider.schedulesByMedicationId[medication.id] ??
+          const <MedicationSchedule>[];
+      return _MedicationItem(
+        medication: medication,
+        schedules: schedules,
+        info: _MedicationInsights.from(medication, schedules, now),
+      );
+    }).where((item) => _matches(item.medication, item.info)).toList();
+
+    items.sort((a, b) {
+      switch (_sort) {
+        case _MedicationSort.name:
+          return a.medication.name.toLowerCase().compareTo(
+                b.medication.name.toLowerCase(),
+              );
+        case _MedicationSort.stock:
+          return b.medication.stockQuantity.compareTo(
+                a.medication.stockQuantity,
+              );
+        case _MedicationSort.daysRemaining:
+          final ad = a.info.daysRemaining ?? double.infinity;
+          final bd = b.info.daysRemaining ?? double.infinity;
+          return ad.compareTo(bd);
+        case _MedicationSort.nextDose:
+          final an = a.info.nextDose ?? DateTime(9999);
+          final bn = b.info.nextDose ?? DateTime(9999);
+          return an.compareTo(bn);
+      }
+    });
+    return items;
   }
 
   @override
@@ -251,32 +309,69 @@ class _MedicationListPageState extends State<MedicationListPage> {
     final l = AppLocalizations.of(context);
     final provider = context.watch<MedicationProvider>();
     final userId = context.read<AuthProvider>().profile?.id;
+    final items = _buildItems(provider);
+    final allItems = provider.medications.map((m) {
+      final schedules = provider.schedulesByMedicationId[m.id] ??
+          const <MedicationSchedule>[];
+      return _MedicationInsights.from(m, schedules, DateTime.now());
+    }).toList();
+    final low = allItems.where((i) => i.status == _MedicationStatus.lowStock).length;
+    final out = allItems.where((i) => i.status == _MedicationStatus.outOfStock).length;
+    final ending = allItems.where((i) => i.status == _MedicationStatus.endingSoon).length;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l.medicines)),
+      appBar: AppBar(
+        title: Text(l.medicines),
+        actions: [
+          PopupMenuButton<_MedicationSort>(
+            tooltip: 'ترتيب',
+            icon: const Icon(Icons.sort_rounded),
+            initialValue: _sort,
+            onSelected: (value) => setState(() => _sort = value),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: _MedicationSort.nextDose, child: Text('أقرب جرعة')),
+              PopupMenuItem(value: _MedicationSort.name, child: Text('الاسم')),
+              PopupMenuItem(value: _MedicationSort.stock, child: Text('المخزون')),
+              PopupMenuItem(value: _MedicationSort.daysRemaining, child: Text('الأيام المتبقية')),
+            ],
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final medicationProvider = context.read<MedicationProvider>();
           final added = await Navigator.of(context).push<bool>(
             MaterialPageRoute(builder: (_) => const AddMedicationPage()),
           );
-          if (!mounted) return;
-          if (added == true && userId != null) {
-            await medicationProvider.load(userId);
-          }
+          if (!mounted || added != true || userId == null) return;
+          await provider.load(userId);
         },
         icon: const Icon(Icons.add_rounded),
         label: Text(l.newMedicine),
       ),
-      body: _buildBody(provider, l),
+      body: _buildBody(
+        provider,
+        items,
+        total: provider.medications.length,
+        low: low,
+        out: out,
+        ending: ending,
+      ),
     );
   }
 
-  Widget _buildBody(MedicationProvider provider, AppLocalizations l) {
+  Widget _buildBody(
+    MedicationProvider provider,
+    List<_MedicationItem> items, {
+    required int total,
+    required int low,
+    required int out,
+    required int ending,
+  }) {
     if (provider.isLoading && provider.medications.isEmpty) {
       return const LoadingIndicator();
     }
     if (provider.medications.isEmpty) {
+      final l = AppLocalizations.of(context);
       return EmptyState(
         icon: Icons.medication_outlined,
         title: l.noMedicinesYet,
@@ -284,31 +379,16 @@ class _MedicationListPageState extends State<MedicationListPage> {
       );
     }
 
-    final visible = provider.medications.where(_matches).toList();
-    final low = provider.medications
-        .where((m) =>
-            m.stockEnabled &&
-            m.stockQuantity > 0 &&
-            m.stockQuantity <= m.lowStockThreshold)
-        .length;
-    final empty = provider.medications
-        .where((m) => m.stockEnabled && m.stockQuantity <= 0)
-        .length;
-
+    final userId = context.read<AuthProvider>().profile?.id;
     return RefreshIndicator(
       onRefresh: () async {
-        final userId = context.read<AuthProvider>().profile?.id;
         if (userId != null) await provider.load(userId);
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 96),
         children: [
-          _MedicationOverview(
-            total: provider.medications.length,
-            low: low,
-            empty: empty,
-          ),
+          _SmartOverview(total: total, low: low, out: out, ending: ending),
           const SizedBox(height: 12),
           TextField(
             onChanged: (value) => setState(() => _query = value),
@@ -328,12 +408,15 @@ class _MedicationListPageState extends State<MedicationListPage> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _filterChip('الكل', _MedicationFilter.all,
-                    provider.medications.length),
+                _filterChip('الكل', _MedicationFilter.all, total),
                 const SizedBox(width: 8),
-                _filterChip('مخزون منخفض', _MedicationFilter.lowStock, low),
+                _filterChip('يحتاج انتباه', _MedicationFilter.attention, low + out + ending),
                 const SizedBox(width: 8),
-                _filterChip('نفد المخزون', _MedicationFilter.outOfStock, empty),
+                _filterChip('منخفض', _MedicationFilter.lowStock, low),
+                const SizedBox(width: 8),
+                _filterChip('نفد', _MedicationFilter.outOfStock, out),
+                const SizedBox(width: 8),
+                _filterChip('ينتهي قريبًا', _MedicationFilter.endingSoon, ending),
                 const SizedBox(width: 8),
                 _filterChip(
                   'بدون تتبع',
@@ -344,7 +427,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
             ),
           ),
           const SizedBox(height: 12),
-          if (visible.isEmpty)
+          if (items.isEmpty)
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -354,10 +437,9 @@ class _MedicationListPageState extends State<MedicationListPage> {
                     const SizedBox(height: 10),
                     Text(
                       'لا توجد أدوية مطابقة',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w800),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
                     ),
                     const SizedBox(height: 5),
                     const Text('جرّب تغيير البحث أو الفلتر.'),
@@ -366,38 +448,32 @@ class _MedicationListPageState extends State<MedicationListPage> {
               ),
             )
           else
-            ...visible.map((med) {
-              final schedules =
-                  provider.schedulesByMedicationId[med.id] ??
-                      const <MedicationSchedule>[];
-              return Padding(
+            ...items.map(
+              (item) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: _MedicationTile(
-                  medication: med,
-                  schedules: schedules,
-                  imageUrlFuture:
-                      provider.signedMedicationImageUrl(med.imageUrl),
-                  onTap: () => _openDetails(med),
-                  onChangeImage: () => _changeImage(med),
-                  onRemoveImage: med.imageUrl == null
+                child: _SmartMedicationTile(
+                  item: item,
+                  imageUrlFuture: provider.signedMedicationImageUrl(
+                    item.medication.imageUrl,
+                  ),
+                  onTap: () => _openDetails(item.medication),
+                  onEdit: () => _editMedication(item.medication),
+                  onChangeImage: () => _changeImage(item.medication),
+                  onRemoveImage: item.medication.imageUrl == null
                       ? null
-                      : () => _removeImage(med),
-                  onDeactivate: () => _confirmDeactivate(med),
-                  onAddStock: () => _addStock(med),
-                  onStockDetails: () => _openStockDetails(med),
+                      : () => _removeImage(item.medication),
+                  onDeactivate: () => _confirmDeactivate(item.medication),
+                  onAddStock: () => _addStock(item.medication),
+                  onStockDetails: () => _openStockDetails(item.medication),
                 ),
-              );
-            }),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _filterChip(
-    String label,
-    _MedicationFilter filter,
-    int count,
-  ) {
+  Widget _filterChip(String label, _MedicationFilter filter, int count) {
     return FilterChip(
       label: Text('$label ($count)'),
       selected: _filter == filter,
@@ -429,70 +505,147 @@ class _MedicationListPageState extends State<MedicationListPage> {
   }
 }
 
-class _MedicationOverview extends StatelessWidget {
+class _MedicationItem {
+  final Medication medication;
+  final List<MedicationSchedule> schedules;
+  final _MedicationInsights info;
+
+  const _MedicationItem({
+    required this.medication,
+    required this.schedules,
+    required this.info,
+  });
+}
+
+enum _MedicationStatus { active, lowStock, outOfStock, endingSoon }
+
+class _MedicationInsights {
+  final DateTime? nextDose;
+  final double? daysRemaining;
+  final double dailyConsumption;
+  final _MedicationStatus status;
+
+  const _MedicationInsights({
+    required this.nextDose,
+    required this.daysRemaining,
+    required this.dailyConsumption,
+    required this.status,
+  });
+
+  factory _MedicationInsights.from(
+    Medication medication,
+    List<MedicationSchedule> schedules,
+    DateTime now,
+  ) {
+    DateTime? next;
+    final windowEnd = now.add(const Duration(days: 30));
+    for (final schedule in schedules) {
+      final occurrences = DoseEngine.computeOccurrences(
+        schedule: schedule,
+        windowStart: now,
+        windowEnd: windowEnd,
+      );
+      for (final occurrence in occurrences) {
+        if (!occurrence.isBefore(now) && (next == null || occurrence.isBefore(next))) {
+          next = occurrence;
+        }
+      }
+    }
+
+    var daily = 0.0;
+    for (final schedule in schedules) {
+      final dose = _parseDose(schedule.doseAmount);
+      if (dose <= 0 || schedule.type == ScheduleType.prn) continue;
+      switch (schedule.type) {
+        case ScheduleType.daily:
+        case ScheduleType.once:
+          daily += dose;
+          break;
+        case ScheduleType.weekly:
+        case ScheduleType.specificDays:
+          daily += dose * schedule.daysOfWeek.length / 7;
+          break;
+        case ScheduleType.interval:
+          final days = schedule.intervalDays ?? 1;
+          if (days > 0) daily += dose / days;
+          break;
+        case ScheduleType.prn:
+          break;
+      }
+    }
+
+    double? daysRemaining;
+    if (medication.stockEnabled && medication.stockQuantity > 0 && daily > 0) {
+      daysRemaining = medication.stockQuantity / daily;
+    } else if (medication.stockEnabled && medication.stockQuantity <= 0) {
+      daysRemaining = 0;
+    }
+
+    final status = !medication.active
+        ? _MedicationStatus.endingSoon
+        : medication.stockEnabled && medication.stockQuantity <= 0
+            ? _MedicationStatus.outOfStock
+            : medication.stockEnabled &&
+                    medication.stockQuantity <= medication.lowStockThreshold
+                ? _MedicationStatus.lowStock
+                : medication.endDate != null &&
+                        medication.endDate!.difference(now).inDays <= 7
+                    ? _MedicationStatus.endingSoon
+                    : _MedicationStatus.active;
+
+    return _MedicationInsights(
+      nextDose: next,
+      daysRemaining: daysRemaining,
+      dailyConsumption: daily,
+      status: status,
+    );
+  }
+
+  static double _parseDose(String value) {
+    final match = RegExp(r'([0-9]+(?:[.,][0-9]+)?)').firstMatch(value);
+    return match == null
+        ? 0
+        : double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
+  }
+}
+
+class _SmartOverview extends StatelessWidget {
   final int total;
   final int low;
-  final int empty;
+  final int out;
+  final int ending;
 
-  const _MedicationOverview({
+  const _SmartOverview({
     required this.total,
     required this.low,
-    required this.empty,
+    required this.out,
+    required this.ending,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            Expanded(
-              child: _metric(
-                context,
-                Icons.medication_rounded,
-                '$total',
-                'الأدوية',
-              ),
-            ),
+            Expanded(child: _metric(context, Icons.medication_rounded, '$total', 'الأدوية')),
             _divider(context),
-            Expanded(
-              child: _metric(
-                context,
-                Icons.warning_amber_rounded,
-                '$low',
-                'منخفض',
-              ),
-            ),
+            Expanded(child: _metric(context, Icons.warning_amber_rounded, '${low + out}', 'المخزون')),
             _divider(context),
-            Expanded(
-              child: _metric(
-                context,
-                Icons.error_outline_rounded,
-                '$empty',
-                'نفد',
-              ),
-            ),
+            Expanded(child: _metric(context, Icons.event_busy_rounded, '$ending', 'ينتهي قريبًا')),
           ],
         ),
       ),
     );
   }
 
-  Widget _metric(
-    BuildContext context,
-    IconData icon,
-    String value,
-    String label,
-  ) {
+  Widget _metric(BuildContext context, IconData icon, String value, String label) {
     return Column(
       children: [
-        Icon(icon, color: AppColors.primary, size: 23),
-        const SizedBox(height: 5),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
-        ),
+        Icon(icon, color: AppColors.primary, size: 22),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
         Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
@@ -508,22 +661,22 @@ class _MedicationOverview extends StatelessWidget {
   }
 }
 
-class _MedicationTile extends StatelessWidget {
-  final Medication medication;
-  final List<MedicationSchedule> schedules;
+class _SmartMedicationTile extends StatelessWidget {
+  final _MedicationItem item;
   final Future<String?> imageUrlFuture;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
   final VoidCallback onChangeImage;
   final VoidCallback? onRemoveImage;
   final VoidCallback onDeactivate;
   final VoidCallback onAddStock;
   final VoidCallback onStockDetails;
 
-  const _MedicationTile({
-    required this.medication,
-    required this.schedules,
+  const _SmartMedicationTile({
+    required this.item,
     required this.imageUrlFuture,
     required this.onTap,
+    required this.onEdit,
     required this.onChangeImage,
     required this.onRemoveImage,
     required this.onDeactivate,
@@ -533,6 +686,8 @@ class _MedicationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final medication = item.medication;
+    final info = item.info;
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context);
 
@@ -541,147 +696,120 @@ class _MedicationTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              FutureBuilder<String?>(
-                future: imageUrlFuture,
-                builder: (context, snapshot) {
-                  final image = snapshot.data;
-                  return Container(
-                    width: 68,
-                    height: 68,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: .09),
-                      borderRadius: BorderRadius.circular(17),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: image == null
-                        ? const Icon(
-                            Icons.medication_liquid_rounded,
-                            color: AppColors.primary,
-                            size: 32,
-                          )
-                        : Image.network(
-                            image,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.medication_liquid_rounded,
-                              color: AppColors.primary,
-                              size: 32,
-                            ),
-                          ),
-                  );
-                },
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      medication.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                      ),
-                    ),
-                    if (medication.genericName != null &&
-                        medication.genericName!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        medication.genericName!.trim(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                    const SizedBox(height: 5),
-                    Wrap(
-                      spacing: 5,
-                      runSpacing: 4,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FutureBuilder<String?>(
+                    future: imageUrlFuture,
+                    builder: (context, snapshot) {
+                      final image = snapshot.data;
+                      return Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: .09),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: image == null
+                            ? const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 30)
+                            : Image.network(
+                                image,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.medication_liquid_rounded,
+                                  color: AppColors.primary,
+                                  size: 30,
+                                ),
+                              ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (medication.strength != null &&
-                            medication.strength!.trim().isNotEmpty)
-                          _chip(medication.strength!.trim()),
-                        if (medication.dosageForm != null &&
-                            medication.dosageForm!.trim().isNotEmpty)
-                          _chip(
-                            l.dosageFormLabel(medication.dosageForm!.trim()),
-                          ),
-                        if (schedules.isNotEmpty)
-                          _chip(_scheduleCountLabel(l, schedules.length)),
-                      ],
-                    ),
-                    if (schedules.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      ...schedules.take(2).map(
-                            (s) => Padding(
-                              padding: const EdgeInsets.only(bottom: 2),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
                               child: Text(
-                                '• ${DoseEngine.describeSchedule(s)} · ${l.doseAmount}: ${s.doseAmount}',
-                                maxLines: 1,
+                                medication.name,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall,
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                               ),
                             ),
-                          ),
-                      if (schedules.length > 2)
-                        Text(
-                          '+ ${schedules.length - 2} ${_tr(context, 'جداول أخرى', 'more schedules', 'autres horaires')}',
-                          style: theme.textTheme.bodySmall,
+                            _StatusChip(status: info.status),
+                          ],
                         ),
-                    ],
-                    const SizedBox(height: 4),
-                    Text(
-                      _periodLabel(context),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                        if (medication.genericName != null && medication.genericName!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            medication.genericName!.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                        const SizedBox(height: 5),
+                        Wrap(
+                          spacing: 5,
+                          runSpacing: 4,
+                          children: [
+                            if (medication.strength != null && medication.strength!.trim().isNotEmpty)
+                              _chip(medication.strength!.trim()),
+                            if (medication.dosageForm != null && medication.dosageForm!.trim().isNotEmpty)
+                              _chip(l.dosageFormLabel(medication.dosageForm!.trim())),
+                            if (item.schedules.isNotEmpty)
+                              _chip(_scheduleLabel(item.schedules.length)),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    MedicationStockBadge(
-                      medication: medication,
-                      schedules: schedules,
-                      onAdd: onAddStock,
-                      onDetails: onStockDetails,
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuButton<String>(
-                tooltip: l.medicines,
-                onSelected: (value) {
-                  switch (value) {
-                    case 'change_image':
-                      onChangeImage();
-                      break;
-                    case 'remove_image':
-                      onRemoveImage?.call();
-                      break;
-                    case 'deactivate':
-                      onDeactivate();
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem<String>(
-                    value: 'change_image',
-                    child: Text(l.changeMedicineImage),
                   ),
-                  if (onRemoveImage != null)
-                    PopupMenuItem<String>(
-                      value: 'remove_image',
-                      child: Text(l.deleteMedicineImage),
-                    ),
-                  PopupMenuItem<String>(
-                    value: 'deactivate',
-                    child: Text(l.deactivateMedicine),
+                  PopupMenuButton<String>(
+                    tooltip: l.medicines,
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'edit':
+                          onEdit();
+                          break;
+                        case 'change_image':
+                          onChangeImage();
+                          break;
+                        case 'remove_image':
+                          onRemoveImage?.call();
+                          break;
+                        case 'deactivate':
+                          onDeactivate();
+                          break;
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'edit', child: Text('تعديل الدواء')),
+                      PopupMenuItem(value: 'change_image', child: Text(l.changeMedicineImage)),
+                      if (onRemoveImage != null)
+                        PopupMenuItem(value: 'remove_image', child: Text(l.deleteMedicineImage)),
+                      PopupMenuItem(value: 'deactivate', child: Text(l.deactivateMedicine)),
+                    ],
                   ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              _NextDoseRow(nextDose: info.nextDose, schedules: item.schedules),
+              const SizedBox(height: 8),
+              _StockSummary(
+                medication: medication,
+                daysRemaining: info.daysRemaining,
+                dailyConsumption: info.dailyConsumption,
+                onAdd: onAddStock,
+                onDetails: onStockDetails,
               ),
             ],
           ),
@@ -690,37 +818,7 @@ class _MedicationTile extends StatelessWidget {
     );
   }
 
-  String _scheduleCountLabel(AppLocalizations l, int count) {
-    if (l.locale.languageCode == 'en') {
-      return '$count schedule${count == 1 ? '' : 's'}';
-    }
-    if (l.locale.languageCode == 'fr') {
-      return '$count horaire${count == 1 ? '' : 's'}';
-    }
-    return '$count ${count == 1 ? 'جدول' : 'جداول'}';
-  }
-
-  String _periodLabel(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final start = DateTimeUtils.formatShortDate(medication.startDate);
-    final end = medication.endDate == null
-        ? '—'
-        : DateTimeUtils.formatShortDate(medication.endDate!);
-    if (l.locale.languageCode == 'en') return 'Treatment: $start → $end';
-    if (l.locale.languageCode == 'fr') return 'Traitement : $start → $end';
-    return 'العلاج: $start ← $end';
-  }
-
-  String _tr(BuildContext context, String ar, String en, String fr) {
-    switch (AppLocalizations.of(context).locale.languageCode) {
-      case 'en':
-        return en;
-      case 'fr':
-        return fr;
-      default:
-        return ar;
-    }
-  }
+  String _scheduleLabel(int count) => '$count ${count == 1 ? 'جدول' : 'جداول'}';
 
   Widget _chip(String text) {
     return Container(
@@ -729,9 +827,182 @@ class _MedicationTile extends StatelessWidget {
         color: AppColors.primary.withValues(alpha: .10),
         borderRadius: BorderRadius.circular(18),
       ),
-      child: Text(
-        text,
-        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+      child: Text(text, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+    );
+  }
+}
+
+class _NextDoseRow extends StatelessWidget {
+  final DateTime? nextDose;
+  final List<MedicationSchedule> schedules;
+
+  const _NextDoseRow({required this.nextDose, required this.schedules});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (schedules.any((s) => s.type == ScheduleType.prn) && nextDose == null) {
+      return Row(
+        children: [
+          const Icon(Icons.event_available_rounded, size: 19),
+          const SizedBox(width: 7),
+          Text('الجرعة التالية: عند الحاجة', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+        ],
+      );
+    }
+    if (nextDose == null) {
+      return Row(
+        children: [
+          const Icon(Icons.event_busy_rounded, size: 19),
+          const SizedBox(width: 7),
+          Text('لا توجد جرعة قادمة', style: theme.textTheme.bodyMedium),
+        ],
+      );
+    }
+
+    final now = DateTime.now();
+    final sameDay = DateTimeUtils.isSameDate(nextDose!, now);
+    final date = DateTimeUtils.formatShortDate(nextDose!);
+    final time = '${nextDose!.hour.toString().padLeft(2, '0')}:${nextDose!.minute.toString().padLeft(2, '0')}';
+    final label = sameDay ? 'اليوم $time' : '$date · $time';
+    return Row(
+      children: [
+        const Icon(Icons.schedule_rounded, size: 19),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            'الجرعة التالية: $label',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StockSummary extends StatelessWidget {
+  final Medication medication;
+  final double? daysRemaining;
+  final double dailyConsumption;
+  final VoidCallback onAdd;
+  final VoidCallback onDetails;
+
+  const _StockSummary({
+    required this.medication,
+    required this.daysRemaining,
+    required this.dailyConsumption,
+    required this.onAdd,
+    required this.onDetails,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!medication.stockEnabled) {
+      return MedicationStockBadge(
+        medication: medication,
+        schedules: const [],
+        onAdd: onAdd,
+        onDetails: onDetails,
+      );
+    }
+
+    final unit = _unit(medication.stockUnit);
+    final stock = _format(medication.stockQuantity);
+    final days = daysRemaining == null
+        ? 'غير محسوب'
+        : daysRemaining! <= 0
+            ? 'نفد'
+            : daysRemaining! < 1
+                ? '< يوم'
+                : '${daysRemaining!.floor()} يوم';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onDetails,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .55),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.inventory_2_outlined, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('المخزون: $stock $unit', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 2),
+                  Text(
+                    dailyConsumption > 0
+                        ? 'يكفي تقريبًا $days · استهلاك ${_format(dailyConsumption)}/يوم'
+                        : 'لا يمكن تقدير الاستهلاك اليومي',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'إضافة مخزون',
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_box_outlined),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _unit(String value) {
+    switch (value) {
+      case 'tablet':
+        return 'قرص';
+      case 'capsule':
+        return 'كبسولة';
+      case 'ml':
+        return 'مل';
+      case 'drop':
+        return 'قطرة';
+      case 'injection':
+        return 'حقنة';
+      default:
+        return 'وحدة';
+    }
+  }
+
+  String _format(double value) => value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(1);
+}
+
+class _StatusChip extends StatelessWidget {
+  final _MedicationStatus status;
+
+  const _StatusChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, icon) = switch (status) {
+      _MedicationStatus.active => ('نشط', Icons.check_circle_outline_rounded),
+      _MedicationStatus.lowStock => ('مخزون منخفض', Icons.warning_amber_rounded),
+      _MedicationStatus.outOfStock => ('نفد المخزون', Icons.error_outline_rounded),
+      _MedicationStatus.endingSoon => ('ينتهي قريبًا', Icons.event_busy_rounded),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14),
+          const SizedBox(width: 3),
+          Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
+        ],
       ),
     );
   }

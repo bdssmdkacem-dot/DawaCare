@@ -40,11 +40,10 @@ class MedicationStockBadge extends StatelessWidget {
     final effectiveThreshold = lowStockThreshold ?? threshold ?? medication.lowStockThreshold;
     final empty = StockIntelligence.isOutOfStock(medication);
     final low = !empty && quantity <= effectiveThreshold;
-    final daily = StockIntelligence.dailyConsumption(
+    final days = StockIntelligence.daysRemaining(
       medication: medication,
       schedules: schedules,
     );
-    final days = daily > 0 ? quantity / daily : null;
     final color = empty
         ? theme.colorScheme.error
         : low

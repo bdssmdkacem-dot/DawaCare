@@ -7,6 +7,7 @@ import '../../../core/network/connectivity_service.dart';
 import '../../../models/dose_instance.dart';
 import '../../../models/medication_schedule.dart';
 import '../../medications/data/medication_repository.dart';
+import '../../medications/data/stock_alert_service.dart';
 import '../domain/dose_engine.dart';
 
 /// Offline-first data access for dose instances.
@@ -16,9 +17,6 @@ class DoseRepository {
   final MedicationRepository _medicationRepo = MedicationRepository();
   final Uuid _uuid = const Uuid();
 
-  /// Generates (idempotently) dose rows for active medication schedules.
-  /// Safe to call repeatedly because the database enforces
-  /// `unique(schedule_id, scheduled_at)`.
   Future<void> ensureDosesGenerated(String patientId, {int daysAhead = 14}) async {
     if (!ConnectivityService.instance.isOnline) return;
 
@@ -58,12 +56,6 @@ class DoseRepository {
     }
   }
 
-  /// Marks unresolved doses as MISSED once their scheduled time has passed.
-  ///
-  /// Snoozed doses are deliberately excluded: their original scheduled_at
-  /// remains the prescription time, while the active snooze notification is
-  /// scheduled separately. They must stay actionable until that reminder is
-  /// handled.
   Future<void> reconcileMissedDoses(
     String patientId, {
     Duration gracePeriod = const Duration(minutes: 5),
@@ -141,6 +133,26 @@ class DoseRepository {
           'action': doseStatusToDb(newStatus),
           'source': source,
         });
+
+        // The stock trigger runs as part of the status update. Refresh the
+        // medication after that transaction and evaluate its alert state.
+        // Alert delivery is deliberately non-critical: a notification failure
+        // must never turn a successful dose action into an error.
+        try {
+          final medication = await _client
+              .from('medications')
+              .select()
+              .eq('id', dose.medicationId)
+              .maybeSingle();
+          if (medication != null) {
+            await StockAlertService.instance.checkMedication(
+              Medication.fromMap(medication),
+            );
+          }
+        } catch (_) {
+          // Stock alert failure must not affect dose status persistence.
+        }
+
         return updated;
       } catch (_) {
         // network blip after the connectivity check — queue the write

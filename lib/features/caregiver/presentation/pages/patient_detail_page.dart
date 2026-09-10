@@ -34,7 +34,6 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
   PatientPermissions get _permissions =>
       PatientPermissions.forRole(widget.link.role);
 
-  bool get _canManageDoses => _permissions.canManageDose;
   bool get _canUnlink => _permissions.canUnlink;
 
   Future<void> _loadPatientData(BuildContext providerContext) async {

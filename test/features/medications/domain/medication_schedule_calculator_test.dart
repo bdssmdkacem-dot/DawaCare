@@ -32,6 +32,7 @@ Medication medication({
   bool stockEnabled = true,
   double stock = 30,
   DateTime? end,
+  String stockUnit = 'tablet',
 }) {
   return Medication(
     id: 'med-1',
@@ -44,12 +45,42 @@ Medication medication({
     createdAt: DateTime(2026, 9, 10),
     stockEnabled: stockEnabled,
     stockQuantity: stock,
-    stockUnit: 'tablet',
+    stockUnit: stockUnit,
   );
 }
 
 void main() {
   final now = DateTime(2026, 9, 10, 7, 30);
+
+  group('parseDose', () {
+    test('supports decimal point', () {
+      expect(
+        MedicationScheduleCalculator.parseDose('2.5 ml', stockUnit: 'ml'),
+        2.5,
+      );
+    });
+
+    test('supports decimal comma', () {
+      expect(
+        MedicationScheduleCalculator.parseDose('2,5 ml', stockUnit: 'ml'),
+        2.5,
+      );
+    });
+
+    test('uses inventory quantity instead of medication strength', () {
+      expect(
+        MedicationScheduleCalculator.parseDose(
+          '500 mg, 2 tablets',
+          stockUnit: 'tablet',
+        ),
+        2,
+      );
+    });
+
+    test('keeps plain numeric doses compatible', () {
+      expect(MedicationScheduleCalculator.parseDose('1'), 1);
+    });
+  });
 
   group('nextDose', () {
     test('uses DoseEngine rules for daily schedules', () {
@@ -91,6 +122,16 @@ void main() {
       );
     });
 
+    test('uses inventory quantity instead of medication strength', () {
+      expect(
+        MedicationScheduleCalculator.dailyConsumption(
+          [schedule(dose: '500 mg, 2 tablets')],
+          stockUnit: 'tablet',
+        ),
+        2,
+      );
+    });
+
     test('averages specific days over seven days', () {
       expect(
         MedicationScheduleCalculator.dailyConsumption([
@@ -125,6 +166,15 @@ void main() {
       final days = MedicationScheduleCalculator.daysRemaining(
         medication(stock: 30),
         [schedule(dose: '3')],
+        now,
+      );
+      expect(days, 10);
+    });
+
+    test('uses the medication stock unit when calculating coverage', () {
+      final days = MedicationScheduleCalculator.daysRemaining(
+        medication(stock: 20, stockUnit: 'tablet'),
+        [schedule(dose: '500 mg, 2 tablets')],
         now,
       );
       expect(days, 10);

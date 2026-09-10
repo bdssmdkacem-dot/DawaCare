@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../core/database/local_database.dart';
 import '../../features/doses/data/dose_repository.dart';
 import '../../models/dose_instance.dart';
 import '../../models/reminder_policy.dart';
@@ -19,6 +20,7 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   final SupabaseClient _client = Supabase.instance.client;
+  final LocalDatabase _local = LocalDatabase.instance;
   final StreamController<String> _voiceMessageController = StreamController<String>.broadcast();
   final StreamController<String> _notificationController = StreamController<String>.broadcast();
   bool _initialized = false;
@@ -207,11 +209,36 @@ class NotificationService {
     }
   }
 
+  Future<DoseInstance?> _resolveDose(String doseId) async {
+    try {
+      final rows = await _client
+          .from('dose_instances')
+          .select('*, medications(name)')
+          .eq('id', doseId)
+          .maybeSingle();
+      if (rows != null) {
+        final dose = DoseInstance.fromMap(rows);
+        await _local.upsertDose(dose.toLocalRow());
+        return dose;
+      }
+    } catch (e) {
+      debugPrint('DawaCare remote dose lookup failed; using local cache: $e');
+    }
+
+    try {
+      final localRow = await _local.doseById(doseId);
+      if (localRow == null) return null;
+      return DoseInstance.fromLocalRow(localRow);
+    } catch (e) {
+      debugPrint('DawaCare local dose lookup failed: $e');
+      return null;
+    }
+  }
+
   Future<void> _handleDoseAction(String doseId, DoseStatus status) async {
     try {
-      final rows = await _client.from('dose_instances').select('*, medications(name)').eq('id', doseId).maybeSingle();
-      if (rows == null) return;
-      final dose = DoseInstance.fromMap(rows);
+      final dose = await _resolveDose(doseId);
+      if (dose == null) return;
       await DoseRepository().updateStatus(dose, status, source: 'NOTIFICATION');
       await cancelDoseReminders(doseId);
     } catch (e) {
@@ -241,9 +268,8 @@ class NotificationService {
 
   Future<void> _handleSnooze(String doseId) async {
     try {
-      final rows = await _client.from('dose_instances').select('*, medications(name)').eq('id', doseId).maybeSingle();
-      if (rows == null) return;
-      final dose = DoseInstance.fromMap(rows);
+      final dose = await _resolveDose(doseId);
+      if (dose == null) return;
       await snoozeDose(dose, source: 'NOTIFICATION');
     } catch (e) {
       debugPrint('DawaCare snooze action failed: $e');

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:dawacare/features/medications/presentation/widgets/medication_stock_badge.dart';
 import 'package:dawacare/models/medication.dart';
 import 'package:dawacare/models/medication_schedule.dart';
-import 'package:dawacare/features/medications/presentation/widgets/medication_stock_badge.dart';
 
-Medication _med({double stock = 24, double threshold = 5}) => Medication(
+Medication _med({
+  double stock = 24,
+  double threshold = 5,
+  String stockUnit = 'capsule',
+}) => Medication(
       id: 'm1',
       patientId: 'p1',
       name: 'دواء',
@@ -15,7 +19,7 @@ Medication _med({double stock = 24, double threshold = 5}) => Medication(
       createdAt: DateTime(2026, 1, 1),
       stockEnabled: true,
       stockQuantity: stock,
-      stockUnit: 'capsule',
+      stockUnit: stockUnit,
       packageQuantity: 24,
       lowStockThreshold: threshold,
     );
@@ -44,6 +48,45 @@ void main() {
     expect(find.text('متبقي 24 كبسولة'), findsOneWidget);
     expect(find.textContaining('يكفي تقريبًا لـ 12 أيام'), findsOneWidget);
     expect(find.textContaining('عبوة: 24'), findsOneWidget);
+  });
+
+  testWidgets('shows correct days for a decimal tablet dose', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: MedicationStockBadge(
+          medication: _med(stock: 15, stockUnit: 'tablet'),
+          schedules: [_daily('2.5 tablets')],
+        ),
+      ),
+    ));
+
+    expect(find.textContaining('يكفي تقريبًا لـ 6 أيام'), findsOneWidget);
+  });
+
+  testWidgets('uses configured unit when dose contains strength and quantity', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: MedicationStockBadge(
+          medication: _med(stock: 15, stockUnit: 'tablet'),
+          schedules: [_daily('500 mg, 2 tablets')],
+        ),
+      ),
+    ));
+
+    expect(find.textContaining('يكفي تقريبًا لـ 7.5 أيام'), findsOneWidget);
+  });
+
+  testWidgets('shows correct days for a decimal ml dose', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: MedicationStockBadge(
+          medication: _med(stock: 30, stockUnit: 'ml'),
+          schedules: [_daily('2.5 ml')],
+        ),
+      ),
+    ));
+
+    expect(find.textContaining('يكفي تقريبًا لـ 12 أيام'), findsOneWidget);
   });
 
   testWidgets('shows low stock state', (tester) async {

@@ -99,6 +99,38 @@ class FamilyMemberCard extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w700),
         )),
       ]),
+      if (summary.nextDoseAt != null) ...[
+        const SizedBox(height: 8),
+        Row(children: [
+          const Icon(Icons.schedule_rounded, size: 17, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Expanded(child: Text(
+            _tr(context, 'الجرعة القادمة', 'Next dose', 'Prochaine dose'),
+            style: Theme.of(context).textTheme.bodySmall,
+          )),
+          Text(
+            TimeOfDay.fromDateTime(summary.nextDoseAt!.toLocal()).format(context),
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ]),
+      ],
+      if (summary.lowStockMedicationCount > 0 || summary.outOfStockMedicationCount > 0) ...[
+        const SizedBox(height: 8),
+        Row(children: [
+          Icon(
+            summary.outOfStockMedicationCount > 0 ? Icons.inventory_rounded : Icons.inventory_2_outlined,
+            size: 17,
+            color: summary.outOfStockMedicationCount > 0 ? AppColors.danger : Colors.orange,
+          ),
+          const SizedBox(width: 6),
+          Expanded(child: Text(
+            summary.outOfStockMedicationCount > 0
+                ? _tr(context, '${summary.outOfStockMedicationCount} أدوية نفد مخزونها', '${summary.outOfStockMedicationCount} medicines out of stock', '${summary.outOfStockMedicationCount} médicaments épuisés')
+                : _tr(context, '${summary.lowStockMedicationCount} أدوية منخفضة المخزون', '${summary.lowStockMedicationCount} low-stock medicines', '${summary.lowStockMedicationCount} médicaments bientôt épuisés'),
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          )),
+        ]),
+      ],
     ]);
   }
 

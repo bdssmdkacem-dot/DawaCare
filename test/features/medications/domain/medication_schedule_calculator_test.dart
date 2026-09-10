@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:dawa_care/features/medications/domain/medication_schedule_calculator.dart';
-import 'package:dawa_care/models/medication.dart';
-import 'package:dawa_care/models/medication_schedule.dart';
+import 'package:dawacare/features/medications/domain/medication_schedule_calculator.dart';
+import 'package:dawacare/models/medication.dart';
+import 'package:dawacare/models/medication_schedule.dart';
 
 MedicationSchedule schedule({
   ScheduleType type = ScheduleType.daily,
@@ -53,9 +53,7 @@ void main() {
 
   group('nextDose', () {
     test('uses DoseEngine rules for daily schedules', () {
-      final next = MedicationScheduleCalculator.nextDose([
-        schedule(),
-      ], now);
+      final next = MedicationScheduleCalculator.nextDose([schedule()], now);
       expect(next, DateTime(2026, 9, 10, 8));
     });
 
@@ -88,9 +86,7 @@ void main() {
 
     test('supports decimal doses', () {
       expect(
-        MedicationScheduleCalculator.dailyConsumption([
-          schedule(dose: '2.5 ml'),
-        ]),
+        MedicationScheduleCalculator.dailyConsumption([schedule(dose: '2.5 ml')]),
         2.5,
       );
     });
@@ -99,7 +95,7 @@ void main() {
       expect(
         MedicationScheduleCalculator.dailyConsumption([
           schedule(type: ScheduleType.specificDays, days: [1, 3, 5], dose: '2'),
-        ],),
+        ]),
         closeTo(6 / 7, 0.000001),
       );
     });

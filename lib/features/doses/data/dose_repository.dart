@@ -60,8 +60,10 @@ class DoseRepository {
 
   /// Marks unresolved doses as MISSED once their scheduled time has passed.
   ///
-  /// A five-minute grace period prevents a dose from becoming missed while
-  /// the notification is still actionable. Resolved doses are never changed.
+  /// Snoozed doses are deliberately excluded: their original scheduled_at
+  /// remains the prescription time, while the active snooze notification is
+  /// scheduled separately. They must stay actionable until that reminder is
+  /// handled.
   Future<void> reconcileMissedDoses(
     String patientId, {
     Duration gracePeriod = const Duration(minutes: 5),
@@ -76,7 +78,7 @@ class DoseRepository {
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('patient_id', patientId)
-        .inFilter('status', const ['PENDING', 'REMINDER_SENT', 'SNOOZED'])
+        .inFilter('status', const ['PENDING', 'REMINDER_SENT'])
         .lt('scheduled_at', cutoff);
   }
 

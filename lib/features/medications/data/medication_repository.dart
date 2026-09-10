@@ -18,7 +18,12 @@ class MedicationRepository {
   }
 
   Future<List<MedicationSchedule>> fetchSchedules(String medicationId) async {
-    final rows = await _client.from('medication_schedules').select().eq('medication_id', medicationId);
+    final today = DateTime.now().toIso8601String().split('T').first;
+    final rows = await _client
+        .from('medication_schedules')
+        .select()
+        .eq('medication_id', medicationId)
+        .or('end_date.is.null,end_date.gte.$today');
     return rows.map((r) => MedicationSchedule.fromMap(r)).toList();
   }
 
@@ -36,7 +41,6 @@ class MedicationRepository {
     final row = await _client.from('medications').insert(medication.toInsertMap()).select().single();
     var created = Medication.fromMap(row);
     String? uploadedPath;
-
     try {
       if (imageBytes != null) {
         uploadedPath = await _imageService.upload(patientId: created.patientId, medicationId: created.id, bytes: imageBytes);
@@ -65,6 +69,11 @@ class MedicationRepository {
       rethrow;
     }
     return created;
+  }
+
+  Future<Medication> updateMedication(Medication medication) async {
+    final row = await _client.from('medications').update(medication.toInsertMap()).eq('id', medication.id).select().single();
+    return Medication.fromMap(row);
   }
 
   Future<double> addStock({required String medicationId, required String patientId, required double quantity, String type = 'ADD', String? note}) async {
@@ -118,6 +127,30 @@ class MedicationRepository {
     final data = schedule.toInsertMap(schedule.medicationId)..remove('medication_id');
     final row = await _client.from('medication_schedules').update(data).eq('id', schedule.id).select().single();
     return MedicationSchedule.fromMap(row);
+  }
+
+  Future<void> retireSchedule(String scheduleId, DateTime endDate) async {
+    await _client.from('medication_schedules').update({
+      'end_date': endDate.toIso8601String().split('T').first,
+    }).eq('id', scheduleId);
+  }
+
+  /// Rebuilds the future schedule while preserving old schedule rows and dose history.
+  /// Existing schedules are retired yesterday; new schedules receive fresh IDs.
+  Future<List<MedicationSchedule>> replaceSchedules({
+    required String medicationId,
+    required List<MedicationSchedule> schedules,
+  }) async {
+    final existing = await _client.from('medication_schedules').select('id').eq('medication_id', medicationId);
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    for (final row in existing) {
+      await retireSchedule(row['id'] as String, yesterday);
+    }
+    final created = <MedicationSchedule>[];
+    for (final schedule in schedules) {
+      created.add(await createSchedule(medicationId, schedule));
+    }
+    return created;
   }
 
   /// Removes only future, unresolved dose occurrences for a schedule.

@@ -51,7 +51,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   final _name = TextEditingController();
   final _strength = TextEditingController();
   final _dose = TextEditingController(text: '1');
-  final _times = TextEditingController(text: '3');
+  final _times = TextEditingController(text: '2');
   final _hours = TextEditingController(text: '8');
   final _stock = TextEditingController(text: '0');
   final _pack = TextEditingController();
@@ -71,8 +71,6 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   final Set<int> _days = <int>{};
   DateTime _start = DateTime.now();
   DateTime? _end;
-  int _maxPrn = 4;
-  int _minPrnHours = 6;
 
   @override
   void dispose() {
@@ -107,6 +105,43 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         'unit': 'وحدة',
       }[unit] ?? 'وحدة';
 
+  String _formHint() {
+    switch (_form) {
+      case 'قرص':
+      case 'كبسولة':
+        return 'مثال: 1 ${_unitLabel(_unit)} في كل جرعة';
+      case 'شراب':
+        return 'مثال: 5 مل في كل جرعة';
+      case 'قطرة':
+        return 'مثال: 2 قطرة في كل جرعة';
+      case 'حقنة':
+        return 'مثال: 1 حقنة في كل جرعة';
+      case 'كريم/مرهم':
+        return 'مثال: كمية مناسبة في كل استعمال';
+      case 'بخاخ':
+        return 'مثال: 2 بخة في كل استعمال';
+      default:
+        return 'أدخل الكمية في كل جرعة';
+    }
+  }
+
+  String _frequencyHint() {
+    switch (_frequency) {
+      case _Frequency.daily:
+        return 'جرعة واحدة يوميًا في الوقت الذي تختاره.';
+      case _Frequency.timesPerDay:
+        return 'سيتم توزيع الجرعات تلقائيًا على اليوم بدءًا من الوقت المحدد.';
+      case _Frequency.everyHours:
+        return 'الفاصل يجب أن يقسم 24 ساعة، مثل 4 أو 6 أو 8 أو 12.';
+      case _Frequency.specificDays:
+        return 'اختر الأيام التي يجب أن تظهر فيها الجرعة.';
+      case _Frequency.once:
+        return 'هذه الجرعة تُنشأ مرة واحدة فقط.';
+      case _Frequency.prn:
+        return 'للأدوية عند الحاجة. سجّل الاستعمال يدويًا عند أخذ الجرعة.';
+    }
+  }
+
   Future<void> _pickImage() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -128,32 +163,22 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       ),
     );
 
-    if (source == null) {
-      return;
-    }
-
+    if (source == null) return;
     final file = await _picker.pickImage(
       source: source,
       maxWidth: 1200,
       maxHeight: 1200,
       imageQuality: 82,
     );
-    if (file != null) {
-      final bytes = await file.readAsBytes();
-      if (mounted) {
-        setState(() => _image = bytes);
-      }
-    }
+    if (file == null) return;
+
+    final bytes = await file.readAsBytes();
+    if (mounted) setState(() => _image = bytes);
   }
 
   Future<void> _pickTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: _time,
-    );
-    if (time != null && mounted) {
-      setState(() => _time = time);
-    }
+    final time = await showTimePicker(context: context, initialTime: _time);
+    if (time != null && mounted) setState(() => _time = time);
   }
 
   Future<void> _pickDate(bool start) async {
@@ -163,38 +188,35 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 1095)),
     );
-    if (date != null && mounted) {
-      setState(() {
-        if (start) {
-          _start = date;
-        } else {
-          _end = date;
-        }
-      });
-    }
+    if (date == null || !mounted) return;
+
+    setState(() {
+      if (start) {
+        _start = date;
+        if (_end != null && _end!.isBefore(date)) _end = null;
+      } else {
+        _end = date;
+      }
+    });
   }
 
   List<TimeOfDay> _buildTimes() {
     if (_frequency == _Frequency.timesPerDay) {
-      final count = int.tryParse(_times.text) ?? 1;
-      if (count <= 1) {
-        return [_time];
-      }
-      final step = 24 ~/ count;
+      final count = int.tryParse(_times.text) ?? 0;
+      if (count < 1 || count > 6) return const [];
+      final step = 24 / count;
       return List.generate(
         count,
         (index) => TimeOfDay(
-          hour: (_time.hour + index * step) % 24,
+          hour: (_time.hour + (index * step).round()) % 24,
           minute: _time.minute,
         ),
       );
     }
 
     if (_frequency == _Frequency.everyHours) {
-      final hours = int.tryParse(_hours.text) ?? 8;
-      if (hours <= 0 || 24 % hours != 0) {
-        return [_time];
-      }
+      final hours = int.tryParse(_hours.text) ?? 0;
+      if (hours <= 0 || hours > 24 || 24 % hours != 0) return const [];
       return List.generate(
         24 ~/ hours,
         (index) => TimeOfDay(
@@ -207,10 +229,20 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     return [_time];
   }
 
+  String? _validatePositive(String? value, String label) {
+    final number = _number(value ?? '');
+    if (number == null || number <= 0) return '$label يجب أن يكون أكبر من صفر';
+    return null;
+  }
+
   Future<void> _submit() async {
     final localizations = AppLocalizations.of(context);
+    if (!_formKey.currentState!.validate()) return;
 
-    if (!_formKey.currentState!.validate()) {
+    if (_form == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اختر شكل الدواء أولًا.')),
+      );
       return;
     }
 
@@ -221,11 +253,38 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       return;
     }
 
-    final auth = context.read<AuthProvider>();
-    final patientId = auth.profile?.id;
-    if (patientId == null) {
+    if (_frequency == _Frequency.timesPerDay) {
+      final count = int.tryParse(_times.text) ?? 0;
+      if (count < 1 || count > 6) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('عدد المرات يجب أن يكون بين 1 و6.')),
+        );
+        return;
+      }
+    }
+
+    if (_frequency == _Frequency.everyHours) {
+      final hours = int.tryParse(_hours.text) ?? 0;
+      if (hours <= 0 || hours > 24 || 24 % hours != 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('الفاصل يجب أن يقسم 24، مثل 4 أو 6 أو 8 أو 12.'),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (_end != null && _end!.isBefore(_start)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تاريخ الانتهاء يجب أن يكون بعد البداية.')),
+      );
       return;
     }
+
+    final auth = context.read<AuthProvider>();
+    final patientId = auth.profile?.id;
+    if (patientId == null) return;
 
     final dose = _number(_dose.text);
     if (dose == null || dose <= 0) {
@@ -246,18 +305,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       return;
     }
 
-    final hours = int.tryParse(_hours.text) ?? 0;
-    if (_frequency == _Frequency.everyHours &&
-        (hours <= 0 || 24 % hours != 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'الفاصل بالساعات يجب أن يقسم 24، مثل 4 أو 6 أو 8 أو 12.',
-          ),
-        ),
-      );
-      return;
-    }
+    final times = _buildTimes();
+    if (times.isEmpty) return;
 
     setState(() => _submitting = true);
 
@@ -285,7 +334,6 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       lowStockThreshold: _stockEnabled ? threshold : 5,
     );
 
-    final times = _buildTimes();
     final type = _frequency == _Frequency.prn
         ? ScheduleType.prn
         : _frequency == _Frequency.once
@@ -317,21 +365,18 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         );
 
     if (ok && times.length > 1) {
-      final extras = times
-          .skip(1)
-          .map(
-            (time) => MedicationSchedule(
-              id: uuid.v4(),
-              medicationId: medicationId,
-              type: ScheduleType.daily,
-              time: _timeValue(time),
-              doseAmount: _dose.text.trim(),
-              startDate: _start,
-              endDate: _end,
-              timezone: timezone,
-            ),
-          )
-          .toList();
+      final extras = times.skip(1).map((time) {
+        return MedicationSchedule(
+          id: uuid.v4(),
+          medicationId: medicationId,
+          type: ScheduleType.daily,
+          time: _timeValue(time),
+          doseAmount: _dose.text.trim(),
+          startDate: _start,
+          endDate: _end,
+          timezone: timezone,
+        );
+      }).toList();
 
       try {
         await _scheduleService.createSchedules(
@@ -340,16 +385,14 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
           schedules: extras,
         );
       } catch (_) {
-        // The primary medication has already been created. The next sync
-        // will reconcile schedules/reminders when the user retries.
+        // The medication itself was created. A later provider refresh can
+        // reconcile schedules without blocking the save result.
       }
     }
 
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     setState(() => _submitting = false);
+
     if (ok) {
       Navigator.pop(context, true);
     } else {
@@ -378,63 +421,49 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
             children: [
               _imageCard(),
               const SizedBox(height: 22),
-              _header('1', 'ما شكل الدواء؟'),
+              _header('1', 'بيانات الدواء'),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _forms
-                    .map(
-                      (form) => ChoiceChip(
-                        label: Text(form),
-                        selected: _form == form,
-                        onSelected: (_) {
-                          setState(() {
-                            _form = form;
-                            _unit = _units[form]!;
-                          });
-                        },
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 18),
+              _formSelector(),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _name,
                 decoration: InputDecoration(
                   labelText: localizations.medicineName,
                   prefixIcon: const Icon(Icons.medication_rounded),
                 ),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? localizations.enterMedicineName
-                        : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? localizations.enterMedicineName
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _strength,
                 decoration: InputDecoration(
                   labelText: localizations.strength,
+                  hintText: 'مثال: 500 mg',
                   prefixIcon: const Icon(Icons.science_rounded),
                 ),
               ),
               const SizedBox(height: 22),
-              _header('2', 'كيف وصف الطبيب الجرعة؟'),
+              _header('2', 'الجرعة والتوقيت'),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _freq('مرة يوميًا', _Frequency.daily),
-                  _freq('مرات في اليوم', _Frequency.timesPerDay),
-                  _freq('كل X ساعات', _Frequency.everyHours),
-                  _freq('أيام محددة', _Frequency.specificDays),
-                  _freq('مرة واحدة', _Frequency.once),
-                  _freq('عند الحاجة PRN', _Frequency.prn),
-                ],
+              _frequencySelector(),
+              const SizedBox(height: 10),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    _frequencyHint(),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: TextFormField(
@@ -443,13 +472,13 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'الجرعة',
+                        labelText: 'كمية الجرعة',
                         prefixIcon: const Icon(Icons.exposure_plus_1_rounded),
                         suffixText: _unitLabel(_unit),
+                        helperText: _formHint(),
                       ),
-                      validator: (value) => _number(value ?? '') == null
-                          ? 'أدخل جرعة صحيحة'
-                          : null,
+                      validator: (value) =>
+                          _validatePositive(value, 'الجرعة'),
                     ),
                   ),
                   if (_frequency == _Frequency.timesPerDay) ...[
@@ -459,8 +488,15 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         controller: _times,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          labelText: 'عدد المرات',
+                          labelText: 'مرات/اليوم',
+                          suffixText: 'مرات',
                         ),
+                        validator: (value) {
+                          final count = int.tryParse(value ?? '');
+                          return count == null || count < 1 || count > 6
+                              ? '1 إلى 6'
+                              : null;
+                        },
                       ),
                     ),
                   ],
@@ -471,8 +507,18 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         controller: _hours,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          labelText: 'كل كم ساعة؟',
+                          labelText: 'الفاصل',
+                          suffixText: 'ساعات',
                         ),
+                        validator: (value) {
+                          final hours = int.tryParse(value ?? '');
+                          return hours == null ||
+                                  hours <= 0 ||
+                                  hours > 24 ||
+                                  24 % hours != 0
+                              ? '4/6/8/12/24'
+                              : null;
+                        },
                       ),
                     ),
                   ],
@@ -483,10 +529,11 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.access_time_rounded),
-                    title: const Text('وقت البداية'),
+                    title: const Text('أول وقت للجرعة'),
+                    subtitle: const Text('سيتم إنشاء بقية الأوقات تلقائيًا حسب النمط.'),
                     trailing: Text(
                       _time.format(context),
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
                     onTap: _pickTime,
                   ),
@@ -496,6 +543,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 6,
+                  runSpacing: 6,
                   children: List.generate(7, (index) {
                     final day = index + 1;
                     return FilterChip(
@@ -515,62 +563,19 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 ),
               ],
               if (_frequency == _Frequency.prn) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            initialValue: _maxPrn,
-                            decoration: const InputDecoration(
-                              labelText: 'الحد الأقصى / 24 ساعة',
-                            ),
-                            items: [2, 3, 4, 6, 8]
-                                .map(
-                                  (value) => DropdownMenuItem(
-                                    value: value,
-                                    child: Text('$value جرعات'),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _maxPrn = value);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            initialValue: _minPrnHours,
-                            decoration: const InputDecoration(
-                              labelText: 'أقل فترة',
-                            ),
-                            items: [2, 4, 6, 8, 12]
-                                .map(
-                                  (value) => DropdownMenuItem(
-                                    value: value,
-                                    child: Text('$value ساعات'),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _minPrnHours = value);
-                              }
-                            },
-                          ),
-                        ),
-                      ],
+                  child: ListTile(
+                    leading: const Icon(Icons.health_and_safety_rounded),
+                    title: const Text('دواء عند الحاجة'),
+                    subtitle: const Text(
+                      'لن يتم إنشاء أوقات ثابتة. استخدم تسجيل الجرعة عند استعمال الدواء.',
                     ),
                   ),
                 ),
               ],
               const SizedBox(height: 22),
-              _header('3', 'المخزون المتوقع'),
+              _header('3', 'المخزون'),
               const SizedBox(height: 8),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
@@ -578,8 +583,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   'تتبع المخزون',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
-                subtitle: const Text(
-                  'سيحسب التطبيق الاستهلاك والأيام المتبقية تلقائيًا.',
+                subtitle: Text(
+                  'الوحدة الحالية: ${_unitLabel(_unit)} — سيُستخدم معدل الجرعة لعرض الأيام المتبقية.',
                 ),
                 value: _stockEnabled,
                 onChanged: (value) => setState(() => _stockEnabled = value),
@@ -597,6 +602,12 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                           labelText: 'الكمية الحالية',
                           suffixText: _unitLabel(_unit),
                         ),
+                        validator: (value) {
+                          final number = _number(value ?? '');
+                          return number == null || number < 0
+                              ? 'قيمة صحيحة'
+                              : null;
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -606,9 +617,17 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'محتوى العبوة',
+                          suffixText: _unitLabel(_unit),
                         ),
+                        validator: (value) {
+                          if ((value ?? '').trim().isEmpty) return null;
+                          final number = _number(value!);
+                          return number == null || number <= 0
+                              ? 'قيمة صحيحة'
+                              : null;
+                        },
                       ),
                     ),
                   ],
@@ -619,13 +638,20 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'حد المخزون المنخفض',
+                    suffixText: _unitLabel(_unit),
                   ),
+                  validator: (value) {
+                    final number = _number(value ?? '');
+                    return number == null || number < 0
+                        ? 'قيمة صحيحة'
+                        : null;
+                  },
                 ),
               ],
               const SizedBox(height: 22),
-              _header('4', 'مدة العلاج'),
+              _header('4', 'مدة العلاج والتعليمات'),
               const SizedBox(height: 8),
               _dateTile(
                 'تاريخ البدء',
@@ -634,15 +660,16 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
               ),
               _dateTile(
                 'تاريخ الانتهاء',
-                _end == null ? '—' : DateTimeUtils.formatShortDate(_end!),
+                _end == null ? 'بدون تاريخ انتهاء' : DateTimeUtils.formatShortDate(_end!),
                 () => _pickDate(false),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _instructions,
-                maxLines: 2,
+                maxLines: 3,
                 decoration: InputDecoration(
                   labelText: localizations.instructionsOptional,
+                  hintText: 'مثال: بعد الأكل، مع كوب ماء…',
                   prefixIcon: const Icon(Icons.notes_rounded),
                 ),
               ),
@@ -677,6 +704,65 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
             text,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
+        ],
+      );
+
+  Widget _formSelector() => Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _forms.map((form) {
+          return ChoiceChip(
+            avatar: Icon(_formIcon(form), size: 18),
+            label: Text(form),
+            selected: _form == form,
+            onSelected: (_) {
+              setState(() {
+                _form = form;
+                _unit = _units[form]!;
+                if (form == 'قرص' || form == 'كبسولة') {
+                  _dose.text = '1';
+                } else if (form == 'شراب') {
+                  _dose.text = '5';
+                } else if (form == 'قطرة') {
+                  _dose.text = '2';
+                }
+              });
+            },
+          );
+        }).toList(),
+      );
+
+  IconData _formIcon(String form) {
+    switch (form) {
+      case 'قرص':
+        return Icons.circle_outlined;
+      case 'كبسولة':
+        return Icons.medication_rounded;
+      case 'شراب':
+        return Icons.local_drink_rounded;
+      case 'قطرة':
+        return Icons.water_drop_rounded;
+      case 'حقنة':
+        return Icons.vaccines_rounded;
+      case 'كريم/مرهم':
+        return Icons.clean_hands_rounded;
+      case 'بخاخ':
+        return Icons.air_rounded;
+      default:
+        return Icons.medical_services_rounded;
+    }
+  }
+
+  Widget _frequencySelector() => Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _freq('مرة يوميًا', _Frequency.daily),
+          _freq('مرات في اليوم', _Frequency.timesPerDay),
+          _freq('كل X ساعات', _Frequency.everyHours),
+          _freq('أيام محددة', _Frequency.specificDays),
+          _freq('مرة واحدة', _Frequency.once),
+          _freq('عند الحاجة', _Frequency.prn),
         ],
       );
 

@@ -3,7 +3,7 @@ import 'package:dawacare/features/medications/domain/stock_intelligence.dart';
 import 'package:dawacare/models/medication.dart';
 import 'package:dawacare/models/medication_schedule.dart';
 
-Medication medication({double stock = 30, double threshold = 5}) => Medication(
+Medication medication({double stock = 30, double threshold = 5, bool stockEnabled = true}) => Medication(
       id: 'med-1',
       patientId: 'patient-1',
       name: 'Test',
@@ -11,7 +11,7 @@ Medication medication({double stock = 30, double threshold = 5}) => Medication(
       active: true,
       createdBy: 'patient-1',
       createdAt: DateTime(2026, 1, 1),
-      stockEnabled: true,
+      stockEnabled: stockEnabled,
       stockQuantity: stock,
       stockUnit: 'tablet',
       lowStockThreshold: threshold,
@@ -112,7 +112,7 @@ void main() {
   });
 
   test('disabled stock never reports low or out of stock', () {
-    final med = medication(stock: 0).copyWith(stockEnabled: false);
+    final med = medication(stock: 0, stockEnabled: false);
     expect(StockIntelligence.isLowStock(med), isFalse);
     expect(StockIntelligence.isOutOfStock(med), isFalse);
     expect(

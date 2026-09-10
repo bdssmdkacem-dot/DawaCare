@@ -31,6 +31,8 @@ class NotificationService {
   static const String _actionTaken = 'DOSE_TAKEN';
   static const String _actionSnooze = 'DOSE_SNOOZE';
   static const int _beforeDoseMinutes = 5;
+  static const int _snoozeNotificationIndex = 99;
+  static const Duration _snoozeDuration = Duration(minutes: 10);
 
   Stream<String> get voiceMessageOpened => _voiceMessageController.stream;
   Stream<String> get notificationOpened => _notificationController.stream;
@@ -217,37 +219,68 @@ class NotificationService {
     }
   }
 
+  /// Marks a dose as snoozed and schedules exactly one follow-up notification.
+  /// The prescription scheduledAt remains unchanged.
+  Future<DoseInstance?> snoozeDose(
+    DoseInstance dose, {
+    String source = 'PATIENT',
+  }) async {
+    try {
+      final updated = await DoseRepository().updateStatus(
+        dose,
+        DoseStatus.snoozed,
+        source: source,
+      );
+      await _scheduleSnoozeNotification(updated);
+      return updated;
+    } catch (e) {
+      debugPrint('DawaCare snooze scheduling failed: $e');
+      return null;
+    }
+  }
+
   Future<void> _handleSnooze(String doseId) async {
     try {
       final rows = await _client.from('dose_instances').select('*, medications(name)').eq('id', doseId).maybeSingle();
       if (rows == null) return;
       final dose = DoseInstance.fromMap(rows);
-      await DoseRepository().updateStatus(dose, DoseStatus.snoozed, source: 'NOTIFICATION');
-      await cancelDoseReminders(doseId);
-      final snoozeTime = tz.TZDateTime.now(tz.local).add(const Duration(minutes: 10));
-      final imagePath = await _prepareMedicationImage(dose);
-      final androidDetails = AndroidNotificationDetails(
-        _channelId,
-        'تذكير الجرعات',
-        channelDescription: 'إشعارات تذكير بمواعيد الأدوية',
-        importance: Importance.max,
-        priority: Priority.high,
-        largeIcon: imagePath == null ? null : FilePathAndroidBitmap(imagePath),
-        styleInformation: imagePath == null ? null : BigPictureStyleInformation(FilePathAndroidBitmap(imagePath), hideExpandedLargeIcon: false, contentTitle: dose.medicationName, summaryText: dose.doseAmount),
-        actions: const [
-          AndroidNotificationAction(_actionTaken, 'تم أخذ الدواء', showsUserInterface: false, cancelNotification: true),
-          AndroidNotificationAction(_actionSnooze, 'تأجيل 10 دقائق', showsUserInterface: false, cancelNotification: true),
-        ],
-      );
-      await _schedule(_notificationId(dose.id, 99), 'تذكير: حان وقت الدواء 💊', '${dose.medicationName} — ${dose.doseAmount}', snoozeTime, NotificationDetails(android: androidDetails), payload: dose.id);
+      await snoozeDose(dose, source: 'NOTIFICATION');
     } catch (e) {
-      debugPrint('DawaCare snooze scheduling failed: $e');
+      debugPrint('DawaCare snooze action failed: $e');
     }
+  }
+
+  Future<void> _scheduleSnoozeNotification(DoseInstance dose) async {
+    await cancelDoseReminders(dose.id);
+    final snoozeTime = tz.TZDateTime.now(tz.local).add(_snoozeDuration);
+    final imagePath = await _prepareMedicationImage(dose);
+    final androidDetails = AndroidNotificationDetails(
+      _channelId,
+      'تذكير الجرعات',
+      channelDescription: 'إشعارات تذكير بمواعيد الأدوية',
+      importance: Importance.max,
+      priority: Priority.high,
+      category: AndroidNotificationCategory.reminder,
+      largeIcon: imagePath == null ? null : FilePathAndroidBitmap(imagePath),
+      styleInformation: imagePath == null ? null : BigPictureStyleInformation(FilePathAndroidBitmap(imagePath), hideExpandedLargeIcon: false, contentTitle: dose.medicationName, summaryText: dose.doseAmount),
+      actions: const [
+        AndroidNotificationAction(_actionTaken, 'تم أخذ الدواء', showsUserInterface: false, cancelNotification: true),
+        AndroidNotificationAction(_actionSnooze, 'تأجيل 10 دقائق', showsUserInterface: false, cancelNotification: true),
+      ],
+    );
+    await _schedule(
+      _notificationId(dose.id, _snoozeNotificationIndex),
+      'تذكير: حان وقت الدواء 💊',
+      '${dose.medicationName} — ${dose.doseAmount}',
+      snoozeTime,
+      NotificationDetails(android: androidDetails),
+      payload: dose.id,
+    );
   }
 
   Future<void> scheduleDoseReminders({required DoseInstance dose, required ReminderPolicy policy}) async {
     await cancelDoseReminders(dose.id);
-    if (dose.status == DoseStatus.taken || dose.status == DoseStatus.skipped || dose.status == DoseStatus.cancelled) return;
+    if (dose.status == DoseStatus.taken || dose.status == DoseStatus.skipped || dose.status == DoseStatus.cancelled || dose.status == DoseStatus.snoozed) return;
     final imagePath = await _prepareMedicationImage(dose);
     final now = tz.TZDateTime.now(tz.local);
     final baseTime = tz.TZDateTime.from(dose.scheduledAt, tz.local);

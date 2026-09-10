@@ -11,10 +11,6 @@ enum MedicationStatus {
   prn,
 }
 
-/// Single source of truth for medication-level schedule insights.
-///
-/// It deliberately delegates occurrence calculation to [DoseEngine], while
-/// keeping stock/treatment calculations independent from persistence.
 class MedicationScheduleCalculator {
   MedicationScheduleCalculator._();
 
@@ -41,9 +37,8 @@ class MedicationScheduleCalculator {
 
   /// Average inventory units consumed per calendar day.
   ///
-  /// PRN and once-only schedules are intentionally excluded: neither defines
-  /// an ongoing daily consumption rate. When [stockUnit] is known, a dose such
-  /// as `500 mg, 2 tablets` consumes 2 tablets rather than 500 mg of stock.
+  /// The configured stock unit is used to select the consumption quantity
+  /// when the dose text contains both strength and inventory quantity.
   static double dailyConsumption(
     List<MedicationSchedule> schedules, {
     String? stockUnit,
@@ -74,9 +69,6 @@ class MedicationScheduleCalculator {
     return total;
   }
 
-  /// Returns stock coverage in days, capped by the remaining treatment period
-  /// when an end date exists. A PRN/once-only regimen has no meaningful daily
-  /// rate, so null is returned instead of a misleading number.
   static double? daysRemaining(
     Medication medication,
     List<MedicationSchedule> schedules,
@@ -126,31 +118,54 @@ class MedicationScheduleCalculator {
     return MedicationStatus.active;
   }
 
-  /// Parses the quantity consumed from a dose description.
+  /// Parses the inventory quantity consumed from a dose description.
   ///
-  /// If [stockUnit] is present in the description, prefer the number directly
-  /// before that unit. This keeps strength (`500 mg`) separate from inventory
-  /// quantity (`2 tablets`). Decimal comma is supported for Moroccan/French
-  /// input (`2,5 ml`).
+  /// When [stockUnit] is configured, the parser first looks for a number
+  /// immediately followed by that unit. This prevents `500 mg, 2 tablets`
+  /// from being interpreted as 500 tablets. Decimal point and decimal comma
+  /// are both supported.
   static double parseDose(String value, {String? stockUnit}) {
     final normalized = value.trim();
     if (stockUnit != null && stockUnit.trim().isNotEmpty) {
-      final escapedUnit = RegExp.escape(stockUnit.trim());
+      final unit = stockUnit.trim();
+      final unitPattern = _unitPattern(unit);
       final unitMatch = RegExp(
-        r'([0-9]+(?:[.,][0-9]+)?)\s*' + escapedUnit + r'\b',
+        r'([0-9]+(?:[.,][0-9]+)?)\s*' + unitPattern,
         caseSensitive: false,
       ).firstMatch(normalized);
       if (unitMatch != null) {
-        return double.tryParse(
-              unitMatch.group(1)!.replaceAll(',', '.'),
-            ) ??
-            0;
+        return _toDouble(unitMatch.group(1));
       }
     }
 
     final match = RegExp(r'([0-9]+(?:[.,][0-9]+)?)').firstMatch(normalized);
-    return match == null
-        ? 0
-        : double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
+    return _toDouble(match?.group(1));
+  }
+
+  /// Handles common singular/plural forms without changing the stored unit.
+  static String _unitPattern(String unit) {
+    final escaped = RegExp.escape(unit);
+    switch (unit.toLowerCase()) {
+      case 'tablet':
+      case 'tablette':
+        return '(?:$escaped|tablets|tablettes)\\b';
+      case 'capsule':
+      case 'gélule':
+      case 'gelule':
+        return '(?:$escaped|capsules|gélules|gelules)\\b';
+      case 'ml':
+        return r'(?:ml|mL)\b';
+      case 'unit':
+      case 'unité':
+      case 'unite':
+        return '(?:$escaped|units|unités|unites)\\b';
+      default:
+        return '$escaped\\b';
+    }
+  }
+
+  static double _toDouble(String? value) {
+    if (value == null) return 0;
+    return double.tryParse(value.replaceAll(',', '.')) ?? 0;
   }
 }

@@ -17,7 +17,10 @@ class FamilyLinkException implements Exception {
 }
 
 class CaregiverRepository {
-  final SupabaseClient _client = Supabase.instance.client;
+  final SupabaseClient _client;
+
+  CaregiverRepository({SupabaseClient? client})
+      : _client = client ?? Supabase.instance.client;
 
   Future<List<CaregiverLink>> fetchLinkedPatients(String caregiverId) async {
     final rows = await _client
@@ -35,9 +38,9 @@ class CaregiverRepository {
     final results = await Future.wait([
       _client
           .from('medications')
-          .select('id, stock_enabled, stock_quantity, low_stock_threshold')
+          .select('id')
           .eq('patient_id', patientId)
-          .eq('active', true),
+          .eq('is_active', true),
       _client
           .from('dose_instances')
           .select('*')
@@ -46,40 +49,47 @@ class CaregiverRepository {
           .lt('scheduled_at', end.toUtc().toIso8601String())
           .order('scheduled_at'),
     ]);
-    final medicationRows = results[0] as List;
+
+    final medications = results[0] as List;
     final doseRows = results[1] as List;
-    final doses = doseRows
-        .map((row) => DoseInstance.fromMap(Map<String, dynamic>.from(row as Map)))
-        .toList();
-
-    final futurePending = doses
-        .where((dose) =>
-            dose.scheduledAt.isAfter(now) &&
-            dose.status != DoseStatus.taken &&
-            dose.status != DoseStatus.missed)
-        .toList()
-      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
-
-    var lowStock = 0;
-    var outOfStock = 0;
-    for (final row in medicationRows) {
-      if (row['stock_enabled'] != true) continue;
-      final quantity = (row['stock_quantity'] as num?)?.toDouble() ?? 0;
-      final threshold = (row['low_stock_threshold'] as num?)?.toDouble() ?? 5;
-      if (quantity <= 0) {
-        outOfStock++;
-      } else if (quantity <= threshold) {
-        lowStock++;
-      }
-    }
-
+    final doses = doseRows.map((r) => DoseInstance.fromMap(r)).toList();
     return FamilyMemberSummary.fromDoses(
-      activeMedicationCount: medicationRows.length,
-      todayDoses: doses,
-      nextDoseAt: futurePending.isEmpty ? null : futurePending.first.scheduledAt,
-      lowStockMedicationCount: lowStock,
-      outOfStockMedicationCount: outOfStock,
+      activeMedicationCount: medications.length,
+      doses: doses,
     );
+  }
+
+  Future<List<CaregiverAlert>> fetchAlerts(String caregiverId) async {
+    final rows = await _client
+        .from('caregiver_alerts')
+        .select()
+        .eq('caregiver_id', caregiverId)
+        .order('created_at', ascending: false);
+    return rows.map((r) => CaregiverAlert.fromMap(r)).toList();
+  }
+
+  Future<List<FamilyLinkRequest>> fetchIncomingRequests(String caregiverId) async {
+    final rows = await _client
+        .from('family_link_requests')
+        .select('*, patient:profiles!patient_id(full_name, avatar_url)')
+        .eq('caregiver_id', caregiverId)
+        .eq('status', 'pending')
+        .order('created_at', ascending: false);
+    return rows.map((r) => FamilyLinkRequest.fromMap(r)).toList();
+  }
+
+  Future<List<FamilyLinkRequest>> fetchSentRequests(String patientId) async {
+    final rows = await _client
+        .from('family_link_requests')
+        .select('*, caregiver:profiles!caregiver_id(full_name, avatar_url)')
+        .eq('patient_id', patientId)
+        .eq('status', 'pending')
+        .order('created_at', ascending: false);
+    return rows.map((r) => FamilyLinkRequest.fromMap(r)).toList();
+  }
+
+  Future<void> markAlertRead(String alertId) async {
+    await _client.from('caregiver_alerts').update({'read_at': DateTime.now().toUtc().toIso8601String()}).eq('id', alertId);
   }
 
   Future<void> unlink(String linkId) async {
@@ -87,122 +97,39 @@ class CaregiverRepository {
   }
 
   Future<FamilyLinkCode> createLinkCode() async {
-    final rows = await _client.rpc('create_family_link_code');
-    return FamilyLinkCode.fromMap((rows as List).first as Map<String, dynamic>);
+    final response = await _client.rpc('create_family_link_code');
+    return FamilyLinkCode.fromMap(response);
   }
 
-  Future<String> requestLink({
+  Future<String?> requestLink({
     required String code,
     required CaregiverRole role,
     String? relationshipLabel,
   }) async {
     try {
-      final rows = await _client.rpc('request_family_link', params: {
-        'p_code': _normalizeLinkCode(code),
+      final response = await _client.rpc('request_family_link', params: {
+        'p_code': code,
+        'p_role': role.name,
         'p_relationship_label': relationshipLabel,
-        'p_role': caregiverRoleToDb(role),
       });
-      final row = (rows as List).first as Map<String, dynamic>;
-      final requestId = row['request_id'] as String?;
-      if (requestId != null && requestId.isNotEmpty) {
-        try {
-          await _notifyFamilyLink(requestId, 'REQUESTED');
-        } catch (_) {}
-      }
-      return row['patient_name'] as String? ?? 'مريض';
+      return response == null ? null : response.toString();
     } on PostgrestException catch (e) {
-      throw FamilyLinkException(_extractCode(e.message));
+      throw FamilyLinkException(e.code ?? e.message);
     }
   }
 
   Future<void> cancelRequest(String requestId) async {
-    try {
-      await _client.rpc('cancel_family_link_request', params: {'p_request_id': requestId});
-    } on PostgrestException catch (e) {
-      throw FamilyLinkException(_extractCode(e.message));
-    }
+    await _client.rpc('cancel_family_link_request', params: {'p_request_id': requestId});
   }
 
-  Future<String> respondToRequest({required String requestId, required bool approve}) async {
+  Future<void> respondToRequest({required String requestId, required bool approve}) async {
     try {
-      final rows = await _client.rpc('respond_family_link_request', params: {
+      await _client.rpc('respond_to_family_link_request', params: {
         'p_request_id': requestId,
         'p_approve': approve,
       });
-      final row = (rows as List).first as Map<String, dynamic>;
-      final status = row['status'] as String? ?? (approve ? 'APPROVED' : 'REJECTED');
-      try {
-        await _notifyFamilyLink(requestId, approve ? 'APPROVED' : 'REJECTED');
-      } catch (_) {}
-      return status;
     } on PostgrestException catch (e) {
-      throw FamilyLinkException(_extractCode(e.message));
+      throw FamilyLinkException(e.code ?? e.message);
     }
-  }
-
-  Future<void> _notifyFamilyLink(String requestId, String eventType) async {
-    final response = await _client.functions.invoke(
-      'family-link-notify',
-      body: {'request_id': requestId, 'event_type': eventType},
-    );
-    if (response.status < 200 || response.status >= 300) {
-      throw StateError('family-link-notify failed: ${response.status}');
-    }
-  }
-
-  Future<List<FamilyLinkRequest>> fetchIncomingRequests(String patientId) async {
-    final rows = await _client
-        .from('family_link_requests')
-        .select('*, caregiver:profiles!caregiver_id(full_name)')
-        .eq('patient_id', patientId)
-        .eq('status', 'PENDING')
-        .order('requested_at', ascending: false);
-    return rows.map((r) => FamilyLinkRequest.fromMap(r)).toList();
-  }
-
-  Future<List<FamilyLinkRequest>> fetchSentRequests(String caregiverId) async {
-    final rows = await _client
-        .from('family_link_requests')
-        .select('*, patient:profiles!patient_id(full_name)')
-        .eq('caregiver_id', caregiverId)
-        .eq('status', 'PENDING')
-        .order('requested_at', ascending: false);
-    return rows.map((r) => FamilyLinkRequest.fromMap(r)).toList();
-  }
-
-  Future<List<CaregiverAlert>> fetchAlerts(
-    String caregiverId, {
-    bool unreadOnly = false,
-  }) async {
-    var query = _client
-        .from('caregiver_alerts')
-        .select('*, patient:profiles!patient_id(full_name)')
-        .eq('caregiver_id', caregiverId);
-    if (unreadOnly) {
-      query = query.eq('read', false);
-    }
-    final rows = await query.order('created_at', ascending: false).limit(50);
-    return rows.map((r) => CaregiverAlert.fromMap(r)).toList();
-  }
-
-  Future<void> markAlertRead(String alertId) async {
-    await _client.from('caregiver_alerts').update({'read': true}).eq('id', alertId);
-  }
-
-  String _normalizeLinkCode(String value) {
-    const arabicIndic = '٠١٢٣٤٥٦٧٨٩';
-    const extendedArabicIndic = '۰۱۲۳۴۵۶۷۸۹';
-    const latin = '0123456789';
-    var result = value.trim();
-    for (var i = 0; i < latin.length; i++) {
-      result = result.replaceAll(arabicIndic[i], latin[i]);
-      result = result.replaceAll(extendedArabicIndic[i], latin[i]);
-    }
-    return result.replaceAll(RegExp(r'[^0-9]'), '');
-  }
-
-  String _extractCode(String message) {
-    final match = RegExp(r'[A-Z_]{6,}').firstMatch(message);
-    return match?.group(0) ?? 'UNKNOWN_ERROR';
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../../models/dose_instance.dart';
@@ -88,20 +90,58 @@ class MedicationProvider extends ChangeNotifier {
     try {
       final created = await _repo.createMedication(medication, imageBytes: imageBytes);
       final createdSchedule = await _repo.createSchedule(created.id, schedule);
-      await _doseRepo.ensureDosesGenerated(created.patientId);
-      final now = DateTime.now();
-      final from = DateTime(now.year, now.month, now.day);
-      final to = from.add(const Duration(days: 2, hours: 23));
-      final generatedDoses = await _doseRepo.fetchDosesForRange(created.patientId, from: from, to: to);
-      final medicationDoses = generatedDoses.where((dose) => dose.medicationId == created.id).toList();
-      final policy = await _policyRepo.fetch(created.patientId);
-      await ReminderEngine.syncUpcoming(medicationDoses, policy);
+      await _syncMedicationFuture(patientId: created.patientId, medicationId: created.id);
       medications.insert(0, created);
       schedulesByMedicationId[created.id] = [createdSchedule];
       _notify();
       return true;
     } catch (_) {
       error = 'تعذّر إضافة الدواء. حاول مرة أخرى.';
+      _notify();
+      return false;
+    }
+  }
+
+  /// Updates medication metadata/prescription only. Stock is deliberately preserved.
+  /// Existing resolved dose history is never removed; only future unresolved doses
+  /// are rebuilt so a prescription edit cannot rewrite the patient's history.
+  Future<bool> updateMedication(Medication medication) async {
+    try {
+      final now = DateTime.now();
+      final from = now;
+      final to = DateTime(now.year, now.month, now.day).add(const Duration(days: 2, hours: 23));
+      final futureDoses = await _doseRepo.fetchDosesForRange(
+        medication.patientId,
+        from: from,
+        to: to,
+      );
+
+      for (final dose in futureDoses.where(
+        (d) => d.medicationId == medication.id && !isResolvedStatus(d.status),
+      )) {
+        await ReminderEngine.cancelFor(dose.id);
+      }
+
+      final updated = await _repo.updateMedication(medication);
+      await _doseRepo.clearFutureUnresolvedDosesByMedication(medication.id, from);
+      await _syncMedicationFuture(patientId: medication.patientId, medicationId: medication.id);
+
+      final index = medications.indexWhere((m) => m.id == medication.id);
+      if (index >= 0) {
+        // Keep the authoritative stock value from the local state/database. The
+        // repository intentionally excludes stock_quantity from prescription updates.
+        final current = medications[index];
+        medications[index] = _copyMedication(
+          updated,
+          stockEnabled: current.stockEnabled,
+          stockQuantity: current.stockQuantity,
+          stockUnit: current.stockUnit,
+        );
+      }
+      _notify();
+      return true;
+    } catch (_) {
+      error = 'تعذّر تعديل الدواء.';
       _notify();
       return false;
     }
@@ -197,14 +237,30 @@ class MedicationProvider extends ChangeNotifier {
 
   Future<bool> updateSchedule(MedicationSchedule schedule, {required String patientId, required String time, required String doseAmount}) async {
     try {
+      // Only doses from this instant onward are candidates for rescheduling.
+      // Doses earlier today remain immutable history, even if unresolved.
       final now = DateTime.now();
-      final from = DateTime(now.year, now.month, now.day);
-      final to = from.add(const Duration(days: 2, hours: 23));
+      final from = now;
+      final to = DateTime(now.year, now.month, now.day).add(const Duration(days: 2, hours: 23));
       final oldDoses = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
       for (final dose in oldDoses.where((d) => d.scheduleId == schedule.id && !isResolvedStatus(d.status))) {
         await ReminderEngine.cancelFor(dose.id);
       }
-      final updated = await _repo.updateSchedule(MedicationSchedule(id: schedule.id, medicationId: schedule.medicationId, type: schedule.type, time: time, daysOfWeek: schedule.daysOfWeek, intervalDays: schedule.intervalDays, doseAmount: doseAmount, startDate: schedule.startDate, endDate: schedule.endDate, timezone: schedule.timezone));
+
+      final updated = await _repo.updateSchedule(
+        MedicationSchedule(
+          id: schedule.id,
+          medicationId: schedule.medicationId,
+          type: schedule.type,
+          time: time,
+          daysOfWeek: schedule.daysOfWeek,
+          intervalDays: schedule.intervalDays,
+          doseAmount: doseAmount,
+          startDate: schedule.startDate,
+          endDate: schedule.endDate,
+          timezone: schedule.timezone,
+        ),
+      );
       await _repo.deleteFutureUnresolvedDoses(schedule.id, from);
       await _doseRepo.ensureDosesGenerated(patientId);
       final refreshed = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
@@ -222,6 +278,19 @@ class MedicationProvider extends ChangeNotifier {
       _notify();
       return false;
     }
+  }
+
+  Future<void> _syncMedicationFuture({required String patientId, required String medicationId}) async {
+    await _doseRepo.ensureDosesGenerated(patientId);
+    final now = DateTime.now();
+    final from = now;
+    final to = DateTime(now.year, now.month, now.day).add(const Duration(days: 2, hours: 23));
+    final doses = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
+    final policy = await _policyRepo.fetch(patientId);
+    await ReminderEngine.syncUpcoming(
+      doses.where((dose) => dose.medicationId == medicationId && !isResolvedStatus(dose.status)).toList(),
+      policy,
+    );
   }
 
   Future<String?> signedMedicationImageUrl(String? imagePath) {

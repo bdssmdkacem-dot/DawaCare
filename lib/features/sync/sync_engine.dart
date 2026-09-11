@@ -67,7 +67,7 @@ class SyncEngine {
 
       switch (op['entity_type']) {
         case 'DOSE_STATUS':
-          return _replayDoseStatus(payload);
+          return await _replayDoseStatus(payload);
         default:
           // Unknown operations must not block the entire queue forever.
           return _ReplayOutcome.completed;

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../models/caregiver_alert.dart';
+import '../../../../models/caregiver_link.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/caregiver_repository.dart';
 import '../providers/caregiver_provider.dart';
@@ -23,9 +24,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _load();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   Future<void> _load() async {
@@ -42,6 +41,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
           orElse: () => null,
         );
     if (alert == null) return;
+
     _openedInitialAlert = true;
     final link = provider.linkedPatients.cast<CaregiverLink?>().firstWhere(
           (item) => item?.patientId == alert.patientId,
@@ -49,6 +49,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
         );
     provider.markAlertRead(alert);
     if (link == null) return;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       Navigator.of(context).push(
@@ -67,12 +68,15 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
     final l = AppLocalizations.of(context);
     await provider.generateCode();
     if (!mounted) return;
-    if (provider.activeCode == null) {
+
+    final code = provider.activeCode;
+    if (code == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(provider.error ?? l.unexpectedError)),
       );
       return;
     }
+
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -81,7 +85,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
       ),
       builder: (context) => Padding(
         padding: const EdgeInsets.all(24),
-        child: Text(provider.activeCode!),
+        child: SelectableText(code.code),
       ),
     );
   }
@@ -93,7 +97,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l.caregiver),
+        title: Text(l.family),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -107,7 +111,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
           padding: const EdgeInsets.all(16),
           children: [
             Text(
-              l.caregiverDashboard,
+              l.familyMembers,
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 16),
@@ -120,11 +124,12 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                 (link) => Card(
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primary,
                       child: const Icon(Icons.person),
                     ),
-                    title: Text(link.patientName ?? l.patient),
-                    subtitle: Text(link.relationship ?? ''),
+                    title: Text(link.patientName),
+                    subtitle: Text(link.relationshipLabel ?? ''),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).push(

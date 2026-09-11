@@ -62,7 +62,9 @@ class SyncEngine with WidgetsBindingObserver {
         if (outcome == _ReplayOutcome.completed ||
             outcome == _ReplayOutcome.conflict) {
           await _local.markSynced(op['id'] as String);
-          if (outcome == _ReplayOutcome.conflict) {
+          if (outcome == _ReplayOutcome.completed) {
+            await _refreshReplayedDose(op);
+          } else {
             await _refreshConflictedDose(op);
           }
           continue;
@@ -143,6 +145,26 @@ class SyncEngine with WidgetsBindingObserver {
     }
 
     return _ReplayOutcome.retry;
+  }
+
+  Future<void> _refreshReplayedDose(Map<String, dynamic> op) async {
+    try {
+      final payload = jsonDecode(op['payload'] as String) as Map<String, dynamic>;
+      final doseId = payload['dose_id'] as String?;
+      if (doseId == null) return;
+
+      final row = await _client
+          .from('dose_instances')
+          .select('*, medications(name)')
+          .eq('id', doseId)
+          .maybeSingle();
+      if (row != null) {
+        await _local.upsertDose(DoseRowNormalizer.toLocalRow(row));
+      }
+    } catch (_) {
+      // The server write is already successful. A later normal fetch can
+      // refresh the cache if this best-effort read fails.
+    }
   }
 
   Future<void> _refreshConflictedDose(Map<String, dynamic> op) async {

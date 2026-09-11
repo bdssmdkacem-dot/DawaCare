@@ -40,27 +40,35 @@ Deno.serve(async (_req) => {
     );
     if (now < graceDeadline) continue;
 
-    const { error: updateError } = await supabase
+    // The status predicate makes MISSED reconciliation atomic with respect to
+    // TAKEN/SKIPPED/CANCELLED actions from another client or worker.
+    const { data: transitioned, error: updateError } = await supabase
       .from('dose_instances')
       .update({ status: 'MISSED', updated_at: now.toISOString() })
       .eq('id', dose.id)
-      .in('status', ['PENDING', 'REMINDER_SENT', 'SNOOZED']);
-    if (updateError) continue;
+      .in('status', ['PENDING', 'REMINDER_SENT', 'SNOOZED'])
+      .select('id');
 
-    await supabase.from('dose_events').insert({
+    if (updateError) {
+      console.error('Failed to mark dose MISSED', dose.id, updateError);
+      continue;
+    }
+
+    // Zero rows means another actor already resolved the dose. Do not emit a
+    // false MISSED event or caregiver alert in that race.
+    if (!transitioned || transitioned.length === 0) continue;
+
+    const { error: eventError } = await supabase.from('dose_events').insert({
       dose_id: dose.id,
       patient_id: dose.patient_id,
       action: 'MISSED',
       source: 'SYSTEM',
     });
-    if (!policy.caregiver_escalation) continue;
+    if (eventError) {
+      console.error('Failed to log MISSED event', dose.id, eventError);
+    }
 
-    const { data: existingAlert } = await supabase
-      .from('caregiver_alerts')
-      .select('id')
-      .eq('dose_id', dose.id)
-      .limit(1);
-    if (existingAlert && existingAlert.length > 0) continue;
+    if (!policy.caregiver_escalation) continue;
 
     const { data: caregivers } = await supabase
       .from('caregiver_patient')
@@ -75,20 +83,33 @@ Deno.serve(async (_req) => {
     const message = `لم يتم تأكيد جرعة دواء ${patientName} في موعدها.`;
 
     for (const link of caregivers ?? []) {
-      const { data: alert } = await supabase
+      // Unique index + ignoreDuplicates makes cron retries and worker races safe.
+      const { data: alert, error: alertError } = await supabase
         .from('caregiver_alerts')
-        .insert({
-          caregiver_id: link.caregiver_id,
-          patient_id: dose.patient_id,
-          dose_id: dose.id,
-          medication_id: dose.medication_id,
-          type: 'MISSED_DOSE',
-          message,
-        })
+        .upsert(
+          {
+            caregiver_id: link.caregiver_id,
+            patient_id: dose.patient_id,
+            dose_id: dose.id,
+            medication_id: dose.medication_id,
+            type: 'MISSED_DOSE',
+            message,
+          },
+          {
+            onConflict: 'dose_id,caregiver_id,type',
+            ignoreDuplicates: true,
+          },
+        )
         .select('id')
-        .single();
+        .maybeSingle();
 
-      if (FCM_SERVICE_ACCOUNT_JSON && alert?.id) {
+      if (alertError) {
+        console.error('Failed to create caregiver alert', dose.id, alertError);
+        continue;
+      }
+      if (!alert?.id) continue;
+
+      if (FCM_SERVICE_ACCOUNT_JSON) {
         await sendPushToUser(
           supabase,
           link.caregiver_id,

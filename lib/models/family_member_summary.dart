@@ -1,11 +1,9 @@
 import 'package:flutter/foundation.dart';
 
+import '../features/doses/domain/adherence_engine.dart';
 import 'dose_instance.dart';
 
 /// Lightweight dashboard metrics for one linked family member.
-///
-/// The summary is intentionally separate from [CaregiverLink] so the family
-/// page can keep connection management independent from medication data.
 @immutable
 class FamilyMemberSummary {
   final int activeMedicationCount;
@@ -55,13 +53,15 @@ class FamilyMemberSummary {
     for (final dose in todayDoses) {
       if (last == null || dose.updatedAt.isAfter(last)) last = dose.updatedAt;
     }
+
+    final day = DateTime.now();
+    final adherence = AdherenceEngine.compute(todayDoses, day: day);
+
     return FamilyMemberSummary(
       activeMedicationCount: activeMedicationCount,
       todayDoseCount: todayDoses.length,
-      takenDoseCount:
-          todayDoses.where((d) => d.status == DoseStatus.taken).length,
-      missedDoseCount:
-          todayDoses.where((d) => d.status == DoseStatus.missed).length,
+      takenDoseCount: adherence.taken,
+      missedDoseCount: adherence.missed,
       nextDoseAt: nextDoseAt,
       lowStockMedicationCount: lowStockMedicationCount,
       outOfStockMedicationCount: outOfStockMedicationCount,

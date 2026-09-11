@@ -63,16 +63,32 @@ class DoseRepository {
   }) async {
     if (!ConnectivityService.instance.isOnline) return;
 
-    final cutoff = DateTime.now().toUtc().subtract(gracePeriod).toIso8601String();
-    await _client
+    final cutoff = DateTime.now().toUtc().subtract(gracePeriod);
+    final rows = await _client
         .from('dose_instances')
-        .update({
-          'status': 'MISSED',
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        })
+        .select('id, patient_id, status')
         .eq('patient_id', patientId)
         .inFilter('status', const ['PENDING', 'REMINDER_SENT', 'SNOOZED'])
-        .lt('scheduled_at', cutoff);
+        .lt('scheduled_at', cutoff.toIso8601String());
+
+    for (final row in rows) {
+      final doseId = row['id'] as String?;
+      if (doseId == null) continue;
+
+      try {
+        await _client.rpc(
+          'apply_dose_status_transition',
+          params: {
+            'p_dose_id': doseId,
+            'p_patient_id': patientId,
+            'p_to_status': 'MISSED',
+            'p_source': 'SYSTEM',
+          },
+        );
+      } catch (_) {
+        // A transient failure is retried by the next reconciliation pass.
+      }
+    }
   }
 
   Future<List<DoseInstance>> fetchDosesForRange(

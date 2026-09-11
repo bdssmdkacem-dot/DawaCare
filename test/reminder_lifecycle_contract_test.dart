@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/features/reminders/domain/reminder_rules.dart';
-import '../lib/models/dose_instance.dart';
+import 'package:dawacare/features/reminders/domain/reminder_rules.dart';
+import 'package:dawacare/models/dose_instance.dart';
 
 DoseInstance _dose(DoseStatus status, DateTime scheduledAt) => DoseInstance(
       id: 'dose-1',

@@ -9,9 +9,8 @@ import '../../../../models/caregiver_link.dart';
 import '../../../../models/medication.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../medications/presentation/providers/medication_provider.dart';
-import '../domain/patient_permissions.dart';
+import '../../domain/patient_permissions.dart';
 import '../providers/caregiver_provider.dart';
-import 'caregiver_medication_detail_page.dart';
 import 'caregiver_medication_refill_page.dart';
 import 'patient_detail_page.dart';
 
@@ -104,12 +103,7 @@ class CaregiverAlertCenterPage extends StatelessWidget {
 
   Widget _section(BuildContext context, AppLocalizations l, _AlertKind kind, List<CaregiverAlert> alerts) {
     if (alerts.isEmpty) return const SizedBox.shrink();
-    final title = switch (kind) {
-      _AlertKind.missed => _tr(context, 'جرعات فائتة', 'Missed doses', 'Doses manquées'),
-      _AlertKind.lowStock => _tr(context, 'مخزون منخفض', 'Low stock', 'Stock faible'),
-      _AlertKind.outOfStock => _tr(context, 'نفاد المخزون', 'Out of stock', 'Rupture de stock'),
-      _AlertKind.other => l.alerts,
-    };
+    final title = switch (kind) { _AlertKind.missed => _tr(context, 'جرعات فائتة', 'Missed doses', 'Doses manquées'), _AlertKind.lowStock => _tr(context, 'مخزون منخفض', 'Low stock', 'Stock faible'), _AlertKind.outOfStock => _tr(context, 'نفاد المخزون', 'Out of stock', 'Rupture de stock'), _AlertKind.other => l.alerts };
     final icon = switch (kind) { _AlertKind.missed => Icons.schedule_rounded, _AlertKind.lowStock => Icons.inventory_rounded, _AlertKind.outOfStock => Icons.production_quantity_limits_rounded, _AlertKind.other => Icons.notifications_rounded };
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Padding(padding: const EdgeInsets.only(bottom: 9), child: Row(children: [Icon(icon, color: AppColors.primary, size: 21), const SizedBox(width: 8), Expanded(child: Text('$title (${alerts.length})', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)))])), ...alerts.map((alert) => _alertTile(context, alert)), const SizedBox(height: 16)]);
   }

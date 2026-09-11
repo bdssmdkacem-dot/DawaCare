@@ -10,6 +10,8 @@ class FamilyMemberSummary {
   final int todayDoseCount;
   final int takenDoseCount;
   final int missedDoseCount;
+  final int pendingDoseCount;
+  final int excludedDoseCount;
   final DateTime? nextDoseAt;
   final int lowStockMedicationCount;
   final int outOfStockMedicationCount;
@@ -20,6 +22,8 @@ class FamilyMemberSummary {
     required this.todayDoseCount,
     required this.takenDoseCount,
     required this.missedDoseCount,
+    required this.pendingDoseCount,
+    required this.excludedDoseCount,
     required this.nextDoseAt,
     required this.lowStockMedicationCount,
     required this.outOfStockMedicationCount,
@@ -31,6 +35,8 @@ class FamilyMemberSummary {
         todayDoseCount = 0,
         takenDoseCount = 0,
         missedDoseCount = 0,
+        pendingDoseCount = 0,
+        excludedDoseCount = 0,
         nextDoseAt = null,
         lowStockMedicationCount = 0,
         outOfStockMedicationCount = 0,
@@ -54,14 +60,15 @@ class FamilyMemberSummary {
       if (last == null || dose.updatedAt.isAfter(last)) last = dose.updatedAt;
     }
 
-    final day = DateTime.now();
-    final adherence = AdherenceEngine.compute(todayDoses, day: day);
+    final adherence = AdherenceEngine.compute(todayDoses, day: DateTime.now());
 
     return FamilyMemberSummary(
       activeMedicationCount: activeMedicationCount,
       todayDoseCount: todayDoses.length,
       takenDoseCount: adherence.taken,
       missedDoseCount: adherence.missed,
+      pendingDoseCount: adherence.pending,
+      excludedDoseCount: adherence.excluded,
       nextDoseAt: nextDoseAt,
       lowStockMedicationCount: lowStockMedicationCount,
       outOfStockMedicationCount: outOfStockMedicationCount,

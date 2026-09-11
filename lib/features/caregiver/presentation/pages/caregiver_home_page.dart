@@ -14,6 +14,7 @@ import '../providers/caregiver_provider.dart';
 import '../widgets/caregiver_daily_dashboard.dart';
 import '../widgets/family_member_card.dart';
 import '../widgets/link_code_sheet.dart';
+import 'caregiver_alert_center_page.dart';
 import 'patient_detail_page.dart';
 
 class CaregiverHomePage extends StatefulWidget {
@@ -188,6 +189,28 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
             const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l.family, style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(_tr(context, 'تابع من تحب وكن قريباً من أدويتهم.', 'Stay close to the people you care for and their medicines.', 'Restez proche de vos proches et de leurs médicaments.'), style: TextStyle(color: Colors.white.withValues(alpha: .88), height: 1.35))]))
           ])),
           if (provider.linkedPatients.isNotEmpty || provider.isSummariesLoading) ...[const SizedBox(height: 16), CaregiverDailyDashboard(provider: provider)],
+          if (provider.alerts.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Card(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CaregiverAlertCenterPage())),
+                child: Padding(
+                  padding: const EdgeInsets.all(15),
+                  child: Row(children: [
+                    Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: .10), borderRadius: BorderRadius.circular(14)), child: Icon(Icons.notifications_active_rounded, color: AppColors.danger)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(_tr(context, 'مركز التنبيهات والرعاية', 'Care & Alerts', 'Centre des alertes'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                      const SizedBox(height: 3),
+                      Text(_tr(context, '${provider.unreadAlertCount} تنبيه غير مقروء · راجع الجرعات والمخزون', '${provider.unreadAlertCount} unread · review doses and stock', '${provider.unreadAlertCount} non lue(s) · vérifiez doses et stock')),
+                    ])),
+                    const Icon(Icons.chevron_right_rounded),
+                  ]),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           if (provider.incomingRequests.isNotEmpty) ...[
             _sectionHeader(context, l.familyRequests, icon: Icons.notifications_active_rounded),
@@ -199,10 +222,6 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
           if (provider.sentRequests.isNotEmpty) ...[
             const SizedBox(height: 18), _sectionHeader(context, l.pendingRequests, icon: Icons.hourglass_top_rounded),
             ...provider.sentRequests.map((request) => _SentRequestTile(request: request, onCancel: () async { final ok = await context.read<CaregiverProvider>().cancelSentRequest(request); if (!context.mounted) return; if (ok) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_tr(context, 'تم إلغاء الطلب', 'Request cancelled', 'Demande annulée')))); })),
-          ],
-          if (provider.alerts.isNotEmpty) ...[
-            const SizedBox(height: 18), _sectionHeader(context, l.alerts, icon: Icons.warning_amber_rounded),
-            ...provider.alerts.take(5).map((alert) => _AlertTile(alert: alert, onTap: () => _openAlert(alert))),
           ],
           const SizedBox(height: 18), _sectionHeader(context, l.familyMembers, icon: Icons.groups_rounded),
           if (provider.linkedPatients.isEmpty)
@@ -230,7 +249,7 @@ class _IncomingRequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context); final role = _roleLabel(context, request.role); final relationship = request.relationshipLabel;
     final message = relationship != null && relationship.isNotEmpty ? _tr(context, '${request.caregiverName} ($relationship) يطلب الوصول كـ $role', '${request.caregiverName} ($relationship) requests access as $role', '${request.caregiverName} ($relationship) demande un accès en tant que $role') : _tr(context, '${request.caregiverName} يطلب الوصول كـ $role', '${request.caregiverName} requests access as $role', '${request.caregiverName} demande un accès en tant que $role');
-    return Card(color: Theme.of(context).colorScheme.primary.withValues(alpha: .06), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(message, style: const TextStyle(fontWeight: FontWeight.w700)), const SizedBox(height: 4), Text(DateTimeUtils.relativeDayLabel(request.requestedAt), style: Theme.of(context).textTheme.bodySmall), const SizedBox(height: 12), Row(children: [Expanded(child: OutlinedButton(onPressed: onReject, child: Text(l.reject))), const SizedBox(width: 10), Expanded(child: FilledButton(onPressed: onApprove, child: Text(l.accept)))])])));
+    return Card(color: Theme.of(context).colorScheme.primary.withValues(alpha: .06), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(message, style: const TextStyle(fontWeight: FontWeight.w700)), const SizedBox(height: 4), Text(DateTimeUtils.relativeDayLabel(request.requestedAt), style: Theme.of(context).textTheme.bodySmall), const SizedBox(height: 12), Row(children: [Expanded(child: OutlinedButton(onPressed: onReject, child: Text(l.reject))), const SizedBox(width: 10), Expanded(child: FilledButton(onPressed: onApprove, child: Text(l.accept)))])]))) ;
   }
 }
 
@@ -239,11 +258,4 @@ class _SentRequestTile extends StatelessWidget {
   const _SentRequestTile({required this.request, required this.onCancel});
   @override
   Widget build(BuildContext context) => Card(child: ListTile(leading: const CircleAvatar(child: Icon(Icons.hourglass_top_rounded)), title: Text(request.patientName, style: const TextStyle(fontWeight: FontWeight.w700)), subtitle: Text('${AppLocalizations.of(context).waitingApproval} · ${_roleLabel(context, request.role)}'), trailing: TextButton(onPressed: onCancel, child: Text(AppLocalizations.of(context).cancel))));
-}
-
-class _AlertTile extends StatelessWidget {
-  final CaregiverAlert alert; final VoidCallback onTap;
-  const _AlertTile({required this.alert, required this.onTap});
-  @override
-  Widget build(BuildContext context) => Card(child: ListTile(leading: Icon(alert.read ? Icons.notifications_none_rounded : Icons.notifications_active_rounded, color: alert.read ? null : AppColors.danger), title: Text(alert.message, maxLines: 2, overflow: TextOverflow.ellipsis), subtitle: Text(DateTimeUtils.relativeDayLabel(alert.createdAt)), onTap: onTap));
 }

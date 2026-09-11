@@ -235,6 +235,7 @@ class CaregiverProvider extends ChangeNotifier {
         patientId: alert.patientId,
         patientName: alert.patientName,
         doseId: alert.doseId,
+        medicationId: alert.medicationId,
         type: alert.type,
         message: alert.message,
         read: true,

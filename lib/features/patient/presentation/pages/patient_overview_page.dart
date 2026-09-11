@@ -5,6 +5,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../doses/domain/adherence_engine.dart';
 import '../../../doses/domain/adherence_report.dart';
 import '../../../doses/presentation/providers/dose_provider.dart';
 import '../../../medications/domain/stock_intelligence.dart';
@@ -214,7 +215,7 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
   Widget _stockSummary(dynamic medication, double? days, bool low, bool empty) {
     if (!medication.stockEnabled) return const Icon(Icons.inventory_2_outlined, size: 22);
     if (empty) return const Tooltip(message: 'نفد المخزون', child: Icon(Icons.error_rounded, color: AppColors.danger));
-    if (low) return Tooltip(message: 'المخزون منخفض', child: Icon(Icons.warning_rounded, color: AppColors.warning));
+    if (low) return Tooltip(message: 'المخزون منخفض', child: const Icon(Icons.warning_rounded, color: AppColors.warning));
     if (days != null) return Text('${days.floor()} يوم', style: const TextStyle(fontWeight: FontWeight.w800));
     return Text('${medication.stockQuantity}', style: const TextStyle(fontWeight: FontWeight.w800));
   }

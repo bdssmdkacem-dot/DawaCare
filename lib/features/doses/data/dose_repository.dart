@@ -76,7 +76,7 @@ class DoseRepository {
       if (doseId == null) continue;
 
       try {
-        await _client.rpc(
+        final result = await _client.rpc(
           'apply_dose_status_transition',
           params: {
             'p_dose_id': doseId,
@@ -84,7 +84,33 @@ class DoseRepository {
             'p_to_status': 'MISSED',
             'p_source': 'SYSTEM',
           },
-        );
+        ) as List<dynamic>;
+
+        if (result.isEmpty) continue;
+        final transition = Map<String, dynamic>.from(result.first as Map);
+        final applied = transition['applied'] == true;
+        final currentStatus = transition['current_status'] as String?;
+
+        // Keep the offline cache aligned with the authoritative server state
+        // immediately after successful reconciliation. If another client
+        // already reconciled the dose, the RPC returns MISSED without creating
+        // a duplicate event, and the same cache update remains correct.
+        if (applied || currentStatus == 'MISSED') {
+          final cached = await _local.doseById(doseId);
+          if (cached != null) {
+            final cachedDose = DoseInstance.fromLocalRow(cached);
+            if (cachedDose.status != DoseStatus.missed) {
+              await _local.upsertDose(
+                cachedDose
+                    .copyWith(
+                      status: DoseStatus.missed,
+                      updatedAt: DateTime.now(),
+                    )
+                    .toLocalRow(),
+              );
+            }
+          }
+        }
       } catch (_) {
         // A transient failure is retried by the next reconciliation pass.
       }

@@ -8,7 +8,11 @@ import '../../../../models/family_member_summary.dart';
 import '../../data/caregiver_repository.dart';
 
 class CaregiverProvider extends ChangeNotifier {
-  final CaregiverRepository _repo = CaregiverRepository();
+  final CaregiverRepository _repo;
+
+  CaregiverProvider({CaregiverRepository? repository})
+      : _repo = repository ?? CaregiverRepository();
+
   List<CaregiverLink> linkedPatients = [];
   List<CaregiverAlert> alerts = [];
   List<FamilyLinkRequest> incomingRequests = [];

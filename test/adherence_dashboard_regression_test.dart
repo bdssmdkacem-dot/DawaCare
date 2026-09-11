@@ -1,3 +1,4 @@
+import 'package:dawacare/features/caregiver/data/caregiver_repository.dart';
 import 'package:dawacare/features/caregiver/presentation/providers/caregiver_provider.dart';
 import 'package:dawacare/features/caregiver/presentation/widgets/caregiver_daily_dashboard.dart';
 import 'package:dawacare/features/doses/domain/adherence_engine.dart';
@@ -51,12 +52,13 @@ void main() {
   });
 
   testWidgets('Caregiver dashboard renders the same adherence semantics', (tester) async {
-    await Supabase.initialize(
-      url: 'https://example.supabase.co',
-      anonKey: 'test-anon-key',
+    final client = SupabaseClient(
+      'https://example.supabase.co',
+      'test-anon-key',
     );
-
-    final provider = CaregiverProvider();
+    final provider = CaregiverProvider(
+      repository: CaregiverRepository(client: client),
+    );
     provider.linkedPatients = [
       CaregiverLink(
         id: 'link-1',

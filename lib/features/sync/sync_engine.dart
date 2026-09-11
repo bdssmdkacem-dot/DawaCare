@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/database/local_database.dart';
@@ -12,7 +13,7 @@ import '../../core/network/connectivity_service.dart';
 /// transition, or a lifecycle conflict that has been observed on the server
 /// is considered terminal for that queue item. Transient failures remain in
 /// the queue and are retried later.
-class SyncEngine {
+class SyncEngine with WidgetsBindingObserver {
   SyncEngine._();
   static final SyncEngine instance = SyncEngine._();
 
@@ -20,17 +21,32 @@ class SyncEngine {
   final LocalDatabase _local = LocalDatabase.instance;
 
   StreamSubscription<bool>? _connectivitySub;
+  bool _started = false;
   bool _flushing = false;
 
   void start() {
+    if (_started) {
+      unawaited(flushQueue());
+      return;
+    }
+
+    _started = true;
+    WidgetsBinding.instance.addObserver(this);
     ConnectivityService.instance.start();
     _connectivitySub ??=
         ConnectivityService.instance.onOnlineChanged.listen((online) {
       if (online) {
-        flushQueue();
+        unawaited(flushQueue());
       }
     });
-    flushQueue();
+    unawaited(flushQueue());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(flushQueue());
+    }
   }
 
   Future<void> flushQueue() async {
@@ -142,6 +158,10 @@ class SyncEngine {
   void dispose() {
     _connectivitySub?.cancel();
     _connectivitySub = null;
+    if (_started) {
+      WidgetsBinding.instance.removeObserver(this);
+      _started = false;
+    }
   }
 }
 

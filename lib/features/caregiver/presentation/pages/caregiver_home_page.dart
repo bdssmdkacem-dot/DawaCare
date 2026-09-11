@@ -15,8 +15,6 @@ class CaregiverHomePage extends StatefulWidget {
 
   @override
   State<CaregiverHomePage> createState() => _CaregiverHomePageState();
-
-  
 }
 
 class _CaregiverHomePageState extends State<CaregiverHomePage> {

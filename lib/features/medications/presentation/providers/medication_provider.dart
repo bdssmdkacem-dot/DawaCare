@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
 import '../../../../models/dose_instance.dart';
@@ -237,8 +235,6 @@ class MedicationProvider extends ChangeNotifier {
 
   Future<bool> updateSchedule(MedicationSchedule schedule, {required String patientId, required String time, required String doseAmount}) async {
     try {
-      // Only doses from this instant onward are candidates for rescheduling.
-      // Doses earlier today remain immutable history, even if unresolved.
       final now = DateTime.now();
       final from = now;
       final to = DateTime(now.year, now.month, now.day).add(const Duration(days: 2, hours: 23));

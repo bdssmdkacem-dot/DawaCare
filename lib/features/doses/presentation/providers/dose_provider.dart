@@ -7,6 +7,7 @@ import '../../../../models/reminder_policy.dart';
 import '../../../reminders/data/reminder_policy_repository.dart';
 import '../../../reminders/domain/reminder_engine.dart';
 import '../../data/dose_repository.dart';
+import '../../domain/adherence_engine.dart';
 
 /// Drives the Today screen and owns the load → generate → reconcile → fetch
 /// → reminder synchronization pipeline.
@@ -30,6 +31,12 @@ class DoseProvider extends ChangeNotifier {
     today.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
     return today;
   }
+
+  /// Single source of truth for Today-screen adherence metrics.
+  AdherenceSummary get todayAdherence =>
+      AdherenceEngine.compute(todayDoses, day: DateTime.now());
+
+  double get todayAdherenceRate => todayAdherence.percentage / 100;
 
   List<DoseInstance> get upcomingDoses {
     final now = DateTime.now();
@@ -61,12 +68,7 @@ class DoseProvider extends ChangeNotifier {
     _notify();
 
     try {
-      // Generation is idempotent and intentionally happens before fetching.
       await _doseRepo.ensureDosesGenerated(forPatientId);
-
-      // Resolve overdue doses before the UI and reminder engine consume them.
-      // The five-minute grace period lives in DoseRepository so all callers
-      // use the same definition of "missed".
       await _doseRepo.reconcileMissedDoses(forPatientId);
 
       final now = DateTime.now();

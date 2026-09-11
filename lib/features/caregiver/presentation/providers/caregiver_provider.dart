@@ -25,6 +25,48 @@ class CaregiverProvider extends ChangeNotifier {
 
   FamilyMemberSummary? summaryFor(String patientId) => memberSummaries[patientId];
 
+  /// Aggregated daily metrics for the caregiver dashboard.
+  int get totalActiveMedicationCount =>
+      memberSummaries.values.fold(0, (sum, item) => sum + item.activeMedicationCount);
+
+  int get totalTodayDoseCount =>
+      memberSummaries.values.fold(0, (sum, item) => sum + item.todayDoseCount);
+
+  int get totalTakenDoseCount =>
+      memberSummaries.values.fold(0, (sum, item) => sum + item.takenDoseCount);
+
+  int get totalMissedDoseCount =>
+      memberSummaries.values.fold(0, (sum, item) => sum + item.missedDoseCount);
+
+  int get totalPendingDoseCount {
+    final pending = totalTodayDoseCount - totalTakenDoseCount - totalMissedDoseCount;
+    return pending < 0 ? 0 : pending;
+  }
+
+  int get lowStockMedicationCount =>
+      memberSummaries.values.fold(0, (sum, item) => sum + item.lowStockMedicationCount);
+
+  int get outOfStockMedicationCount =>
+      memberSummaries.values.fold(0, (sum, item) => sum + item.outOfStockMedicationCount);
+
+  /// Overall adherence across all resolved doses, rather than averaging
+  /// percentages from individual patients.
+  double get overallAdherence {
+    final resolved = totalTakenDoseCount + totalMissedDoseCount;
+    if (resolved == 0) return 0;
+    return totalTakenDoseCount / resolved;
+  }
+
+  DateTime? get nextDoseAt {
+    DateTime? next;
+    for (final summary in memberSummaries.values) {
+      final candidate = summary.nextDoseAt;
+      if (candidate == null) continue;
+      if (next == null || candidate.isBefore(next)) next = candidate;
+    }
+    return next;
+  }
+
   Future<void> load(String userId) async {
     isLoading = true;
     error = null;

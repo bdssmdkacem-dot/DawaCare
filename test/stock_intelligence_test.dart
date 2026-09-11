@@ -81,8 +81,32 @@ void main() {
       );
     });
 
-    test('weekly and specific-days schedules are averaged over seven days', () {
-      final weekly = _schedule(ScheduleType.weekly, '7 tablets');
+    test('weekly schedule uses its selected days, matching DoseEngine', () {
+      final weekly = _schedule(
+        ScheduleType.weekly,
+        '2 tablets',
+        days: [1, 3, 5],
+      );
+      expect(
+        StockIntelligence.dailyConsumption(
+          medication: _medication(),
+          schedules: [weekly],
+        ),
+        closeTo(6 / 7, 0.0001),
+      );
+    });
+
+    test('weekly schedule with no selected days has no consumption', () {
+      expect(
+        StockIntelligence.dailyConsumption(
+          medication: _medication(),
+          schedules: [_schedule(ScheduleType.weekly, '7 tablets')],
+        ),
+        0,
+      );
+    });
+
+    test('specific-days schedule is averaged over seven days', () {
       final specific = _schedule(
         ScheduleType.specificDays,
         '2 tablets',
@@ -91,9 +115,9 @@ void main() {
       expect(
         StockIntelligence.dailyConsumption(
           medication: _medication(),
-          schedules: [weekly, specific],
+          schedules: [specific],
         ),
-        closeTo(1 + 6 / 7, 0.0001),
+        closeTo(6 / 7, 0.0001),
       );
     });
 

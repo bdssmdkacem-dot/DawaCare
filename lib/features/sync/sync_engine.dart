@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/database/local_database.dart';
 import '../../core/network/connectivity_service.dart';
+import 'domain/sync_queue_rules.dart';
 
 /// Replays queued offline writes against Supabase once connectivity returns.
 ///
@@ -125,13 +126,23 @@ class SyncEngine with WidgetsBindingObserver {
     final applied = result['applied'] == true;
     final currentStatus = result['current_status'] as String?;
 
-    if (applied || currentStatus == status) {
+    if (SyncQueueRules.isAlreadyApplied(
+      applied: applied,
+      currentStatus: currentStatus,
+      requestedStatus: status,
+    )) {
       return _ReplayOutcome.completed;
     }
 
-    // The server has a newer/incompatible lifecycle state. This is a
-    // permanent conflict for this queued intent, not a network failure.
-    return _ReplayOutcome.conflict;
+    if (SyncQueueRules.isPermanentConflict(
+      applied: applied,
+      currentStatus: currentStatus,
+      requestedStatus: status,
+    )) {
+      return _ReplayOutcome.conflict;
+    }
+
+    return _ReplayOutcome.retry;
   }
 
   Future<void> _refreshConflictedDose(Map<String, dynamic> op) async {

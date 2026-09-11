@@ -6,6 +6,7 @@ import 'package:dawacare/models/dose_instance.dart';
 import 'package:dawacare/models/family_member_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 DoseInstance _dose({
   required DoseStatus status,
@@ -50,6 +51,11 @@ void main() {
   });
 
   testWidgets('Caregiver dashboard renders the same adherence semantics', (tester) async {
+    await Supabase.initialize(
+      url: 'https://example.supabase.co',
+      anonKey: 'test-anon-key',
+    );
+
     final provider = CaregiverProvider();
     provider.linkedPatients = [
       CaregiverLink(

@@ -1,73 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../app/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../core/utils/date_time_utils.dart';
-import '../../../../core/widgets/loading_indicator.dart';
-import '../../../../core/widgets/primary_button.dart';
-import '../../../../models/caregiver_alert.dart';
-import '../../../../models/caregiver_link.dart';
-import '../../../../models/family_link_request.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../data/caregiver_repository.dart';
 import '../providers/caregiver_provider.dart';
-import '../widgets/caregiver_daily_dashboard.dart';
-import '../widgets/family_member_card.dart';
-import '../widgets/link_code_sheet.dart';
-import 'caregiver_alert_center_page.dart';
 import 'patient_detail_page.dart';
 
 class CaregiverHomePage extends StatefulWidget {
-  final String? initialAlertId;
   const CaregiverHomePage({super.key, this.initialAlertId});
+
+  final String? initialAlertId;
+
   @override
   State<CaregiverHomePage> createState() => _CaregiverHomePageState();
 }
 
 class _CaregiverHomePageState extends State<CaregiverHomePage> {
-  bool _loadedOnce = false;
   bool _openedInitialAlert = false;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_loadedOnce) return;
-    _loadedOnce = true;
-    final id = context.read<AuthProvider>().profile?.id;
-    if (id != null) {
-      context.read<CaregiverProvider>().load(id).then((_) {
-        if (mounted) _openInitialAlert();
-      });
-    }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _load();
+    });
   }
 
-  Future<void> _reload() async {
+  Future<void> _load() async {
     final id = context.read<AuthProvider>().profile?.id;
     if (id != null) await context.read<CaregiverProvider>().load(id);
+    _openInitialAlert();
   }
 
   void _openInitialAlert() {
     if (!mounted || _openedInitialAlert || widget.initialAlertId == null) return;
     final provider = context.read<CaregiverProvider>();
-    final alert = provider.alerts.cast<CaregiverAlert?>().firstWhere((item) => item?.id == widget.initialAlertId, orElse: () => null);
+    final alert = provider.alerts.cast<CaregiverAlert?>().firstWhere(
+          (item) => item?.id == widget.initialAlertId,
+          orElse: () => null,
+        );
     if (alert == null) return;
     _openedInitialAlert = true;
-    final link = provider.linkedPatients.cast<CaregiverLink?>().firstWhere((item) => item?.patientId == alert.patientId, orElse: () => null);
+    final link = provider.linkedPatients.cast<CaregiverLink?>().firstWhere(
+          (item) => item?.patientId == alert.patientId,
+          orElse: () => null,
+        );
     provider.markAlertRead(alert);
     if (link == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPage(link: link, initialDoseId: alert.doseId)));
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PatientDetailPage(
+            link: link,
+            initialDoseId: alert.doseId,
+          ),
+        ),
+      );
     });
-  }
-
-  Future<void> _openAlert(CaregiverAlert alert) async {
-    final provider = context.read<CaregiverProvider>();
-    await provider.markAlertRead(alert);
-    if (!mounted) return;
-    final link = provider.linkedPatients.cast<CaregiverLink?>().firstWhere((item) => item?.patientId == alert.patientId, orElse: () => null);
-    if (link == null) return;
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPage(link: link, initialDoseId: alert.doseId)));
   }
 
   Future<void> _openGenerateCodeSheet() async {
@@ -76,186 +68,98 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
     await provider.generateCode();
     if (!mounted) return;
     if (provider.activeCode == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.error ?? l.unexpectedError)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.error ?? l.unexpectedError)),
+      );
       return;
     }
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => LinkCodeSheet(
-        initialCode: provider.activeCode!,
-        onRegenerate: () async {
-          await provider.generateCode();
-          return provider.activeCode;
-        },
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(provider.activeCode!),
       ),
     );
   }
 
-  Future<void> _openRequestLinkDialog() async {
-    final l = AppLocalizations.of(context);
-    final codeController = TextEditingController();
-    final relationshipController = TextEditingController();
-    var selectedRole = CaregiverRole.caregiver;
-    try {
-      final result = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
-          title: Text(l.followSomeone),
-          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_tr(context, 'أدخل رمز الربط الذي شاركه معك واختر مستوى الوصول.', 'Enter the shared link code and choose the access level.', 'Saisissez le code partagé et choisissez le niveau d’accès.')),
-            const SizedBox(height: 14),
-            TextField(controller: codeController, autofocus: true, textAlign: TextAlign.center, keyboardType: TextInputType.number, maxLength: 6, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 6), decoration: const InputDecoration(counterText: '', hintText: '000000')),
-            const SizedBox(height: 10),
-            Text(_tr(context, 'نوع الوصول', 'Access level', 'Niveau d’accès'), style: const TextStyle(fontWeight: FontWeight.w800)),
-            RadioGroup<CaregiverRole>(
-              groupValue: selectedRole,
-              onChanged: (value) { if (value != null) setDialogState(() => selectedRole = value); },
-              child: Column(children: [
-                RadioListTile<CaregiverRole>(contentPadding: EdgeInsets.zero, value: CaregiverRole.caregiver, title: Text(_tr(context, 'مرافق — يمكنه متابعة وتدبير الجرعات', 'Caregiver — can monitor and manage doses', 'Accompagnant — peut suivre et gérer les doses'))),
-                RadioListTile<CaregiverRole>(contentPadding: EdgeInsets.zero, value: CaregiverRole.viewer, title: Text(_tr(context, 'فرد العائلة — مشاهدة وإرسال رسائل صوتية فقط', 'Family member — view and send voice messages only', 'Membre de la famille — consultation et messages vocaux uniquement'))),
-              ]),
-            ),
-            TextField(controller: relationshipController, decoration: InputDecoration(labelText: _tr(context, 'صلتك بهذا الشخص (اختياري)', 'Your relationship to this person (optional)', 'Votre lien avec cette personne (facultatif)'), hintText: _tr(context, 'مثال: ابنه، ابنته...', 'e.g. son, daughter...', 'ex. fils, fille...'))),
-          ]),),
-          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(l.cancel)), FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(_tr(context, 'إرسال الطلب', 'Send request', 'Envoyer la demande')))],
-        )),
-      );
-      if (result != true || codeController.text.trim().isEmpty || !mounted) return;
-      final provider = context.read<CaregiverProvider>();
-      final name = await provider.submitCode(codeController.text.trim(), role: selectedRole, relationshipLabel: relationshipController.text.trim());
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(name != null ? _tr(context, 'تم إرسال الطلب إلى $name — بانتظار الموافقة', 'Request sent to $name — awaiting approval', 'Demande envoyée à $name — en attente d’approbation') : (provider.error ?? l.unexpectedError))));
-      if (name != null) await _reload();
-    } finally {
-      codeController.dispose();
-      relationshipController.dispose();
-    }
-  }
-
-  Future<void> _respond(FamilyLinkRequest request, bool approve) async {
-    final provider = context.read<CaregiverProvider>();
-    final ok = await provider.respondToRequest(request, approve: approve);
-    if (!mounted || !ok) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(approve ? _tr(context, 'تم قبول ${request.caregiverName}', '${request.caregiverName} was accepted', '${request.caregiverName} a été accepté') : _tr(context, 'تم رفض الطلب', 'Request rejected', 'Demande refusée'))));
-    if (approve) await _reload();
-  }
-
-  Widget _sectionHeader(BuildContext context, String title, {IconData? icon}) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Row(children: [
-      if (icon != null) ...[
-        Container(width: 34, height: 34, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(11)), child: Icon(icon, size: 19, color: AppColors.primary)),
-        const SizedBox(width: 10),
-      ],
-      Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
-    ]),
-  );
-
-  Widget _actionCard(BuildContext context, {required IconData icon, required String label, required VoidCallback onPressed}) => Expanded(child: Card(child: InkWell(
-    borderRadius: BorderRadius.circular(20), onTap: onPressed,
-    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16), child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), shape: BoxShape.circle), child: Icon(icon, color: AppColors.primary, size: 23)),
-      const SizedBox(height: 9), Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-    ])),
-  )));
-
-  void _openFamilyMemberProfile(CaregiverLink link) {
-    final hasAvatar = link.patientAvatarUrl?.trim().isNotEmpty == true;
-    showDialog<void>(context: context, builder: (dialogContext) => Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
-        CircleAvatar(radius: 72, backgroundImage: hasAvatar ? NetworkImage(link.patientAvatarUrl!.trim()) : null, onBackgroundImageError: hasAvatar ? (_, __) {} : null, child: hasAvatar ? null : const Icon(Icons.person_rounded, size: 52)),
-        const SizedBox(height: 16), Text(link.patientName, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 8), Text(_roleLabel(context, link.role), style: Theme.of(context).textTheme.bodyMedium),
-        if ((link.relationshipLabel ?? '').trim().isNotEmpty) ...[const SizedBox(height: 4), Text(link.relationshipLabel!.trim())],
-        const SizedBox(height: 18), SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.pop(dialogContext), child: Text(AppLocalizations.of(context).cancel))),
-      ])),
-    ));
-  }
-
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
     final provider = context.watch<CaregiverProvider>();
+    final l = AppLocalizations.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: Text(l.family)),
-      body: provider.isLoading && provider.linkedPatients.isEmpty && provider.incomingRequests.isEmpty ? const LoadingIndicator() : RefreshIndicator(
-        onRefresh: _reload,
-        child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 14, 16, 32), children: [
-          Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.primary, AppColors.primaryDark]), borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: .16), blurRadius: 20, offset: const Offset(0, 8))]), child: Row(children: [
-            Container(width: 52, height: 52, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.health_and_safety_rounded, color: Colors.white, size: 29)),
-            const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l.family, style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(_tr(context, 'تابع من تحب وكن قريباً من أدويتهم.', 'Stay close to the people you care for and their medicines.', 'Restez proche de vos proches et de leurs médicaments.'), style: TextStyle(color: Colors.white.withValues(alpha: .88), height: 1.35))]))
-          ])),
-          if (provider.linkedPatients.isNotEmpty || provider.isSummariesLoading) ...[const SizedBox(height: 16), CaregiverDailyDashboard(provider: provider)],
-          if (provider.alerts.isNotEmpty) ...[
+      appBar: AppBar(
+        title: Text(l.caregiver),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _load,
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              l.caregiverDashboard,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             const SizedBox(height: 16),
-            Card(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CaregiverAlertCenterPage())),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Row(children: [
-                    Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: .10), borderRadius: BorderRadius.circular(14)), child: Icon(Icons.notifications_active_rounded, color: AppColors.danger)),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_tr(context, 'مركز التنبيهات والرعاية', 'Care & Alerts', 'Centre des alertes'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                      const SizedBox(height: 3),
-                      Text(_tr(context, '${provider.unreadAlertCount} تنبيه غير مقروء · راجع الجرعات والمخزون', '${provider.unreadAlertCount} unread · review doses and stock', '${provider.unreadAlertCount} non lue(s) · vérifiez doses et stock')),
-                    ])),
-                    const Icon(Icons.chevron_right_rounded),
-                  ]),
+            if (provider.isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (provider.linkedPatients.isEmpty)
+              _EmptyState(onGenerateCode: _openGenerateCodeSheet)
+            else
+              ...provider.linkedPatients.map(
+                (link) => Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.primary,
+                      child: const Icon(Icons.person),
+                    ),
+                    title: Text(link.patientName ?? l.patient),
+                    subtitle: Text(link.relationship ?? ''),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PatientDetailPage(link: link),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
           ],
-          const SizedBox(height: 18),
-          if (provider.incomingRequests.isNotEmpty) ...[
-            _sectionHeader(context, l.familyRequests, icon: Icons.notifications_active_rounded),
-            ...provider.incomingRequests.map((request) => _IncomingRequestCard(request: request, onApprove: () => _respond(request, true), onReject: () => _respond(request, false))),
-            const SizedBox(height: 18),
-          ],
-          _sectionHeader(context, _tr(context, 'إدارة الربط', 'Connection', 'Liaison'), icon: Icons.link_rounded),
-          Row(children: [_actionCard(context, icon: Icons.qr_code_2_rounded, label: l.inviteToMedicines, onPressed: _openGenerateCodeSheet), const SizedBox(width: 10), _actionCard(context, icon: Icons.person_search_rounded, label: l.followSomeone, onPressed: _openRequestLinkDialog)]),
-          if (provider.sentRequests.isNotEmpty) ...[
-            const SizedBox(height: 18), _sectionHeader(context, l.pendingRequests, icon: Icons.hourglass_top_rounded),
-            ...provider.sentRequests.map((request) => _SentRequestTile(request: request, onCancel: () async { final ok = await context.read<CaregiverProvider>().cancelSentRequest(request); if (!context.mounted) return; if (ok) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_tr(context, 'تم إلغاء الطلب', 'Request cancelled', 'Demande annulée')))); })),
-          ],
-          const SizedBox(height: 18), _sectionHeader(context, l.familyMembers, icon: Icons.groups_rounded),
-          if (provider.linkedPatients.isEmpty)
-            Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(children: [Container(width: 64, height: 64, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), shape: BoxShape.circle), child: const Icon(Icons.family_restroom_rounded, size: 32, color: AppColors.primary)), const SizedBox(height: 12), Text(l.noFamilyLinked, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)), const SizedBox(height: 16), SizedBox(width: 220, child: PrimaryButton(label: l.requestFollowNow, onPressed: _openRequestLinkDialog, icon: Icons.person_add_alt_1_rounded))])))
-          else
-            ...provider.linkedPatients.map((link) => FamilyMemberCard(link: link, onOpen: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPage(link: link))), onProfile: () => _openFamilyMemberProfile(link))),
-        ]),
+        ),
       ),
     );
   }
 }
 
-String _tr(BuildContext context, String ar, String en, String fr) {
-  switch (Localizations.localeOf(context).languageCode) { case 'en': return en; case 'fr': return fr; default: return ar; }
-}
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.onGenerateCode});
 
-String _roleLabel(BuildContext context, CaregiverRole role) {
-  switch (role) { case CaregiverRole.viewer: return _tr(context, 'فرد العائلة', 'Family member', 'Membre de la famille'); case CaregiverRole.primary: return _tr(context, 'مرافق رئيسي', 'Primary caregiver', 'Accompagnant principal'); case CaregiverRole.caregiver: return _tr(context, 'مرافق', 'Caregiver', 'Accompagnant'); }
-}
+  final VoidCallback onGenerateCode;
 
-class _IncomingRequestCard extends StatelessWidget {
-  final FamilyLinkRequest request; final VoidCallback onApprove; final VoidCallback onReject;
-  const _IncomingRequestCard({required this.request, required this.onApprove, required this.onReject});
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context); final role = _roleLabel(context, request.role); final relationship = request.relationshipLabel;
-    final message = relationship != null && relationship.isNotEmpty ? _tr(context, '${request.caregiverName} ($relationship) يطلب الوصول كـ $role', '${request.caregiverName} ($relationship) requests access as $role', '${request.caregiverName} ($relationship) demande un accès en tant que $role') : _tr(context, '${request.caregiverName} يطلب الوصول كـ $role', '${request.caregiverName} requests access as $role', '${request.caregiverName} demande un accès en tant que $role');
-    return Card(color: Theme.of(context).colorScheme.primary.withValues(alpha: .06), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(message, style: const TextStyle(fontWeight: FontWeight.w700)), const SizedBox(height: 4), Text(DateTimeUtils.relativeDayLabel(request.requestedAt), style: Theme.of(context).textTheme.bodySmall), const SizedBox(height: 12), Row(children: [Expanded(child: OutlinedButton(onPressed: onReject, child: Text(l.reject))), const SizedBox(width: 10), Expanded(child: FilledButton(onPressed: onApprove, child: Text(l.accept)))])]))) ;
+    return Column(
+      children: [
+        const SizedBox(height: 32),
+        const Icon(Icons.people_outline, size: 64),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: onGenerateCode,
+          child: const Text('Generate link code'),
+        ),
+      ],
+    );
   }
-}
-
-class _SentRequestTile extends StatelessWidget {
-  final FamilyLinkRequest request; final VoidCallback onCancel;
-  const _SentRequestTile({required this.request, required this.onCancel});
-  @override
-  Widget build(BuildContext context) => Card(child: ListTile(leading: const CircleAvatar(child: Icon(Icons.hourglass_top_rounded)), title: Text(request.patientName, style: const TextStyle(fontWeight: FontWeight.w700)), subtitle: Text('${AppLocalizations.of(context).waitingApproval} · ${_roleLabel(context, request.role)}'), trailing: TextButton(onPressed: onCancel, child: Text(AppLocalizations.of(context).cancel))));
 }

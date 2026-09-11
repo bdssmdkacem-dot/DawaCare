@@ -6,7 +6,6 @@ import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../doses/domain/adherence_engine.dart';
-import '../../../doses/domain/adherence_report.dart';
 import '../../../doses/presentation/providers/dose_provider.dart';
 import '../../../medications/domain/stock_intelligence.dart';
 import '../../../medications/presentation/pages/medication_detail_page.dart';

@@ -136,33 +136,32 @@ class DoseRepository {
 
     if (ConnectivityService.instance.isOnline) {
       try {
-        final allowedFrom = DoseLifecycle.allowedPredecessors(newStatus)
-            .map(doseStatusToDb)
-            .toList();
+        final rows = await _client.rpc(
+          'apply_dose_status_transition',
+          params: {
+            'p_dose_id': dose.id,
+            'p_patient_id': dose.patientId,
+            'p_to_status': doseStatusToDb(newStatus),
+            'p_source': source,
+          },
+        ) as List<dynamic>;
 
-        final rows = await _client
-            .from('dose_instances')
-            .update({
-              'status': doseStatusToDb(newStatus),
-              'updated_at': DateTime.now().toUtc().toIso8601String(),
-            })
-            .eq('id', dose.id)
-            .inFilter('status', allowedFrom)
-            .select('id,status');
-
-        // A zero-row update means another actor won the race. Never overwrite
-        // that newer server state and never enqueue a stale transition.
         if (rows.isEmpty) {
           await _local.upsertDose(dose.toLocalRow());
           throw StateError('Dose lifecycle conflict for ${dose.id}');
         }
 
-        await _client.from('dose_events').insert({
-          'dose_id': dose.id,
-          'patient_id': dose.patientId,
-          'action': doseStatusToDb(newStatus),
-          'source': source,
-        });
+        final result = Map<String, dynamic>.from(rows.first as Map);
+        final applied = result['applied'] == true;
+        final currentStatus = result['current_status'] as String?;
+
+        if (!applied && currentStatus != doseStatusToDb(newStatus)) {
+          await _local.upsertDose(dose.toLocalRow());
+          throw StateError(
+            'Dose lifecycle conflict for ${dose.id}: '
+            '${currentStatus ?? 'UNKNOWN'} -> ${doseStatusToDb(newStatus)}',
+          );
+        }
 
         try {
           final medication = await _client

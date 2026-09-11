@@ -40,10 +40,11 @@ class StockIntelligence {
           total += amount;
           break;
         case ScheduleType.weekly:
-          total += amount / 7;
-          break;
         case ScheduleType.specificDays:
-          total += amount * schedule.daysOfWeek.toSet().length / 7;
+          // Both schedule types use daysOfWeek in DoseEngine. Keep stock
+          // consumption consistent with the actual dose-generation rules.
+          final days = schedule.daysOfWeek.toSet().length;
+          if (days > 0) total += amount * days / 7;
           break;
         case ScheduleType.interval:
           final interval = schedule.intervalDays;

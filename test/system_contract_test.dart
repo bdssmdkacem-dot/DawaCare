@@ -17,6 +17,20 @@ void main() {
       );
     });
 
+    test('reminder lifecycle reaches missed then taken deterministically', () {
+      expect(
+        DoseLifecycle.canTransition(
+          DoseStatus.reminderSent,
+          DoseStatus.missed,
+        ),
+        isTrue,
+      );
+      expect(
+        DoseLifecycle.canTransition(DoseStatus.missed, DoseStatus.taken),
+        isTrue,
+      );
+    });
+
     test('taken is terminal and cannot be replayed as another outcome', () {
       for (final status in const [
         DoseStatus.pending,
@@ -67,6 +81,17 @@ void main() {
           requestedStatus: 'TAKEN',
         ),
         isFalse,
+      );
+    });
+
+    test('server already at requested state is treated as completed', () {
+      expect(
+        SyncQueueRules.isAlreadyApplied(
+          applied: false,
+          currentStatus: 'TAKEN',
+          requestedStatus: 'TAKEN',
+        ),
+        isTrue,
       );
     });
 

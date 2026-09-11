@@ -10,6 +10,7 @@ import '../../../models/medication_schedule.dart';
 import '../../medications/data/medication_repository.dart';
 import '../../medications/data/stock_alert_service.dart';
 import '../domain/dose_engine.dart';
+import '../domain/dose_lifecycle.dart';
 
 /// Offline-first data access for dose instances.
 class DoseRepository {
@@ -71,7 +72,7 @@ class DoseRepository {
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('patient_id', patientId)
-        .inFilter('status', const ['PENDING', 'REMINDER_SENT'])
+        .inFilter('status', const ['PENDING', 'REMINDER_SENT', 'SNOOZED'])
         .lt('scheduled_at', cutoff);
   }
 
@@ -116,18 +117,46 @@ class DoseRepository {
     DoseStatus newStatus, {
     String source = 'PATIENT',
   }) async {
+    // Same-state replay is a safe no-op. This prevents duplicate lifecycle
+    // events and repeated stock side effects during notification/offline replay.
+    if (dose.status == newStatus) {
+      await _local.upsertDose(dose.toLocalRow());
+      return dose;
+    }
+
+    if (!DoseLifecycle.canTransition(dose.status, newStatus)) {
+      throw StateError(
+        'Invalid dose lifecycle transition: '
+        '${doseStatusToDb(dose.status)} -> ${doseStatusToDb(newStatus)}',
+      );
+    }
+
     final updated = dose.copyWith(status: newStatus, updatedAt: DateTime.now());
     await _local.upsertDose(updated.toLocalRow());
 
     if (ConnectivityService.instance.isOnline) {
       try {
-        await _client
+        final allowedFrom = DoseLifecycle.allowedPredecessors(newStatus)
+            .map(doseStatusToDb)
+            .toList();
+
+        final rows = await _client
             .from('dose_instances')
             .update({
               'status': doseStatusToDb(newStatus),
               'updated_at': DateTime.now().toUtc().toIso8601String(),
             })
-            .eq('id', dose.id);
+            .eq('id', dose.id)
+            .inFilter('status', allowedFrom)
+            .select('id,status');
+
+        // A zero-row update means another actor won the race. Never overwrite
+        // that newer server state and never enqueue a stale transition.
+        if (rows.isEmpty) {
+          await _local.upsertDose(dose.toLocalRow());
+          throw StateError('Dose lifecycle conflict for ${dose.id}');
+        }
+
         await _client.from('dose_events').insert({
           'dose_id': dose.id,
           'patient_id': dose.patientId,
@@ -135,8 +164,6 @@ class DoseRepository {
           'source': source,
         });
 
-        // The stock trigger runs as part of the status update. Refresh the
-        // medication after that transaction and evaluate its alert state.
         try {
           final medication = await _client
               .from('medications')
@@ -153,8 +180,11 @@ class DoseRepository {
         }
 
         return updated;
+      } on StateError {
+        rethrow;
       } catch (_) {
-        // network blip after the connectivity check — queue the write
+        // Network blip after the connectivity check — keep the optimistic
+        // local state and queue the exact lifecycle transition for replay.
       }
     }
 

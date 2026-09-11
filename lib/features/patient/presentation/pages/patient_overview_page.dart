@@ -5,6 +5,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../doses/domain/adherence_report.dart';
 import '../../../doses/presentation/providers/dose_provider.dart';
 import '../../../medications/domain/stock_intelligence.dart';
 import '../../../medications/presentation/pages/medication_detail_page.dart';
@@ -12,6 +13,7 @@ import '../../../medications/presentation/pages/medication_list_page.dart';
 import '../../../medications/presentation/providers/medication_provider.dart';
 import '../../../settings/presentation/pages/profile_page.dart';
 import '../widgets/next_dose_card.dart';
+import 'adherence_history_page.dart';
 
 class PatientOverviewPage extends StatefulWidget {
   const PatientOverviewPage({super.key});
@@ -65,14 +67,18 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
     }
 
     final today = doses.todayDoses;
-    final taken = today.where((d) => d.status == DoseStatus.taken).length;
-    final missed = today.where((d) => d.status == DoseStatus.missed).length;
-    final pending = today.where((d) => d.status == DoseStatus.pending || d.status == DoseStatus.reminderSent || d.status == DoseStatus.snoozed).length;
+    final adherence = doses.todayAdherence;
+    final taken = adherence.taken;
+    final missed = adherence.missed;
+    final pending = adherence.pending;
     final next = today.cast<DoseInstance?>().firstWhere(
-      (d) => d != null && (d.status == DoseStatus.pending || d.status == DoseStatus.reminderSent || d.status == DoseStatus.snoozed),
+      (d) => d != null &&
+          (d.status == DoseStatus.pending ||
+              d.status == DoseStatus.reminderSent ||
+              d.status == DoseStatus.snoozed),
       orElse: () => null,
     );
-    final progress = today.isEmpty ? 0.0 : taken / today.length;
+    final progress = doses.todayAdherenceRate;
 
     return Scaffold(
       appBar: AppBar(
@@ -93,7 +99,9 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
           children: [
             _welcome(profile.fullName),
             const SizedBox(height: 16),
-            _todayCard(taken: taken, total: today.length, missed: missed, pending: pending, progress: progress),
+            _todayCard(taken: taken, total: adherence.resolved, missed: missed, pending: pending, progress: progress),
+            const SizedBox(height: 12),
+            _adherenceCard(adherence),
             const SizedBox(height: 16),
             if (next != null)
               NextDoseCard(
@@ -172,9 +180,23 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
               const SizedBox(height: 14),
               ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: progress, minHeight: 9)),
               const SizedBox(height: 12),
-              Row(children: [Expanded(child: _metric(Icons.check_circle_rounded, '$taken', 'تم أخذها', AppColors.success)), Expanded(child: _metric(Icons.schedule_rounded, '$pending', 'متبقية', AppColors.warning)), Expanded(child: _metric(Icons.warning_rounded, '$missed', 'فائتة', AppColors.danger))]),
+              Row(children: [Expanded(child: _metric(Icons.check_circle_rounded, '$taken', 'تم أخذها', AppColors.success)), Expanded(child: _metric(Icons.schedule_rounded, '$pending', 'مفتوحة', AppColors.warning)), Expanded(child: _metric(Icons.warning_rounded, '$missed', 'فائتة', AppColors.danger))]),
             ],
           ),
+        ),
+      );
+
+  Widget _adherenceCard(AdherenceSummary summary) => Card(
+        elevation: 0,
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppColors.primary.withValues(alpha: .10),
+            child: const Icon(Icons.insights_rounded, color: AppColors.primary),
+          ),
+          title: Text('الالتزام اليومي · ${summary.percentage.round()}%', style: const TextStyle(fontWeight: FontWeight.w900)),
+          subtitle: Text(summary.resolved == 0 ? 'لا توجد جرعات محسومة بعد.' : '${summary.taken} مأخوذة من ${summary.resolved} جرعات محسومة'),
+          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdherenceHistoryPage())),
         ),
       );
 
@@ -182,7 +204,7 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
 
   Widget _allDone(bool hadDoses) => Card(
         elevation: 0,
-        child: Padding(padding: const EdgeInsets.all(22), child: Column(children: [Icon(hadDoses ? Icons.celebration_rounded : Icons.event_available_rounded, size: 40, color: AppColors.success), const SizedBox(height: 8), Text(hadDoses ? 'أكملت جرعات اليوم 🎉' : 'لا توجد جرعات اليوم', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(hadDoses ? 'أحسنت، استمر على هذا الالتزام.' : 'يمكنك مراجعة أدويتك أو إضافة دواء جديد.')])),
+        child: Padding(padding: const EdgeInsets.all(22), child: Column(children: [Icon(hadDoses ? Icons.celebration_rounded : Icons.event_available_rounded, size: 40, color: AppColors.success), const SizedBox(height: 8), Text(hadDoses ? 'أكملت الجرعات المحسومة اليوم 🎉' : 'لا توجد جرعات اليوم', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(hadDoses ? 'يمكنك مراجعة سجل الالتزام لمتابعة تقدمك.' : 'يمكنك مراجعة أدويتك أو إضافة دواء جديد.')])) ,
       );
 
   Widget _sectionHeader(String title, VoidCallback onMore) => Row(children: [Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900)), const Spacer(), TextButton(onPressed: onMore, child: const Text('عرض الكل'))]);

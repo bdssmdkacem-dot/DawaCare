@@ -1,3 +1,4 @@
+import 'package:dawacare/features/medications/data/medication_repository.dart';
 import 'package:dawacare/models/medication.dart';
 import 'package:dawacare/models/medication_schedule.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -70,6 +71,25 @@ void main() {
 
       expect(data['type'], 'WEEKLY');
       expect(data['days_of_week'], [2, 6]);
+    });
+
+    test('schedule replacement targets only unresolved future doses', () {
+      expect(
+        MedicationRepository.futureUnresolvedDoseStatuses,
+        containsAll(<String>['PENDING', 'REMINDER_SENT', 'SNOOZED', 'MISSED']),
+      );
+      expect(
+        MedicationRepository.futureUnresolvedDoseStatuses,
+        isNot(contains('TAKEN')),
+      );
+      expect(
+        MedicationRepository.futureUnresolvedDoseStatuses,
+        isNot(contains('SKIPPED')),
+      );
+      expect(
+        MedicationRepository.futureUnresolvedDoseStatuses,
+        isNot(contains('CANCELLED')),
+      );
     });
   });
 }

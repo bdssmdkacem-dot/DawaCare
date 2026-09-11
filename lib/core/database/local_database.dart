@@ -124,16 +124,20 @@ class LocalDatabase {
     required String payloadJson,
   }) async {
     final db = await database;
-    await db.insert('sync_queue', {
-      'id': id,
-      'entity_type': entityType,
-      'entity_id': entityId,
-      'operation': operation,
-      'payload': payloadJson,
-      'created_at': DateTime.now().toIso8601String(),
-      'retry_count': 0,
-      'status': 'PENDING',
-    });
+    await db.insert(
+      'sync_queue',
+      {
+        'id': id,
+        'entity_type': entityType,
+        'entity_id': entityId,
+        'operation': operation,
+        'payload': payloadJson,
+        'created_at': DateTime.now().toIso8601String(),
+        'retry_count': 0,
+        'status': 'PENDING',
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
   }
 
   Future<List<Map<String, dynamic>>> pendingSyncOperations() async {

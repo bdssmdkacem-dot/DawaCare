@@ -8,6 +8,13 @@ class MedicationRepository {
   final SupabaseClient _client = Supabase.instance.client;
   final MedicationImageService _imageService = MedicationImageService();
 
+  static const futureUnresolvedDoseStatuses = <String>[
+    'PENDING',
+    'REMINDER_SENT',
+    'SNOOZED',
+    'MISSED',
+  ];
+
   Future<List<Medication>> fetchMedications(String patientId, {bool activeOnly = true}) async { var query = _client.from('medications').select().eq('patient_id', patientId); if (activeOnly) query = query.eq('active', true); final rows = await query.order('created_at', ascending: false); return rows.map((r) => Medication.fromMap(r)).toList(); }
   Future<List<MedicationSchedule>> fetchSchedules(String medicationId) async { final today = DateTime.now().toIso8601String().split('T').first; final rows = await _client.from('medication_schedules').select().eq('medication_id', medicationId).or('end_date.is.null,end_date.gte.$today'); return rows.map((r) => MedicationSchedule.fromMap(r)).toList(); }
   Future<List<Map<String, dynamic>>> fetchStockTransactions(String medicationId) async { final rows = await _client.from('medication_stock_transactions').select('id, medication_id, patient_id, quantity, transaction_type, dose_id, note, created_by, created_at').eq('medication_id', medicationId).order('created_at', ascending: false).limit(100); return rows.map((row) => Map<String, dynamic>.from(row)).toList(); }
@@ -51,8 +58,29 @@ class MedicationRepository {
   Future<MedicationSchedule> createSchedule(String medicationId, MedicationSchedule schedule) async { final row = await _client.from('medication_schedules').insert(schedule.toInsertMap(medicationId)).select().single(); return MedicationSchedule.fromMap(row); }
   Future<MedicationSchedule> updateSchedule(MedicationSchedule schedule) async { final data = schedule.toInsertMap(schedule.medicationId)..remove('medication_id'); final row = await _client.from('medication_schedules').update(data).eq('id', schedule.id).select().single(); return MedicationSchedule.fromMap(row); }
   Future<void> retireSchedule(String scheduleId, DateTime endDate) async { await _client.from('medication_schedules').update({'end_date': endDate.toIso8601String().split('T').first}).eq('id', scheduleId); }
-  Future<List<MedicationSchedule>> replaceSchedules({required String medicationId, required List<MedicationSchedule> schedules}) async { final existing = await _client.from('medication_schedules').select('id').eq('medication_id', medicationId); final yesterday = DateTime.now().subtract(const Duration(days: 1)); for (final row in existing) { await retireSchedule(row['id'] as String, yesterday); } final created = <MedicationSchedule>[]; for (final schedule in schedules) { created.add(await createSchedule(medicationId, schedule)); } return created; }
-  Future<void> deleteFutureUnresolvedDoses(String scheduleId, DateTime from) async { final fromUtc = from.toUtc().toIso8601String(); for (final status in const ['PENDING', 'REMINDER_SENT', 'SNOOZED', 'MISSED']) { await _client.from('dose_instances').delete().eq('schedule_id', scheduleId).eq('status', status).gte('scheduled_at', fromUtc); } }
+
+  Future<List<MedicationSchedule>> replaceSchedules({required String medicationId, required List<MedicationSchedule> schedules}) async {
+    final existing = await _client.from('medication_schedules').select('id').eq('medication_id', medicationId);
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final replacementFrom = DateTime.now();
+    for (final row in existing) {
+      final scheduleId = row['id'] as String;
+      await deleteFutureUnresolvedDoses(scheduleId, replacementFrom);
+      await retireSchedule(scheduleId, yesterday);
+    }
+    final created = <MedicationSchedule>[];
+    for (final schedule in schedules) {
+      created.add(await createSchedule(medicationId, schedule));
+    }
+    return created;
+  }
+
+  Future<void> deleteFutureUnresolvedDoses(String scheduleId, DateTime from) async {
+    final fromUtc = from.toUtc().toIso8601String();
+    for (final status in futureUnresolvedDoseStatuses) {
+      await _client.from('dose_instances').delete().eq('schedule_id', scheduleId).eq('status', status).gte('scheduled_at', fromUtc);
+    }
+  }
   Future<void> deleteFuturePendingDoses(String scheduleId, DateTime from) async { await _client.from('dose_instances').delete().eq('schedule_id', scheduleId).eq('status', 'PENDING').gte('scheduled_at', from.toUtc().toIso8601String()); }
   Future<void> deactivateMedication(String medicationId) async => _client.from('medications').update({'active': false}).eq('id', medicationId);
   Future<void> deleteMedication(String medicationId) async => _client.from('medications').delete().eq('id', medicationId);

@@ -4,6 +4,7 @@ class CaregiverAlert {
   final String patientId;
   final String patientName;
   final String? doseId;
+  final String? medicationId;
   final String type;
   final String message;
   final bool read;
@@ -15,6 +16,7 @@ class CaregiverAlert {
     required this.patientId,
     required this.patientName,
     this.doseId,
+    this.medicationId,
     required this.type,
     required this.message,
     required this.read,
@@ -29,6 +31,7 @@ class CaregiverAlert {
       patientId: map['patient_id'] as String,
       patientName: (patient?['full_name'] as String?) ?? 'مريض',
       doseId: map['dose_id'] as String?,
+      medicationId: map['medication_id'] as String?,
       type: map['type'] as String,
       message: map['message'] as String,
       read: map['read'] as bool? ?? false,

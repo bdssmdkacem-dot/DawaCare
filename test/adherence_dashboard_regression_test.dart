@@ -55,6 +55,10 @@ void main() {
     final client = SupabaseClient(
       'https://example.supabase.co',
       'test-anon-key',
+      authOptions: const FlutterAuthClientOptions(
+        autoRefreshToken: false,
+        persistSession: false,
+      ),
     );
     final provider = CaregiverProvider(
       repository: CaregiverRepository(client: client),

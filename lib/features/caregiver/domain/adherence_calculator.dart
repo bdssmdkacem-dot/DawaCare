@@ -1,10 +1,11 @@
 import '../../../models/dose_instance.dart';
+import '../../doses/domain/adherence_engine.dart';
 
 class AdherenceStats {
   final int taken;
   final int missed;
   final int skipped;
-  final int open; // still pending/snoozed but already due
+  final int open;
   final int total;
 
   const AdherenceStats({
@@ -19,33 +20,19 @@ class AdherenceStats {
   int get takenPercent => (takenRate * 100).round();
 }
 
-/// Computes adherence only over doses whose scheduled time has already
-/// passed — future doses aren't "missed" yet, so counting them would
-/// artificially deflate the percentage (see architecture doc §18).
+/// Compatibility adapter for caregiver reporting.
+/// Adherence semantics are owned by [AdherenceEngine].
 class AdherenceCalculator {
   AdherenceCalculator._();
 
   static AdherenceStats compute(List<DoseInstance> doses) {
-    final now = DateTime.now();
-    final due = doses.where((d) => d.scheduledAt.isBefore(now)).toList();
-
-    int taken = 0, missed = 0, skipped = 0, open = 0;
-    for (final d in due) {
-      switch (d.status) {
-        case DoseStatus.taken:
-          taken++;
-          break;
-        case DoseStatus.missed:
-          missed++;
-          break;
-        case DoseStatus.skipped:
-        case DoseStatus.cancelled:
-          skipped++;
-          break;
-        default:
-          open++;
-      }
-    }
-    return AdherenceStats(taken: taken, missed: missed, skipped: skipped, open: open, total: due.length);
+    final summary = AdherenceEngine.compute(doses, day: DateTime.now());
+    return AdherenceStats(
+      taken: summary.taken,
+      missed: summary.missed,
+      skipped: summary.excluded,
+      open: summary.pending,
+      total: summary.resolved,
+    );
   }
 }

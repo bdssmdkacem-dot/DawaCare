@@ -25,7 +25,6 @@ class CaregiverProvider extends ChangeNotifier {
 
   FamilyMemberSummary? summaryFor(String patientId) => memberSummaries[patientId];
 
-  /// Aggregated daily metrics for the caregiver dashboard.
   int get totalActiveMedicationCount =>
       memberSummaries.values.fold(0, (sum, item) => sum + item.activeMedicationCount);
 
@@ -38,10 +37,11 @@ class CaregiverProvider extends ChangeNotifier {
   int get totalMissedDoseCount =>
       memberSummaries.values.fold(0, (sum, item) => sum + item.missedDoseCount);
 
-  int get totalPendingDoseCount {
-    final pending = totalTodayDoseCount - totalTakenDoseCount - totalMissedDoseCount;
-    return pending < 0 ? 0 : pending;
-  }
+  int get totalPendingDoseCount =>
+      memberSummaries.values.fold(0, (sum, item) => sum + item.pendingDoseCount);
+
+  int get totalExcludedDoseCount =>
+      memberSummaries.values.fold(0, (sum, item) => sum + item.excludedDoseCount);
 
   int get lowStockMedicationCount =>
       memberSummaries.values.fold(0, (sum, item) => sum + item.lowStockMedicationCount);
@@ -49,8 +49,7 @@ class CaregiverProvider extends ChangeNotifier {
   int get outOfStockMedicationCount =>
       memberSummaries.values.fold(0, (sum, item) => sum + item.outOfStockMedicationCount);
 
-  /// Overall adherence across all resolved doses, rather than averaging
-  /// percentages from individual patients.
+  /// Overall adherence across all resolved doses, using the shared adherence semantics.
   double get overallAdherence {
     final resolved = totalTakenDoseCount + totalMissedDoseCount;
     if (resolved == 0) return 0;
@@ -82,9 +81,6 @@ class CaregiverProvider extends ChangeNotifier {
       alerts = results[1] as List<CaregiverAlert>;
       incomingRequests = results[2] as List<FamilyLinkRequest>;
       sentRequests = results[3] as List<FamilyLinkRequest>;
-
-      // Identity, requests and alerts must not wait for slower per-patient
-      // medication/dose summaries. Summary cards update when those queries finish.
       loadMemberSummaries();
     } catch (_) {
       error = 'تعذّر تحميل بيانات العائلة.';
@@ -105,15 +101,9 @@ class CaregiverProvider extends ChangeNotifier {
     try {
       final entries = await Future.wait(linkedPatients.map((link) async {
         try {
-          return MapEntry(
-            link.patientId,
-            await _repo.fetchMemberSummary(link.patientId),
-          );
+          return MapEntry(link.patientId, await _repo.fetchMemberSummary(link.patientId));
         } catch (_) {
-          return MapEntry(
-            link.patientId,
-            const FamilyMemberSummary.empty(),
-          );
+          return MapEntry(link.patientId, const FamilyMemberSummary.empty());
         }
       }));
       memberSummaries
@@ -166,12 +156,10 @@ class CaregiverProvider extends ChangeNotifier {
       return patientName;
     } on FamilyLinkException catch (e) {
       error = switch (e.code) {
-        'CODE_INVALID_OR_EXPIRED' =>
-          'الرمز غير صحيح أو انتهت صلاحيته. اطلب رمزًا جديدًا.',
+        'CODE_INVALID_OR_EXPIRED' => 'الرمز غير صحيح أو انتهت صلاحيته. اطلب رمزًا جديدًا.',
         'CANNOT_LINK_SELF' => 'لا يمكنك إرسال طلب لنفسك.',
         'ALREADY_LINKED' => 'أنتما مرتبطان بالفعل.',
-        'REQUEST_ALREADY_PENDING' =>
-          'لديك طلب سابق بانتظار الموافقة لهذا الشخص.',
+        'REQUEST_ALREADY_PENDING' => 'لديك طلب سابق بانتظار الموافقة لهذا الشخص.',
         'INVALID_LINK_ROLE' => 'نوع الربط غير مسموح.',
         _ => 'تعذّر إرسال الطلب. حاول مرة أخرى.',
       };
@@ -199,15 +187,9 @@ class CaregiverProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> respondToRequest(
-    FamilyLinkRequest request, {
-    required bool approve,
-  }) async {
+  Future<bool> respondToRequest(FamilyLinkRequest request, {required bool approve}) async {
     try {
-      await _repo.respondToRequest(
-        requestId: request.id,
-        approve: approve,
-      );
+      await _repo.respondToRequest(requestId: request.id, approve: approve);
       incomingRequests.removeWhere((r) => r.id == request.id);
       notifyListeners();
       return true;

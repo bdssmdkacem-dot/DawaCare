@@ -136,7 +136,12 @@ class _CaregiverMedicationRefillPageState
           }
 
           final medication = _medication;
-          final days = StockIntelligence.daysRemaining(medication);
+          final schedules =
+              _provider.schedulesByMedicationId[medication.id] ?? const [];
+          final days = StockIntelligence.daysRemaining(
+            medication: medication,
+            schedules: schedules,
+          );
           final low = StockIntelligence.isLowStock(medication);
           final out = StockIntelligence.isOutOfStock(medication);
 
@@ -146,92 +151,46 @@ class _CaregiverMedicationRefillPageState
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(18),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 58,
-                        height: 58,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: .10),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Icons.medication_rounded,
-                          color: AppColors.primary,
-                          size: 30,
-                        ),
-                      ),
-                      const SizedBox(width: 13),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              medication.name,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.patientName,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        medication.name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(widget.patientName),
+                      const SizedBox(height: 16),
                       Row(
                         children: [
-                          Icon(
-                            out
-                                ? Icons.production_quantity_limits_rounded
-                                : low
-                                    ? Icons.warning_amber_rounded
-                                    : Icons.inventory_2_rounded,
-                            color: out || low
-                                ? AppColors.danger
-                                : AppColors.primary,
-                          ),
-                          const SizedBox(width: 9),
                           Expanded(
-                            child: Text(
-                              _tr(
-                                'الحالة الحالية',
-                                'Current stock',
-                                'Stock actuel',
-                              ),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                              ),
+                            child: _metric(
+                              _formatQuantity(medication.stockQuantity),
+                              _tr('المخزون الحالي', 'Current stock', 'Stock actuel'),
                             ),
                           ),
-                          Text(
-                            '${medication.stockQuantity} ${medication.stockUnit}',
-                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          Expanded(
+                            child: _metric(
+                              days == null
+                                  ? '—'
+                                  : '${days.toStringAsFixed(1)} ${_tr('يوم', 'days', 'jours')}',
+                              _tr('المدة المتوقعة', 'Days remaining', 'Jours restants'),
+                            ),
                           ),
                         ],
                       ),
-                      if (days != null) ...[
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Text(
-                            _tr(
-                              'يكفي تقريباً لـ $days يوماً',
-                              'Approximately $days days remaining',
-                              'Environ $days jours restants',
-                            ),
+                      if (out || low) ...[
+                        const SizedBox(height: 14),
+                        Text(
+                          out
+                              ? _tr('المخزون نافد.', 'Out of stock.', 'Stock épuisé.')
+                              : _tr('المخزون منخفض.', 'Low stock.', 'Stock faible.'),
+                          style: TextStyle(
+                            color: AppColors.danger,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
@@ -239,71 +198,34 @@ class _CaregiverMedicationRefillPageState
                   ),
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
               if (widget.canManageStock) ...[
-                Text(
-                  _tr('إضافة مخزون', 'Refill stock', 'Réapprovisionner'),
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
+                TextField(
+                  controller: _quantityController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: _tr('كمية الإضافة', 'Refill quantity', 'Quantité à ajouter'),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _quantityController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: _tr(
-                              'الكمية المضافة',
-                              'Quantity to add',
-                              'Quantité à ajouter',
-                            ),
-                            suffixText: medication.stockUnit,
-                            border: const OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _refill,
-                            icon: const Icon(Icons.add_box_rounded),
-                            label: Text(
-                              _tr(
-                                'إضافة إلى المخزون',
-                                'Add to stock',
-                                'Ajouter au stock',
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _refill,
+                    icon: const Icon(Icons.add_box_rounded),
+                    label: Text(_tr('إضافة إلى المخزون', 'Add to stock', 'Ajouter au stock')),
                   ),
                 ),
               ] else
                 Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.lock_outline_rounded),
-                    title: Text(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Text(
                       _tr(
-                        'المخزون للعرض فقط',
-                        'Stock is view-only',
-                        'Stock en lecture seule',
-                      ),
-                    ),
-                    subtitle: Text(
-                      _tr(
-                        'لا تملك صلاحية تعديل مخزون هذا المريض.',
-                        'You do not have permission to change this patient’s stock.',
-                        'Vous n’avez pas l’autorisation de modifier ce stock.',
+                        'ليس لديك صلاحية تعديل المخزون.',
+                        'You do not have permission to change stock.',
+                        'Vous n’avez pas la permission de modifier le stock.',
                       ),
                     ),
                   ),
@@ -313,5 +235,22 @@ class _CaregiverMedicationRefillPageState
         },
       ),
     );
+  }
+
+  Widget _metric(String value, String label) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(value, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 3),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+
+  String _formatQuantity(double value) {
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
   }
 }

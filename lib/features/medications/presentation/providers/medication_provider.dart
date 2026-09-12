@@ -85,15 +85,35 @@ class MedicationProvider extends ChangeNotifier {
   Future<List<Map<String, dynamic>>> fetchStockTransactions(String medicationId) => _repo.fetchStockTransactions(medicationId);
 
   Future<bool> addMedication({required Medication medication, required MedicationSchedule schedule, Uint8List? imageBytes}) async {
+    Medication? created;
     try {
-      final created = await _repo.createMedication(medication, imageBytes: imageBytes);
+      created = await _repo.createMedication(medication, imageBytes: imageBytes);
       final createdSchedule = await _repo.createSchedule(created.id, schedule);
-      await _syncMedicationFuture(patientId: created.patientId, medicationId: created.id);
+
+      // Saving the medication and its schedule is the critical operation.
+      // Dose generation/reminder synchronization is a follow-up task and must
+      // not turn a successful medication save into a false failure on device.
+      try {
+        await _syncMedicationFuture(patientId: created.patientId, medicationId: created.id);
+      } catch (_) {
+        // The next medication/dose refresh will reconcile future doses and reminders.
+      }
+
       medications.insert(0, created);
       schedulesByMedicationId[created.id] = [createdSchedule];
       _notify();
       return true;
     } catch (_) {
+      // If the medication row was created but its first schedule failed,
+      // remove the incomplete medication so the user never gets a phantom
+      // medication without a schedule.
+      if (created != null) {
+        try {
+          await _repo.deleteMedication(created.id);
+        } catch (_) {
+          // Keep the original failure as the user-facing result.
+        }
+      }
       error = 'تعذّر إضافة الدواء. حاول مرة أخرى.';
       _notify();
       return false;

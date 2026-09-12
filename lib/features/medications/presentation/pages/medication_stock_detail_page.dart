@@ -42,9 +42,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
     try {
       final provider = context.read<MedicationProvider>();
       final schedules = await provider.fetchSchedules(_medication.id);
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _schedules = schedules;
         _loading = false;
@@ -52,9 +50,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       });
       _historyKey.currentState?.refresh();
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _error = 'تعذّر تحميل بيانات المخزون.';
@@ -66,9 +62,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
     var total = 0.0;
     for (final s in _schedules) {
       final dose = _extractNumber(s.doseAmount);
-      if (dose <= 0) {
-        continue;
-      }
+      if (dose <= 0) continue;
       switch (s.type) {
         case ScheduleType.daily:
           total += dose;
@@ -105,12 +99,8 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
           .replaceFirst(RegExp(r'\.$'), '');
 
   String _stockStatus() {
-    if (_medication.stockQuantity <= 0) {
-      return 'منتهي';
-    }
-    if (_medication.stockQuantity <= _medication.lowStockThreshold) {
-      return 'منخفض';
-    }
+    if (_medication.stockQuantity <= 0) return 'منتهي';
+    if (_medication.stockQuantity <= _medication.lowStockThreshold) return 'منخفض';
     return 'جيد';
   }
 
@@ -123,16 +113,12 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
         ),
       ),
     );
-    if (!mounted || changed != true) {
-      return;
-    }
+    if (!mounted || changed != true) return;
     final provider = context.read<MedicationProvider>();
     final updated = provider.medications
         .where((m) => m.id == _medication.id)
         .firstOrNull;
-    if (updated != null) {
-      setState(() => _medication = updated);
-    }
+    if (updated != null) setState(() => _medication = updated);
     await _load();
   }
 
@@ -145,9 +131,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
         content: TextField(
           controller: c,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
-            labelText: 'الكمية (${_medication.stockUnit})',
-          ),
+          decoration: InputDecoration(labelText: 'الكمية (${_medication.stockUnit})'),
         ),
         actions: [
           TextButton(
@@ -165,25 +149,27 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       ),
     );
     c.dispose();
-    if (!mounted || result == null || result <= 0) {
-      return;
-    }
+    if (!mounted || result == null || result <= 0) return;
+
+    // The dialog route must finish its overlay/dependent teardown before the
+    // provider notifies the IndexedStack/MaterialApp tree. Without this frame
+    // boundary Flutter can hit InheritedElement._dependents assertions.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
     final provider = context.read<MedicationProvider>();
     final ok = await provider.addMedicationStock(
       medication: _medication,
       quantity: result,
     );
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     if (ok) {
       final updated = provider.medications
           .where((m) => m.id == _medication.id)
           .firstOrNull;
-      if (updated != null) {
-        setState(() => _medication = updated);
-      }
-      _historyKey.currentState?.refresh();
+      if (updated != null) setState(() => _medication = updated);
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted) _historyKey.currentState?.refresh();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(provider.error ?? 'تعذر تحديث المخزون')),
@@ -219,25 +205,18 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                   DropdownMenuItem(value: 'injection', child: Text('حقنة')),
                 ],
                 onChanged: (v) {
-                  if (v != null) {
-                    setDialogState(() => unit = v);
-                  }
+                  if (v != null) setDialogState(() => unit = v);
                 },
               ),
               TextField(
                 controller: package,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(labelText: 'كمية العبوة'),
               ),
               TextField(
                 controller: threshold,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration:
-                    const InputDecoration(labelText: 'حد المخزون المنخفض'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'حد المخزون المنخفض'),
               ),
             ],
           ),
@@ -258,9 +237,11 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
     final t = double.tryParse(threshold.text.trim().replaceAll(',', '.'));
     package.dispose();
     threshold.dispose();
-    if (result != true || !mounted || t == null || t < 0) {
-      return;
-    }
+    if (result != true || !mounted || t == null || t < 0) return;
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
     final provider = context.read<MedicationProvider>();
     final ok = await provider.updateMedicationStockSettings(
       medication: _medication,
@@ -268,25 +249,19 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       packageQuantity: p,
       threshold: t,
     );
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     if (ok) {
       final updated = provider.medications
           .where((m) => m.id == _medication.id)
           .firstOrNull;
-      if (updated != null) {
-        setState(() => _medication = updated);
-      }
+      if (updated != null) setState(() => _medication = updated);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final daily = _calculateDailyConsumption();
-    final daysRemaining = daily > 0
-        ? _medication.stockQuantity / daily
-        : null;
+    final daysRemaining = daily > 0 ? _medication.stockQuantity / daily : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -320,13 +295,11 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
                                     'المخزون الحالي',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
+                                    style: TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                   Chip(label: Text(_stockStatus())),
                                 ],
@@ -334,21 +307,17 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                               const SizedBox(height: 12),
                               Text(
                                 '${_formatNumber(_medication.stockQuantity)} ${_medication.stockUnit}',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineMedium,
+                                style: Theme.of(context).textTheme.headlineMedium,
                               ),
                               const SizedBox(height: 12),
                               _InfoRow(
                                 label: 'حد المخزون المنخفض',
-                                value:
-                                    '${_formatNumber(_medication.lowStockThreshold)} ${_medication.stockUnit}',
+                                value: '${_formatNumber(_medication.lowStockThreshold)} ${_medication.stockUnit}',
                               ),
                               if (_medication.packageQuantity != null)
                                 _InfoRow(
                                   label: 'كمية العبوة',
-                                  value:
-                                      '${_formatNumber(_medication.packageQuantity!)} ${_medication.stockUnit}',
+                                  value: '${_formatNumber(_medication.packageQuantity!)} ${_medication.stockUnit}',
                                 ),
                               _InfoRow(
                                 label: 'الاستهلاك اليومي المتوقع',

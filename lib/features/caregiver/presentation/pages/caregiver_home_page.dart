@@ -94,69 +94,106 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
   Future<void> _openAddMemberDialog() async {
     final codeController = TextEditingController();
     final relationshipController = TextEditingController();
+    var selectedRole = CaregiverRole.caregiver;
     try {
       final result = await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('إضافة فرد من العائلة'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('أدخل رمز الربط الذي أرسله لك فرد العائلة من تطبيقه.'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: codeController,
-                autofocus: true,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'رمز الربط',
-                  hintText: 'مثال: 123456',
-                  prefixIcon: Icon(Icons.link_rounded),
-                ),
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('إضافة فرد من العائلة'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('أدخل رمز الربط الذي أرسله لك فرد العائلة من تطبيقه.'),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: codeController,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'رمز الربط',
+                      hintText: 'مثال: 123456',
+                      prefixIcon: Icon(Icons.link_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: relationshipController,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'صلة القرابة (اختياري)',
+                      hintText: 'مثال: ابني، والدتي، زوجتي',
+                      prefixIcon: Icon(Icons.people_alt_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<CaregiverRole>(
+                    value: selectedRole,
+                    decoration: const InputDecoration(
+                      labelText: 'نوع الوصول',
+                      prefixIcon: Icon(Icons.admin_panel_settings_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: CaregiverRole.caregiver,
+                        child: Text('مرافق — يستطيع التعديل'),
+                      ),
+                      DropdownMenuItem(
+                        value: CaregiverRole.viewer,
+                        child: Text('مشاهد — عرض فقط'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() => selectedRole = value);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      selectedRole == CaregiverRole.viewer
+                          ? 'المشاهد يستطيع الاطلاع على بيانات فرد العائلة دون تعديل الأدوية أو الجرعات أو المخزون.'
+                          : 'المرافق يستطيع إدارة الأدوية والجرعات والجدول والمخزون حسب صلاحياته.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: relationshipController,
-                textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'صلة القرابة (اختياري)',
-                  hintText: 'مثال: ابني، والدتي، زوجتي',
-                  prefixIcon: Icon(Icons.people_alt_outlined),
-                ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('إلغاء'),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  final code = codeController.text.trim();
+                  if (code.isEmpty) return;
+                  final provider = context.read<CaregiverProvider>();
+                  final patientName = await provider.submitCode(
+                    code,
+                    role: selectedRole,
+                    relationshipLabel: relationshipController.text.trim().isEmpty
+                        ? null
+                        : relationshipController.text.trim(),
+                  );
+                  if (!dialogContext.mounted) return;
+                  if (patientName != null) {
+                    Navigator.pop(dialogContext, true);
+                  } else {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text(provider.error ?? 'تعذّر إرسال طلب الربط.')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('إرسال الطلب'),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton.icon(
-              onPressed: () async {
-                final code = codeController.text.trim();
-                if (code.isEmpty) return;
-                final provider = context.read<CaregiverProvider>();
-                final patientName = await provider.submitCode(
-                  code,
-                  role: CaregiverRole.caregiver,
-                  relationshipLabel: relationshipController.text.trim().isEmpty
-                      ? null
-                      : relationshipController.text.trim(),
-                );
-                if (!dialogContext.mounted) return;
-                if (patientName != null) {
-                  Navigator.pop(dialogContext, true);
-                } else {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(content: Text(provider.error ?? 'تعذّر إرسال طلب الربط.')),
-                  );
-                }
-              },
-              icon: const Icon(Icons.person_add_alt_1_rounded),
-              label: const Text('إرسال الطلب'),
-            ),
-          ],
         ),
       );
       if (!mounted) return;

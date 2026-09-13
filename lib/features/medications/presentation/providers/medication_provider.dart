@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
@@ -86,8 +87,18 @@ class MedicationProvider extends ChangeNotifier {
 
   Future<bool> addMedication({required Medication medication, required MedicationSchedule schedule, Uint8List? imageBytes}) async {
     Medication? created;
+
     try {
       created = await _repo.createMedication(medication, imageBytes: imageBytes);
+    } catch (e, st) {
+      debugPrint('DawaCare createMedication failed: $e');
+      debugPrintStack(stackTrace: st);
+      error = _medicationSaveError(e, 'medication');
+      _notify();
+      return false;
+    }
+
+    try {
       final createdSchedule = await _repo.createSchedule(created.id, schedule);
 
       // Saving the medication and its schedule is the critical operation.
@@ -95,29 +106,44 @@ class MedicationProvider extends ChangeNotifier {
       // not turn a successful medication save into a false failure on device.
       try {
         await _syncMedicationFuture(patientId: created.patientId, medicationId: created.id);
-      } catch (_) {
-        // The next medication/dose refresh will reconcile future doses and reminders.
+      } catch (e, st) {
+        debugPrint('DawaCare medication follow-up sync failed: $e');
+        debugPrintStack(stackTrace: st);
+        // The medication and schedule are already saved. A later refresh will
+        // reconcile future doses and reminders.
       }
 
       medications.insert(0, created);
       schedulesByMedicationId[created.id] = [createdSchedule];
       _notify();
       return true;
-    } catch (_) {
-      // If the medication row was created but its first schedule failed,
-      // remove the incomplete medication so the user never gets a phantom
-      // medication without a schedule.
-      if (created != null) {
-        try {
-          await _repo.deleteMedication(created.id);
-        } catch (_) {
-          // Keep the original failure as the user-facing result.
-        }
+    } catch (e, st) {
+      debugPrint('DawaCare createSchedule failed: $e');
+      debugPrintStack(stackTrace: st);
+
+      try {
+        await _repo.deleteMedication(created.id);
+      } catch (deleteError, deleteStack) {
+        debugPrint('DawaCare rollback medication failed: $deleteError');
+        debugPrintStack(stackTrace: deleteStack);
       }
-      error = 'تعذّر إضافة الدواء. حاول مرة أخرى.';
+
+      error = _medicationSaveError(e, 'schedule');
       _notify();
       return false;
     }
+  }
+
+  String _medicationSaveError(Object error, String stage) {
+    if (error is PostgrestException) {
+      debugPrint(
+        'DawaCare medication $stage PostgREST: '
+        'code=${error.code}, message=${error.message}, '
+        'details=${error.details}, hint=${error.hint}',
+      );
+      return 'تعذّرت إضافة الدواء ($stage): ${error.message} [${error.code ?? 'no-code'}]';
+    }
+    return 'تعذّرت إضافة الدواء ($stage): $error';
   }
 
   /// Updates medication metadata/prescription only. Stock is deliberately preserved.
@@ -128,15 +154,9 @@ class MedicationProvider extends ChangeNotifier {
       final now = DateTime.now();
       final from = now;
       final to = DateTime(now.year, now.month, now.day).add(const Duration(days: 2, hours: 23));
-      final futureDoses = await _doseRepo.fetchDosesForRange(
-        medication.patientId,
-        from: from,
-        to: to,
-      );
+      final futureDoses = await _doseRepo.fetchDosesForRange(medication.patientId, from: from, to: to);
 
-      for (final dose in futureDoses.where(
-        (d) => d.medicationId == medication.id && !isResolvedStatus(d.status),
-      )) {
+      for (final dose in futureDoses.where((d) => d.medicationId == medication.id && !isResolvedStatus(d.status))) {
         await ReminderEngine.cancelFor(dose.id);
       }
 
@@ -146,15 +166,8 @@ class MedicationProvider extends ChangeNotifier {
 
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
-        // Keep the authoritative stock value from the local state/database. The
-        // repository intentionally excludes stock_quantity from prescription updates.
         final current = medications[index];
-        medications[index] = _copyMedication(
-          updated,
-          stockEnabled: current.stockEnabled,
-          stockQuantity: current.stockQuantity,
-          stockUnit: current.stockUnit,
-        );
+        medications[index] = _copyMedication(updated, stockEnabled: current.stockEnabled, stockQuantity: current.stockQuantity, stockUnit: current.stockUnit);
       }
       _notify();
       return true;
@@ -174,20 +187,9 @@ class MedicationProvider extends ChangeNotifier {
     try {
       final unit = medication.stockEnabled ? medication.stockUnit : _unitForDosageForm(medication.dosageForm);
       if (!medication.stockEnabled) {
-        await _repo.updateStockSettings(
-          medicationId: medication.id,
-          unit: unit,
-          packageQuantity: medication.packageQuantity,
-          threshold: medication.lowStockThreshold,
-        );
+        await _repo.updateStockSettings(medicationId: medication.id, unit: unit, packageQuantity: medication.packageQuantity, threshold: medication.lowStockThreshold);
       }
-      final newQuantity = await _repo.addStock(
-        medicationId: medication.id,
-        patientId: medication.patientId,
-        quantity: quantity,
-        type: medication.stockEnabled ? 'ADD' : 'INITIAL',
-        note: medication.stockEnabled ? 'Manual stock refill' : 'Initial stock setup',
-      );
+      final newQuantity = await _repo.addStock(medicationId: medication.id, patientId: medication.patientId, quantity: quantity, type: medication.stockEnabled ? 'ADD' : 'INITIAL', note: medication.stockEnabled ? 'Manual stock refill' : 'Initial stock setup');
       final index = medications.indexWhere((m) => m.id == medication.id);
       if (index >= 0) {
         medications[index] = _copyMedication(medications[index], stockEnabled: true, stockQuantity: newQuantity, stockUnit: unit);
@@ -263,20 +265,7 @@ class MedicationProvider extends ChangeNotifier {
         await ReminderEngine.cancelFor(dose.id);
       }
 
-      final updated = await _repo.updateSchedule(
-        MedicationSchedule(
-          id: schedule.id,
-          medicationId: schedule.medicationId,
-          type: schedule.type,
-          time: time,
-          daysOfWeek: schedule.daysOfWeek,
-          intervalDays: schedule.intervalDays,
-          doseAmount: doseAmount,
-          startDate: schedule.startDate,
-          endDate: schedule.endDate,
-          timezone: schedule.timezone,
-        ),
-      );
+      final updated = await _repo.updateSchedule(MedicationSchedule(id: schedule.id, medicationId: schedule.medicationId, type: schedule.type, time: time, daysOfWeek: schedule.daysOfWeek, intervalDays: schedule.intervalDays, doseAmount: doseAmount, startDate: schedule.startDate, endDate: schedule.endDate, timezone: schedule.timezone));
       await _repo.deleteFutureUnresolvedDoses(schedule.id, from);
       await _doseRepo.ensureDosesGenerated(patientId);
       final refreshed = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
@@ -303,10 +292,7 @@ class MedicationProvider extends ChangeNotifier {
     final to = DateTime(now.year, now.month, now.day).add(const Duration(days: 2, hours: 23));
     final doses = await _doseRepo.fetchDosesForRange(patientId, from: from, to: to);
     final policy = await _policyRepo.fetch(patientId);
-    await ReminderEngine.syncUpcoming(
-      doses.where((dose) => dose.medicationId == medicationId && !isResolvedStatus(dose.status)).toList(),
-      policy,
-    );
+    await ReminderEngine.syncUpcoming(doses.where((dose) => dose.medicationId == medicationId && !isResolvedStatus(dose.status)).toList(), policy);
   }
 
   Future<String?> signedMedicationImageUrl(String? imagePath) {
@@ -318,18 +304,10 @@ class MedicationProvider extends ChangeNotifier {
     final now = DateTime.now();
     final from = DateTime(now.year, now.month, now.day);
     final to = from.add(const Duration(days: 14));
-    final futureDoses = await _doseRepo.fetchDosesForRange(
-      medication.patientId,
-      from: from,
-      to: to,
-    );
-
-    for (final dose in futureDoses.where(
-      (d) => d.medicationId == medication.id && !isResolvedStatus(d.status),
-    )) {
+    final futureDoses = await _doseRepo.fetchDosesForRange(medication.patientId, from: from, to: to);
+    for (final dose in futureDoses.where((d) => d.medicationId == medication.id && !isResolvedStatus(d.status))) {
       await ReminderEngine.cancelFor(dose.id);
     }
-
     await _repo.deactivateMedication(medication.id);
     await _doseRepo.clearFutureUnresolvedDosesByMedication(medication.id, from);
     medications.removeWhere((m) => m.id == medication.id);
@@ -340,33 +318,20 @@ class MedicationProvider extends ChangeNotifier {
   String _unitForDosageForm(String? form) {
     switch ((form ?? '').trim()) {
       case 'كبسولة':
-      case 'Capsule':
-        return 'capsule';
+      case 'Capsule': return 'capsule';
       case 'قرص':
-      case 'Tablet':
-        return 'tablet';
+      case 'Tablet': return 'tablet';
       case 'شراب':
-      case 'Syrup':
-        return 'ml';
+      case 'Syrup': return 'ml';
       case 'قطرة':
-      case 'Drop':
-        return 'drop';
+      case 'Drop': return 'drop';
       case 'حقنة':
-      case 'Injection':
-        return 'injection';
-      default:
-        return 'unit';
+      case 'Injection': return 'injection';
+      default: return 'unit';
     }
   }
 
-  Medication _copyMedication(
-    Medication medication, {
-    String? imageUrl,
-    bool clearImage = false,
-    bool? stockEnabled,
-    double? stockQuantity,
-    String? stockUnit,
-  }) {
+  Medication _copyMedication(Medication medication, {String? imageUrl, bool clearImage = false, bool? stockEnabled, double? stockQuantity, String? stockUnit}) {
     return Medication(
       id: medication.id,
       patientId: medication.patientId,

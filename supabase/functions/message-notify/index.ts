@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
                 type: 'CHAT_MESSAGE',
                 message_id: message.id,
                 patient_id: message.patient_id,
-                message_type: message.message_type,
+                chat_message_type: message.message_type,
                 sender_id: message.sender_id,
               },
               android: {

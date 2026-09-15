@@ -25,33 +25,23 @@ class ChatSendException implements Exception {
   final String recipientId;
   final Object? details;
   final Object? hint;
-
-  const ChatSendException({
-    required this.message,
-    required this.senderId,
-    required this.patientId,
-    required this.recipientId,
-    this.code,
-    this.details,
-    this.hint,
-  });
-
+  const ChatSendException({required this.message,required this.senderId,required this.patientId,required this.recipientId,this.code,this.details,this.hint});
   String get diagnostic {
-    final parts = <String>[
-      'رسالة الإرسال فشلت',
-      'code=${code ?? '-'}',
-      'sender=$senderId',
-      'patient=$patientId',
-      'recipient=$recipientId',
-      'message=$message',
-    ];
-    if (details != null) parts.add('details=$details');
-    if (hint != null) parts.add('hint=$hint');
+    final parts=<String>['رسالة الإرسال فشلت','code=${code ?? '-'}','sender=$senderId','patient=$patientId','recipient=$recipientId','message=$message'];
+    if(details!=null) parts.add('details=$details');
+    if(hint!=null) parts.add('hint=$hint');
     return parts.join('\n');
   }
+  @override String toString()=>diagnostic;
+}
 
-  @override
-  String toString() => diagnostic;
+class ChatNotifyException implements Exception {
+  final String messageId;
+  final int? status;
+  final Object? details;
+  const ChatNotifyException({required this.messageId,this.status,this.details});
+  String get diagnostic=>'فشل إشعار الرسالة\nmessage=$messageId\nstatus=${status ?? '-'}\ndetails=${details ?? '-'}';
+  @override String toString()=>diagnostic;
 }
 
 class MessageService {
@@ -60,81 +50,40 @@ class MessageService {
   Future<List<ChatMessage>> fetch(String patientId) async {final rows=await _client.from('messages').select('*, sender:profiles!sender_id(full_name)').eq('patient_id',patientId).order('created_at');return rows.map((r)=>ChatMessage.fromMap(Map<String,dynamic>.from(r))).toList();}
   Future<ChatMessage?> fetchById(String id) async {final r=await _client.from('messages').select('*, sender:profiles!sender_id(full_name)').eq('id',id).maybeSingle();return r==null?null:ChatMessage.fromMap(Map<String,dynamic>.from(r));}
   Future<void> markRead(String id) async {await _client.rpc('mark_message_read',params:{'p_message_id':id});}
-
-  Future<ChatMessage> sendText({required String patientId,required String recipientId,required String text}) async {
-    final sender=_client.auth.currentUser?.id;
-    if(sender==null) throw StateError('AUTH_REQUIRED');
-    final value=text.trim();
-    if(value.isEmpty) throw StateError('EMPTY_MESSAGE');
-    return _insert(patientId:patientId,recipientId:recipientId,type:'text',body:value);
-  }
-
-  Future<ChatMessage> sendImage({required String patientId,required String recipientId,required XFile image}) async {
-    final sender=_client.auth.currentUser?.id;
-    if(sender==null) throw StateError('AUTH_REQUIRED');
-    final id=_uuid.v4();
-    final ext=image.name.contains('.')?image.name.split('.').last.toLowerCase():'jpg';
-    final path='messages/$sender/$id.$ext';
-    await _client.storage.from('message-attachments').upload(path,File(image.path),fileOptions:FileOptions(contentType:image.mimeType??'image/jpeg',upsert:false));
-    try{return await _insert(patientId:patientId,recipientId:recipientId,type:'image',storagePath:path,mimeType:image.mimeType??'image/jpeg');}catch(e){await _client.storage.from('message-attachments').remove([path]);rethrow;}
-  }
-
-  Future<ChatMessage> sendVoice({required String patientId,required String recipientId,required String localPath,required int durationMs}) async {
-    final sender=_client.auth.currentUser?.id;
-    if(sender==null) throw StateError('AUTH_REQUIRED');
-    if(durationMs<=0||durationMs>60000) throw StateError('INVALID_VOICE_DURATION');
-    final id=_uuid.v4();
-    final path='messages/$sender/$id.m4a';
-    await _client.storage.from('message-attachments').upload(path,File(localPath),fileOptions:const FileOptions(contentType:'audio/mp4',upsert:false));
-    try{return await _insert(patientId:patientId,recipientId:recipientId,type:'voice',storagePath:path,mimeType:'audio/mp4',durationMs:durationMs);}catch(e){await _client.storage.from('message-attachments').remove([path]);rethrow;}finally{try{await File(localPath).delete();}catch(_){}}
-  }
+  Future<ChatMessage> sendText({required String patientId,required String recipientId,required String text}) async {final sender=_client.auth.currentUser?.id;if(sender==null) throw StateError('AUTH_REQUIRED');final value=text.trim();if(value.isEmpty) throw StateError('EMPTY_MESSAGE');return _insert(patientId:patientId,recipientId:recipientId,type:'text',body:value);}
+  Future<ChatMessage> sendImage({required String patientId,required String recipientId,required XFile image}) async {final sender=_client.auth.currentUser?.id;if(sender==null) throw StateError('AUTH_REQUIRED');final id=_uuid.v4();final ext=image.name.contains('.')?image.name.split('.').last.toLowerCase():'jpg';final path='messages/$sender/$id.$ext';await _client.storage.from('message-attachments').upload(path,File(image.path),fileOptions:FileOptions(contentType:image.mimeType??'image/jpeg',upsert:false));try{return await _insert(patientId:patientId,recipientId:recipientId,type:'image',storagePath:path,mimeType:image.mimeType??'image/jpeg');}catch(e){await _client.storage.from('message-attachments').remove([path]);rethrow;}}
+  Future<ChatMessage> sendVoice({required String patientId,required String recipientId,required String localPath,required int durationMs}) async {final sender=_client.auth.currentUser?.id;if(sender==null) throw StateError('AUTH_REQUIRED');if(durationMs<=0||durationMs>60000) throw StateError('INVALID_VOICE_DURATION');final id=_uuid.v4();final path='messages/$sender/$id.m4a';await _client.storage.from('message-attachments').upload(path,File(localPath),fileOptions:const FileOptions(contentType:'audio/mp4',upsert:false));try{return await _insert(patientId:patientId,recipientId:recipientId,type:'voice',storagePath:path,mimeType:'audio/mp4',durationMs:durationMs);}catch(e){await _client.storage.from('message-attachments').remove([path]);rethrow;}finally{try{await File(localPath).delete();}catch(_){}}}
 
   Future<ChatMessage> _insert({required String patientId,required String recipientId,required String type,String? body,String? storagePath,String? mimeType,int? durationMs}) async {
-    final user=_client.auth.currentUser;
-    final senderId=user?.id;
-    if(senderId==null) throw StateError('AUTH_REQUIRED');
-
-    final payload={
-      'id':_uuid.v4(),
-      'patient_id':patientId,
-      'sender_id':senderId,
-      'recipient_id':recipientId,
-      'message_type':type,
-      'body':body,
-      'storage_path':storagePath,
-      'mime_type':mimeType,
-      'duration_ms':durationMs,
-    };
-
+    final user=_client.auth.currentUser;final senderId=user?.id;if(senderId==null) throw StateError('AUTH_REQUIRED');
+    final payload={'id':_uuid.v4(),'patient_id':patientId,'sender_id':senderId,'recipient_id':recipientId,'message_type':type,'body':body,'storage_path':storagePath,'mime_type':mimeType,'duration_ms':durationMs};
     debugPrint('chat insert: sender=$senderId patient=$patientId recipient=$recipientId type=$type');
-
     try {
       final row=await _client.from('messages').insert(payload).select('*, sender:profiles!sender_id(full_name)').single();
       final message=ChatMessage.fromMap(Map<String,dynamic>.from(row));
-      try{
-        final r=await _client.functions.invoke('message-notify',body:{'message_id':message.id});
-        debugPrint('message-notify status=${r.status} data=${r.data}');
-      }catch(e){debugPrint('message-notify failed: $e');}
+      try {
+        final result=await _client.functions.invoke('message-notify',body:{'message_id':message.id});
+        debugPrint('message-notify ok: status=${result.status} data=${result.data}');
+        if(result.status<200 || result.status>=300) throw ChatNotifyException(messageId:message.id,status:result.status,details:result.data);
+      } on FunctionsHttpError catch(e) {
+        Object? details;
+        try { details=await e.context.json(); } catch(_) { details=e.message; }
+        debugPrint('message-notify HTTP error: status=${e.context.status} details=$details');
+        throw ChatNotifyException(messageId:message.id,status:e.context.status,details:details);
+      } on FunctionsRelayError catch(e) {
+        debugPrint('message-notify relay error: ${e.message}');
+        throw ChatNotifyException(messageId:message.id,details:'RELAY_ERROR: ${e.message}');
+      } on FunctionsFetchError catch(e) {
+        debugPrint('message-notify fetch error: ${e.message}');
+        throw ChatNotifyException(messageId:message.id,details:'FETCH_ERROR: ${e.message}');
+      }
       return message;
     } on PostgrestException catch(e) {
-      final diagnostic=ChatSendException(
-        message:e.message,
-        code:e.code,
-        senderId:senderId,
-        patientId:patientId,
-        recipientId:recipientId,
-        details:e.details,
-        hint:e.hint,
-      );
-      debugPrint(diagnostic.diagnostic);
-      throw diagnostic;
+      final diagnostic=ChatSendException(message:e.message,code:e.code,senderId:senderId,patientId:patientId,recipientId:recipientId,details:e.details,hint:e.hint);debugPrint(diagnostic.diagnostic);throw diagnostic;
     } catch(e,stack) {
-      debugPrint('chat insert unexpected: $e');
-      debugPrintStack(stackTrace:stack);
-      rethrow;
+      debugPrint('chat insert/send unexpected: $e');debugPrintStack(stackTrace:stack);rethrow;
     }
   }
-
   Future<String> signedUrl(String path)=>_client.storage.from('message-attachments').createSignedUrl(path,3600);
   Future<String> startVoiceRecording() async {if(!await _recorder.hasPermission())throw StateError('MIC_PERMISSION_DENIED');final dir=await getTemporaryDirectory();final path='${dir.path}/dawacare_chat_${_uuid.v4()}.m4a';await _recorder.start(const RecordConfig(encoder:AudioEncoder.aacLc,sampleRate:44100,numChannels:1,bitRate:64000),path:path);return path;}
   Future<String?> stopVoiceRecording()=>_recorder.stop(); Future<void> cancelVoiceRecording()=>_recorder.cancel(); Future<XFile?> pickImage()=>_picker.pickImage(source:ImageSource.gallery,imageQuality:85,maxWidth:1920); Future<bool> isRecording()=>_recorder.isRecording(); void dispose()=>_recorder.dispose();

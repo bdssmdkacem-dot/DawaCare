@@ -63,6 +63,7 @@ class Medication {
   }
 
   Map<String, dynamic> toInsertMap() => {
+        'id': id,
         'patient_id': patientId,
         'name': name,
         'generic_name': genericName,

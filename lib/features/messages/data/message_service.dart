@@ -65,17 +65,15 @@ class MessageService {
         final result=await _client.functions.invoke('message-notify',body:{'message_id':message.id});
         debugPrint('message-notify ok: status=${result.status} data=${result.data}');
         if(result.status<200 || result.status>=300) throw ChatNotifyException(messageId:message.id,status:result.status,details:result.data);
-      } on FunctionsHttpError catch(e) {
-        Object? details;
-        try { details=await e.context.json(); } catch(_) { details=e.message; }
-        debugPrint('message-notify HTTP error: status=${e.context.status} details=$details');
-        throw ChatNotifyException(messageId:message.id,status:e.context.status,details:details);
-      } on FunctionsRelayError catch(e) {
-        debugPrint('message-notify relay error: ${e.message}');
-        throw ChatNotifyException(messageId:message.id,details:'RELAY_ERROR: ${e.message}');
-      } on FunctionsFetchError catch(e) {
-        debugPrint('message-notify fetch error: ${e.message}');
-        throw ChatNotifyException(messageId:message.id,details:'FETCH_ERROR: ${e.message}');
+      } on FunctionsHttpException catch(e) {
+        debugPrint('message-notify HTTP error: status=${e.status} details=${e.details} reason=${e.reasonPhrase}');
+        throw ChatNotifyException(messageId:message.id,status:e.status,details:e.details ?? e.reasonPhrase);
+      } on FunctionsRelayException catch(e) {
+        debugPrint('message-notify relay error: ${e.details} reason=${e.reasonPhrase}');
+        throw ChatNotifyException(messageId:message.id,status:e.status,details:e.details ?? e.reasonPhrase);
+      } on FunctionsFetchException catch(e) {
+        debugPrint('message-notify fetch error: ${e.details} reason=${e.reasonPhrase}');
+        throw ChatNotifyException(messageId:message.id,status:e.status,details:e.details ?? e.reasonPhrase);
       }
       return message;
     } on PostgrestException catch(e) {

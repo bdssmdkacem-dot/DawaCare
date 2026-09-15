@@ -10,7 +10,8 @@ class ChatPage extends StatefulWidget {
   final String otherUserId;
   final String otherName;
   const ChatPage({super.key, required this.patientId, required this.otherUserId, required this.otherName});
-  @override State<ChatPage> createState() => _ChatPageState();
+  @override
+  State<ChatPage> createState() => _ChatPageState();
 }
 
 class _ChatPageState extends State<ChatPage> {
@@ -39,16 +40,29 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
-    if (_recording) unawaited(_service.cancelVoiceRecording());
+    if (_recording) {
+      unawaited(_service.cancelVoiceRecording());
+    }
     _playerComplete?.cancel();
     _channel?.unsubscribe();
-    _text.dispose(); _scroll.dispose(); _player.dispose();
+    _text.dispose();
+    _scroll.dispose();
+    _player.dispose();
     super.dispose();
   }
 
   Future<void> _load({bool scrollToBottom = false}) async {
     final me = _db.auth.currentUser?.id;
-    if (me == null) { if (mounted) setState(() { _messages = []; _loading = false; _refreshing = false; }); return; }
+    if (me == null) {
+      if (mounted) {
+        setState(() {
+          _messages = [];
+          _loading = false;
+          _refreshing = false;
+        });
+      }
+      return;
+    }
     final generation = ++_loadGeneration;
     try {
       final rows = await _service.fetch(widget.patientId);
@@ -56,22 +70,45 @@ class _ChatPageState extends State<ChatPage> {
       final filtered = rows.where((m) => (m.senderId == widget.otherUserId && m.recipientId == me) || (m.senderId == me && m.recipientId == widget.otherUserId)).toList();
       setState(() => _messages = filtered);
       for (final m in filtered.where((m) => m.recipientId == me && m.readAt == null)) {
-        try { await _service.markRead(m.id); } catch (e) { debugPrint('chat mark-read: $e'); }
+        try {
+          await _service.markRead(m.id);
+        } catch (e) {
+          debugPrint('chat mark-read: $e');
+        }
       }
     } catch (e) {
       debugPrint('chat load: $e');
-      if (mounted && _messages.isEmpty) _error('تعذر تحميل المحادثة.');
+      if (mounted && _messages.isEmpty) {
+        _error('تعذر تحميل المحادثة.');
+      }
     } finally {
-      if (mounted && generation == _loadGeneration) setState(() { _loading = false; _refreshing = false; });
-      if (scrollToBottom && mounted) WidgetsBinding.instance.addPostFrameCallback((_) => _bottom());
+      if (mounted && generation == _loadGeneration) {
+        setState(() {
+          _loading = false;
+          _refreshing = false;
+        });
+      }
+      if (scrollToBottom && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _bottom());
+      }
     }
   }
 
-  Future<void> _refresh() async { if (_refreshing) return; setState(() => _refreshing = true); await _load(); }
-  void _bottom() { if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 180), curve: Curves.easeOut); }
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    await _load();
+  }
+
+  void _bottom() {
+    if (_scroll.hasClients) {
+      _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 180), curve: Curves.easeOut);
+    }
+  }
 
   Future<void> _sendText() async {
-    final v = _text.text.trim(); if (v.isEmpty || _sending) return;
+    final v = _text.text.trim();
+    if (v.isEmpty || _sending) return;
     await _run(() => _service.sendText(patientId: widget.patientId, recipientId: widget.otherUserId, text: v), clearText: true);
   }
 
@@ -91,7 +128,9 @@ class _ChatPageState extends State<ChatPage> {
         ],
       ),
     );
-    if (confirmed == true && mounted) await _run(() => _service.sendImage(patientId: widget.patientId, recipientId: widget.otherUserId, image: image));
+    if (confirmed == true && mounted) {
+      await _run(() => _service.sendImage(patientId: widget.patientId, recipientId: widget.otherUserId, image: image));
+    }
   }
 
   Future<void> _toggleRecording() async {
@@ -99,16 +138,30 @@ class _ChatPageState extends State<ChatPage> {
     if (_recording) {
       final path = await _service.stopVoiceRecording();
       final started = _recordStarted;
-      if (mounted) setState(() { _recording = false; _recordStarted = null; });
+      if (mounted) {
+        setState(() {
+          _recording = false;
+          _recordStarted = null;
+        });
+      }
       if (path != null && started != null) {
         final ms = DateTime.now().difference(started).inMilliseconds;
-        if (ms > 0) await _run(() => _service.sendVoice(patientId: widget.patientId, recipientId: widget.otherUserId, localPath: path, durationMs: ms));
+        if (ms > 0) {
+          await _run(() => _service.sendVoice(patientId: widget.patientId, recipientId: widget.otherUserId, localPath: path, durationMs: ms));
+        }
       }
     } else {
       try {
         await _service.startVoiceRecording();
-        if (mounted) setState(() { _recordStarted = DateTime.now(); _recording = true; });
-      } catch (_) { _error('تعذر بدء التسجيل.'); }
+        if (mounted) {
+          setState(() {
+            _recordStarted = DateTime.now();
+            _recording = true;
+          });
+        }
+      } catch (_) {
+        _error('تعذر بدء التسجيل.');
+      }
     }
   }
 
@@ -117,25 +170,67 @@ class _ChatPageState extends State<ChatPage> {
     setState(() => _sending = true);
     try {
       final m = await action();
-      if (mounted) { setState(() => _messages = [..._messages, m]); if (clearText) _text.clear(); _signedUrls.remove(m.storagePath); WidgetsBinding.instance.addPostFrameCallback((_) => _bottom()); }
+      if (mounted) {
+        setState(() => _messages = [..._messages, m]);
+        if (clearText) {
+          _text.clear();
+        }
+        _signedUrls.remove(m.storagePath);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _bottom());
+      }
     } catch (e, stack) {
-      debugPrint('chat send error: $e'); debugPrintStack(stackTrace: stack);
-      if (e is ChatSendException) _error(e.diagnostic); else if (e is StateError) _error('خطأ في الإرسال: ${e.message}'); else _error('خطأ في الإرسال: $e');
-    } finally { if (mounted) setState(() => _sending = false); }
+      debugPrint('chat send error: $e');
+      debugPrintStack(stackTrace: stack);
+      if (e is ChatSendException) {
+        _error(e.diagnostic);
+      } else if (e is StateError) {
+        _error('خطأ في الإرسال: ${e.message}');
+      } else {
+        _error('خطأ في الإرسال: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+      }
+    }
   }
 
-  void _error(String text) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 8))); }
+  void _error(String text) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 8)));
+    }
+  }
+
   Future<String> _urlFor(String path) => _signedUrls.putIfAbsent(path, () => _service.signedUrl(path));
 
   Future<void> _play(ChatMessage m) async {
     try {
-      if (_playing == m.id) { await _player.stop(); if (mounted) setState(() => _playing = null); return; }
+      if (_playing == m.id) {
+        await _player.stop();
+        if (mounted) {
+          setState(() => _playing = null);
+        }
+        return;
+      }
       await _playerComplete?.cancel();
-      final url = await _urlFor(m.storagePath!); await _player.play(UrlSource(url));
-      if (mounted) setState(() => _playing = m.id);
-      if (m.readAt == null && m.recipientId == _db.auth.currentUser?.id) { try { await _service.markRead(m.id); } catch (_) {} }
-      _playerComplete = _player.onPlayerComplete.listen((_) { if (mounted && _playing == m.id) setState(() => _playing = null); });
-    } catch (e) { _error('تعذر تشغيل الرسالة الصوتية: $e'); }
+      final url = await _urlFor(m.storagePath!);
+      await _player.play(UrlSource(url));
+      if (mounted) {
+        setState(() => _playing = m.id);
+      }
+      if (m.readAt == null && m.recipientId == _db.auth.currentUser?.id) {
+        try {
+          await _service.markRead(m.id);
+        } catch (_) {}
+      }
+      _playerComplete = _player.onPlayerComplete.listen((_) {
+        if (mounted && _playing == m.id) {
+          setState(() => _playing = null);
+        }
+      });
+    } catch (e) {
+      _error('تعذر تشغيل الرسالة الصوتية: $e');
+    }
   }
 
   @override

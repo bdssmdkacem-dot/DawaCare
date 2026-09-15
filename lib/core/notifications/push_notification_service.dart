@@ -40,16 +40,10 @@ class PushNotificationService {
   Stream<String> get chatMessageOpened => _chatController.stream;
 
   Future<void> init() async {
-    if (!Platform.isAndroid) {
-      return;
-    }
-    if (_initialized) {
-      return;
-    }
+    if (!Platform.isAndroid) return;
+    if (_initialized) return;
     final running = _initFuture;
-    if (running != null) {
-      return running;
-    }
+    if (running != null) return running;
 
     final future = _initialize();
     _initFuture = future;
@@ -71,9 +65,7 @@ class PushNotificationService {
       sound: true,
       provisional: false,
     );
-    debugPrint(
-      'DawaCare FCM permission: ${settings.authorizationStatus}',
-    );
+    debugPrint('DawaCare FCM permission: ${settings.authorizationStatus}');
 
     _localVoiceSubscription = NotificationService.instance.voiceMessageOpened
         .listen(_queueVoiceMessageId);
@@ -92,9 +84,7 @@ class PushNotificationService {
           type == 'CAREGIVER_ALERT' ||
           type == 'CHAT_MESSAGE' ||
           (type is String && type.startsWith('FAMILY_LINK_'));
-      if (!isPush) {
-        return;
-      }
+      if (!isPush) return;
 
       String? payload;
       if (type == 'VOICE_MESSAGE' && id is String) {
@@ -119,13 +109,11 @@ class PushNotificationService {
     _openedSubscription =
         FirebaseMessaging.onMessageOpenedApp.listen(_queueOpenedMessage);
     final initial = await _messaging.getInitialMessage();
-    if (initial != null) {
-      _queueOpenedMessage(initial);
-    }
+    if (initial != null) _queueOpenedMessage(initial);
 
     _latestToken = await _messaging.getToken();
-    _tokenSubscription = _messaging.onTokenRefresh.listen((t) async {
-      _latestToken = t;
+    _tokenSubscription = _messaging.onTokenRefresh.listen((token) async {
+      _latestToken = token;
       await _registerCurrentToken();
     });
     _authSubscription = _client.auth.onAuthStateChange.listen((_) async {
@@ -141,36 +129,30 @@ class PushNotificationService {
     await _registerCurrentToken();
   }
 
-  void _queueOpenedMessage(RemoteMessage m) {
-    final type = m.data['type'];
-    if (type == 'VOICE_MESSAGE' && m.data['voice_message_id'] is String) {
-      _queueVoiceMessageId(m.data['voice_message_id'] as String);
-    } else if (type == 'CAREGIVER_ALERT' && m.data['alert_id'] is String) {
-      _queueCaregiverAlertId(m.data['alert_id'] as String);
-    } else if (type == 'CHAT_MESSAGE' && m.data['message_id'] is String) {
-      _queueChatMessageId(m.data['message_id'] as String);
+  void _queueOpenedMessage(RemoteMessage message) {
+    final type = message.data['type'];
+    if (type == 'VOICE_MESSAGE' && message.data['voice_message_id'] is String) {
+      _queueVoiceMessageId(message.data['voice_message_id'] as String);
+    } else if (type == 'CAREGIVER_ALERT' && message.data['alert_id'] is String) {
+      _queueCaregiverAlertId(message.data['alert_id'] as String);
+    } else if (type == 'CHAT_MESSAGE' && message.data['message_id'] is String) {
+      _queueChatMessageId(message.data['message_id'] as String);
     }
   }
 
   void _queueVoiceMessageId(String id) {
     _pendingVoiceMessageId = id;
-    if (!_voiceMessageController.isClosed) {
-      _voiceMessageController.add(id);
-    }
+    if (!_voiceMessageController.isClosed) _voiceMessageController.add(id);
   }
 
   void _queueCaregiverAlertId(String id) {
     _pendingCaregiverAlertId = id;
-    if (!_notificationController.isClosed) {
-      _notificationController.add(id);
-    }
+    if (!_notificationController.isClosed) _notificationController.add(id);
   }
 
   void _queueChatMessageId(String id) {
     _pendingChatMessageId = id;
-    if (!_chatController.isClosed) {
-      _chatController.add(id);
-    }
+    if (!_chatController.isClosed) _chatController.add(id);
   }
 
   String? takePendingVoiceMessageId() {
@@ -192,18 +174,14 @@ class PushNotificationService {
   }
 
   Future<void> _registerCurrentToken() async {
-    final t = _latestToken;
-    if (t == null || t.isEmpty) {
-      return;
-    }
-    await _registerToken(t);
+    final token = _latestToken;
+    if (token == null || token.isEmpty) return;
+    await _registerToken(token);
   }
 
   Future<void> _registerToken(String token) async {
     final user = _client.auth.currentUser;
-    if (user == null) {
-      return;
-    }
+    if (user == null) return;
     try {
       final existing = await _client
           .from('devices')
@@ -230,9 +208,7 @@ class PushNotificationService {
 
   Future<void> unregister(String userId) async {
     final token = _latestToken ?? await _messaging.getToken();
-    if (token == null || token.isEmpty) {
-      return;
-    }
+    if (token == null || token.isEmpty) return;
     try {
       await _client
           .from('devices')
@@ -264,7 +240,35 @@ Future<void> dawacareFirebaseMessagingBackgroundHandler(
   RemoteMessage message,
 ) async {
   await Firebase.initializeApp();
-  debugPrint(
-    'DawaCare FCM background received: ${message.data['type']}',
+
+  final type = message.data['type'];
+  if (type != 'CHAT_MESSAGE' &&
+      type != 'VOICE_MESSAGE' &&
+      type != 'CAREGIVER_ALERT' &&
+      !(type is String && type.startsWith('FAMILY_LINK_'))) {
+    return;
+  }
+
+  String? payload;
+  if (type == 'CHAT_MESSAGE' && message.data['message_id'] is String) {
+    payload = 'CHAT_MESSAGE:${message.data['message_id']}';
+  } else if (type == 'VOICE_MESSAGE' &&
+      message.data['voice_message_id'] is String) {
+    payload = 'VOICE_MESSAGE:${message.data['voice_message_id']}';
+  } else if (type == 'CAREGIVER_ALERT' && message.data['alert_id'] is String) {
+    payload = 'CAREGIVER_ALERT:${message.data['alert_id']}';
+  } else if (type is String &&
+      type.startsWith('FAMILY_LINK_') &&
+      message.data['request_id'] is String) {
+    payload = 'FAMILY_LINK:${message.data['request_id']}';
+  }
+
+  final notification = message.notification;
+  await RichPushNotificationService.instance.show(
+    title: notification?.title ?? 'DawaCare',
+    body: notification?.body ?? 'لديك إشعار جديد.',
+    payload: payload,
   );
+
+  debugPrint('DawaCare FCM background received: $type');
 }

@@ -100,17 +100,11 @@ class MedicationProvider extends ChangeNotifier {
 
     try {
       final createdSchedule = await _repo.createSchedule(created.id, schedule);
-
-      // Saving the medication and its schedule is the critical operation.
-      // Dose generation/reminder synchronization is a follow-up task and must
-      // not turn a successful medication save into a false failure on device.
       try {
         await _syncMedicationFuture(patientId: created.patientId, medicationId: created.id);
       } catch (e, st) {
         debugPrint('DawaCare medication follow-up sync failed: $e');
         debugPrintStack(stackTrace: st);
-        // The medication and schedule are already saved. A later refresh will
-        // reconcile future doses and reminders.
       }
 
       medications.insert(0, created);
@@ -146,9 +140,6 @@ class MedicationProvider extends ChangeNotifier {
     return 'تعذّرت إضافة الدواء ($stage): $error';
   }
 
-  /// Updates medication metadata/prescription only. Stock is deliberately preserved.
-  /// Existing resolved dose history is never removed; only future unresolved doses
-  /// are rebuilt so a prescription edit cannot rewrite the patient's history.
   Future<bool> updateMedication(Medication medication) async {
     try {
       final now = DateTime.now();
@@ -300,6 +291,7 @@ class MedicationProvider extends ChangeNotifier {
     return _imageUrlFutures.putIfAbsent(imagePath, () => _repo.signedMedicationImageUrl(imagePath));
   }
 
+  /// Stops the medication but keeps its database row, stock, history and image.
   Future<void> deactivate(Medication medication) async {
     final now = DateTime.now();
     final from = DateTime(now.year, now.month, now.day);
@@ -308,10 +300,30 @@ class MedicationProvider extends ChangeNotifier {
     for (final dose in futureDoses.where((d) => d.medicationId == medication.id && !isResolvedStatus(d.status))) {
       await ReminderEngine.cancelFor(dose.id);
     }
-    await _repo.deactivateMedication(medication.id);
     await _doseRepo.clearFutureUnresolvedDosesByMedication(medication.id, from);
+    await _repo.deactivateMedication(medication.id);
     medications.removeWhere((m) => m.id == medication.id);
     schedulesByMedicationId.remove(medication.id);
+    _notify();
+  }
+
+  /// Permanently removes the medication and all database dependents.
+  Future<void> deleteMedication(Medication medication) async {
+    final now = DateTime.now();
+    final from = DateTime(now.year, now.month, now.day);
+    final to = from.add(const Duration(days: 14));
+    try {
+      final futureDoses = await _doseRepo.fetchDosesForRange(medication.patientId, from: from, to: to);
+      for (final dose in futureDoses.where((d) => d.medicationId == medication.id && !isResolvedStatus(d.status))) {
+        await ReminderEngine.cancelFor(dose.id);
+      }
+    } catch (_) {
+      // Reminder cleanup is best-effort; database deletion remains authoritative.
+    }
+    await _repo.deleteMedication(medication.id);
+    medications.removeWhere((m) => m.id == medication.id);
+    schedulesByMedicationId.remove(medication.id);
+    _imageUrlFutures.removeWhere((key, _) => key == medication.imageUrl);
     _notify();
   }
 

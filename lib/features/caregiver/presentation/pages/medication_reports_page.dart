@@ -27,13 +27,14 @@ class MedicationReportsPage extends StatefulWidget {
 class _MedicationReportsPageState extends State<MedicationReportsPage> {
   late final MedicationReportProvider _provider;
   late final MedicationProvider _medicationProvider;
+  bool _medicationLoadStarted = false;
 
   @override
   void initState() {
     super.initState();
     _provider = widget.provider ?? MedicationReportProvider();
     _medicationProvider = MedicationProvider();
-    _medicationProvider.load(widget.patientId);
+    _provider.addListener(_onReportChanged);
     if (widget.provider == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _provider.load(widget.patientId);
@@ -41,13 +42,18 @@ class _MedicationReportsPageState extends State<MedicationReportsPage> {
     }
   }
 
+  void _onReportChanged() {
+    if (_medicationLoadStarted || _provider.report == null) return;
+    _medicationLoadStarted = true;
+    _medicationProvider.load(widget.patientId).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
   @override
   void dispose() {
-    // Do not dispose the notifier here. ChangeNotifierProvider owns the
-    // lifecycle of the internally-created provider; an injected provider is
-    // owned by its caller. Disposing from State.dispose() can race with the
-    // Provider/Consumer subtree being deactivated and trigger Flutter's
-    // InheritedElement "_dependents.isEmpty" assertion.
+    _provider.removeListener(_onReportChanged);
+    _medicationProvider.dispose();
     super.dispose();
   }
 

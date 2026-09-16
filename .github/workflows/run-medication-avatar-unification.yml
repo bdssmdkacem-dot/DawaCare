@@ -27,7 +27,7 @@ jobs:
           script = textwrap.dedent(workflow[start:end])
           script = script.replace(
               "p.unlink()",
-              "p.unlink()\n          Path('.github/workflows/run-medication-avatar-unification.yml').unlink()",
+              "p.unlink()\nPath('.github/workflows/run-medication-avatar-unification.yml').unlink()",
           )
           script = script.replace(
               "subprocess.run(['git', 'rm', '.github/workflows/medication-avatar-unify-once.yml'], check=False)",

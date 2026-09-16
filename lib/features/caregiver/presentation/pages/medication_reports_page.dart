@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../domain/medication_report.dart';
+import '../../../medications/presentation/providers/medication_provider.dart';
+import '../../../medications/presentation/widgets/medication_avatar.dart';
 import '../providers/medication_report_provider.dart';
 
 class MedicationReportsPage extends StatefulWidget {
@@ -24,11 +26,14 @@ class MedicationReportsPage extends StatefulWidget {
 
 class _MedicationReportsPageState extends State<MedicationReportsPage> {
   late final MedicationReportProvider _provider;
+  late final MedicationProvider _medicationProvider;
 
   @override
   void initState() {
     super.initState();
     _provider = widget.provider ?? MedicationReportProvider();
+    _medicationProvider = MedicationProvider();
+    _medicationProvider.load(widget.patientId);
     if (widget.provider == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _provider.load(widget.patientId);
@@ -199,6 +204,7 @@ class _MedicationReportsPageState extends State<MedicationReportsPage> {
 
   Widget _medicationCard(MedicationReport medication) {
     final percent = (medication.adherence * 100).round();
+    final model = _medicationProvider.medications.where((m) => m.id == medication.medicationId).firstOrNull;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -208,7 +214,15 @@ class _MedicationReportsPageState extends State<MedicationReportsPage> {
           children: [
             Row(
               children: [
-                Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.medication_rounded, color: AppColors.primary)),
+                FutureBuilder<String?>(
+                  future: model == null ? null : _medicationProvider.signedMedicationImageUrl(model.imageUrl),
+                  builder: (context, snapshot) => MedicationAvatar(
+                    name: medication.medicationName,
+                    imageUrl: snapshot.data,
+                    size: 42,
+                    radius: 13,
+                  ),
+                ),
                 const SizedBox(width: 11),
                 Expanded(child: Text(medication.medicationName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15))),
                 Text('$percent%', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),

@@ -11,6 +11,7 @@ import '../../../../models/medication_schedule.dart';
 import '../../../doses/data/dose_repository.dart';
 import '../../domain/stock_intelligence.dart';
 import '../providers/medication_provider.dart';
+import '../widgets/medication_avatar.dart';
 
 class MedicationDetailPage extends StatefulWidget {
   final Medication medication;
@@ -139,12 +140,11 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
               future: context.read<MedicationProvider>().signedMedicationImageUrl(med.imageUrl),
               builder: (context, snapshot) {
                 final url = snapshot.data;
-                return Container(
-                  width: 76,
-                  height: 76,
-                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), borderRadius: BorderRadius.circular(20)),
-                  clipBehavior: Clip.antiAlias,
-                  child: url == null ? const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 38) : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 38)),
+                return MedicationAvatar(
+                  name: med.name,
+                  imageUrl: url,
+                  size: 76,
+                  radius: 20,
                 );
               },
             ),

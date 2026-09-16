@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../models/dose_instance.dart';
+import '../../../../models/medication.dart';
+import '../../../medications/presentation/widgets/medication_avatar.dart';
 
 /// Prominent presentation for the single dose the patient should act on next.
 /// Actions remain optional so the same widget is safe for Viewer/caregiver
@@ -10,12 +12,16 @@ class NextDoseCard extends StatelessWidget {
   const NextDoseCard({
     super.key,
     required this.dose,
+    this.medication,
+    this.imageUrlFuture,
     this.onConfirm,
     this.onSnooze,
     this.onSkip,
   });
 
   final DoseInstance dose;
+  final Medication? medication;
+  final Future<String?>? imageUrlFuture;
   final VoidCallback? onConfirm;
   final VoidCallback? onSnooze;
   final VoidCallback? onSkip;
@@ -48,15 +54,26 @@ class NextDoseCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: .14),
-                    borderRadius: BorderRadius.circular(14),
+                if (medication != null)
+                  FutureBuilder<String?>(
+                    future: imageUrlFuture,
+                    builder: (context, snapshot) => MedicationAvatar(
+                      name: medication!.name,
+                      imageUrl: snapshot.data,
+                      size: 42,
+                      radius: 14,
+                    ),
+                  )
+                else
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: .14),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.notifications_active_rounded, color: AppColors.primary),
                   ),
-                  child: const Icon(Icons.notifications_active_rounded, color: AppColors.primary),
-                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(

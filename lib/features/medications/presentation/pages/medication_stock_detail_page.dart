@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
 import '../providers/medication_provider.dart';
+import '../widgets/medication_avatar.dart';
 import '../widgets/medication_stock_history.dart';
 import 'edit_medication_page.dart';
 
@@ -294,6 +295,16 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              FutureBuilder<String?>(
+                                future: context.read<MedicationProvider>().signedMedicationImageUrl(_medication.imageUrl),
+                                builder: (context, snapshot) => MedicationAvatar(
+                                  name: _medication.name,
+                                  imageUrl: snapshot.data,
+                                  size: 72,
+                                  radius: 18,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [

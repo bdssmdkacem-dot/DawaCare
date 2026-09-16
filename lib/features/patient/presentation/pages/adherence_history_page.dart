@@ -7,6 +7,8 @@ import '../../../../models/dose_instance.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../doses/data/dose_repository.dart';
 import '../../../doses/domain/adherence_report.dart';
+import '../../../medications/presentation/providers/medication_provider.dart';
+import '../../../medications/presentation/widgets/medication_avatar.dart';
 
 class AdherenceHistoryPage extends StatefulWidget {
   const AdherenceHistoryPage({super.key});
@@ -44,6 +46,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
         from: from,
         to: to,
       );
+      await context.read<MedicationProvider>().load(patientId);
       if (!mounted) return;
       setState(() {
         _doses = doses;
@@ -184,6 +187,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
   }
 
   Widget _medicationSection(List<MedicationAdherence> report) {
+    final medications = context.read<MedicationProvider>();
     return Card(
       elevation: 0,
       child: Padding(
@@ -199,10 +203,18 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
               ...report.map(
                 (item) => ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primary.withValues(alpha: .10),
-                    child: const Icon(Icons.medication_rounded, color: AppColors.primary),
-                  ),
+                  leading: (() {
+                    final medication = medications.medications.where((m) => m.id == item.medicationId).firstOrNull;
+                    return FutureBuilder<String?>(
+                      future: medication == null ? null : medications.signedMedicationImageUrl(medication.imageUrl),
+                      builder: (context, snapshot) => MedicationAvatar(
+                        name: item.medicationName,
+                        imageUrl: snapshot.data,
+                        size: 48,
+                        radius: 14,
+                      ),
+                    );
+                  })(),
                   title: Text(item.medicationName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
                   subtitle: Text('${item.summary.taken} مأخوذة · ${item.summary.missed} فائتة'),
                   trailing: Text('${item.percentage.round()}%', style: const TextStyle(fontWeight: FontWeight.w900)),

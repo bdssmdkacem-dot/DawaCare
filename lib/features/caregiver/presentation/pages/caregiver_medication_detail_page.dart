@@ -10,6 +10,7 @@ import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
 import '../../../doses/data/dose_repository.dart';
 import '../../../medications/presentation/providers/medication_provider.dart';
+import '../../../medications/presentation/widgets/medication_avatar.dart';
 import 'voice_recorder_page.dart';
 
 class CaregiverMedicationDetailPage extends StatefulWidget {
@@ -218,23 +219,12 @@ class _CaregiverMedicationDetailPageState
               future: context.read<MedicationProvider>().signedMedicationImageUrl(medication.imageUrl),
               builder: (context, snapshot) {
                 final url = snapshot.data;
-                return Container(
-                  width: 104,
-                  height: 104,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: .09),
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: url == null || url.isEmpty
-                      ? const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 48)
-                      : Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          cacheWidth: 312,
-                          cacheHeight: 312,
-                          errorBuilder: (_, __, ___) => const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 48),
-                        ),
+                return MedicationAvatar(
+                  name: medication.name,
+                  imageUrl: url,
+                  size: 104,
+                  radius: 22,
+                );
                 );
               },
             ),

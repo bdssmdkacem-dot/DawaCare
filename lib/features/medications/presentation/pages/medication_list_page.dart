@@ -12,6 +12,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../doses/domain/dose_engine.dart';
 import '../../domain/stock_intelligence.dart';
 import '../providers/medication_provider.dart';
+import '../widgets/medication_avatar.dart';
 import '../widgets/medication_stock_badge.dart';
 import 'add_edit_medication_page.dart';
 import 'edit_medication_page.dart';
@@ -461,14 +462,11 @@ class _SmartMedicationTile extends StatelessWidget {
               future: imageUrlFuture,
               builder: (context, snapshot) {
                 final image = snapshot.data;
-                return Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), borderRadius: BorderRadius.circular(16)),
-                  clipBehavior: Clip.antiAlias,
-                  child: image == null
-                      ? const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 30)
-                      : Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 30)),
+                return MedicationAvatar(
+                  name: medication.name,
+                  imageUrl: image,
+                  size: 64,
+                  radius: 16,
                 );
               },
             ),

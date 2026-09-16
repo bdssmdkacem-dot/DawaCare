@@ -10,6 +10,7 @@ import '../../../doses/presentation/providers/dose_provider.dart';
 import '../../../medications/domain/stock_intelligence.dart';
 import '../../../medications/presentation/pages/medication_detail_page.dart';
 import '../../../medications/presentation/pages/medication_list_page.dart';
+import '../../../medications/presentation/widgets/medication_avatar.dart';
 import '../../../medications/presentation/providers/medication_provider.dart';
 import '../../../settings/presentation/pages/profile_page.dart';
 import '../widgets/next_dose_card.dart';
@@ -79,6 +80,10 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
       orElse: () => null,
     );
     final progress = doses.todayAdherenceRate;
+    Medication? nextMedication;
+    if (next != null) {
+      nextMedication = medications.medications.where((m) => m.id == next.medicationId).firstOrNull;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -106,6 +111,10 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
             if (next != null)
               NextDoseCard(
                 dose: next,
+                medication: nextMedication,
+                imageUrlFuture: nextMedication == null
+                    ? null
+                    : medications.signedMedicationImageUrl(nextMedication.imageUrl),
                 onConfirm: () async { await doses.confirm(next); },
                 onSnooze: () async { await doses.snooze(next); },
                 onSkip: () async { await doses.skip(next); },
@@ -131,9 +140,14 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
                     elevation: 0,
                     child: ListTile(
                       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MedicationDetailPage(medication: medication, schedules: schedules))),
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.primary.withValues(alpha: .10),
-                        child: const Icon(Icons.medication_rounded, color: AppColors.primary),
+                      leading: FutureBuilder<String?>(
+                        future: medications.signedMedicationImageUrl(medication.imageUrl),
+                        builder: (context, snapshot) => MedicationAvatar(
+                          name: medication.name,
+                          imageUrl: snapshot.data,
+                          size: 48,
+                          radius: 14,
+                        ),
                       ),
                       title: Text(medication.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
                       subtitle: Text(medication.strength?.isNotEmpty == true ? '${medication.strength}${medication.dosageForm == null ? '' : ' · ${medication.dosageForm}'}' : (medication.dosageForm ?? '')),

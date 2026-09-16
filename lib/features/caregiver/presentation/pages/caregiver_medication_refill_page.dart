@@ -5,6 +5,7 @@ import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/medication.dart';
 import '../../../medications/domain/stock_intelligence.dart';
 import '../../../medications/presentation/providers/medication_provider.dart';
+import '../../../medications/presentation/widgets/medication_avatar.dart';
 
 class CaregiverMedicationRefillPage extends StatefulWidget {
   final Medication medication;
@@ -154,6 +155,16 @@ class _CaregiverMedicationRefillPageState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      FutureBuilder<String?>(
+                        future: _provider.signedMedicationImageUrl(medication.imageUrl),
+                        builder: (context, snapshot) => MedicationAvatar(
+                          name: medication.name,
+                          imageUrl: snapshot.data,
+                          size: 64,
+                          radius: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Text(
                         medication.name,
                         style: const TextStyle(

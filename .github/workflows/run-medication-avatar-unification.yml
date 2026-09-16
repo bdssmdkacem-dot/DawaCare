@@ -33,5 +33,6 @@ jobs:
               "subprocess.run(['git', 'rm', '.github/workflows/medication-avatar-unify-once.yml'], check=False)",
               "subprocess.run(['git', 'add', '-u', '.github/workflows'], check=True)",
           )
+          script = textwrap.dedent(script)
           subprocess.run(['python3', '-c', script], check=True)
           PY

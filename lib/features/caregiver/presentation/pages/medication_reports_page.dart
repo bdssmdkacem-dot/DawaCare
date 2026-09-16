@@ -26,14 +26,13 @@ class MedicationReportsPage extends StatefulWidget {
 
 class _MedicationReportsPageState extends State<MedicationReportsPage> {
   late final MedicationReportProvider _provider;
-  late final MedicationProvider _medicationProvider;
+  MedicationProvider? _medicationProvider;
   bool _medicationLoadStarted = false;
 
   @override
   void initState() {
     super.initState();
     _provider = widget.provider ?? MedicationReportProvider();
-    _medicationProvider = MedicationProvider();
     _provider.addListener(_onReportChanged);
     if (widget.provider == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -45,15 +44,22 @@ class _MedicationReportsPageState extends State<MedicationReportsPage> {
   void _onReportChanged() {
     if (_medicationLoadStarted || _provider.report == null) return;
     _medicationLoadStarted = true;
-    _medicationProvider.load(widget.patientId).then((_) {
-      if (mounted) setState(() {});
-    });
+    try {
+      final medicationProvider = MedicationProvider();
+      _medicationProvider = medicationProvider;
+      medicationProvider.load(widget.patientId).then((_) {
+        if (mounted) setState(() {});
+      });
+    } catch (_) {
+      // Widget tests may render this page without initializing Supabase.
+      // The shared avatar falls back to medication initials in that case.
+    }
   }
 
   @override
   void dispose() {
     _provider.removeListener(_onReportChanged);
-    _medicationProvider.dispose();
+    _medicationProvider?.dispose();
     super.dispose();
   }
 
@@ -210,7 +216,8 @@ class _MedicationReportsPageState extends State<MedicationReportsPage> {
 
   Widget _medicationCard(MedicationReport medication) {
     final percent = (medication.adherence * 100).round();
-    final model = _medicationProvider.medications.where((m) => m.id == medication.medicationId).firstOrNull;
+    final medicationProvider = _medicationProvider;
+    final model = medicationProvider?.medications.where((m) => m.id == medication.medicationId).firstOrNull;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -221,7 +228,9 @@ class _MedicationReportsPageState extends State<MedicationReportsPage> {
             Row(
               children: [
                 FutureBuilder<String?>(
-                  future: model == null ? null : _medicationProvider.signedMedicationImageUrl(model.imageUrl),
+                  future: model == null || medicationProvider == null
+                      ? null
+                      : medicationProvider.signedMedicationImageUrl(model.imageUrl),
                   builder: (context, snapshot) => MedicationAvatar(
                     name: medication.medicationName,
                     imageUrl: snapshot.data,

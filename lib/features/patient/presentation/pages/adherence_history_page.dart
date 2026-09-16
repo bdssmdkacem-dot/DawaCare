@@ -46,6 +46,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
         from: from,
         to: to,
       );
+      if (!mounted) return;
       await context.read<MedicationProvider>().load(patientId);
       if (!mounted) return;
       setState(() {

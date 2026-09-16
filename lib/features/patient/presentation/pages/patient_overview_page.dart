@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/dose_instance.dart';
+import '../../../../models/medication.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../doses/domain/adherence_engine.dart';
 import '../../../doses/presentation/providers/dose_provider.dart';

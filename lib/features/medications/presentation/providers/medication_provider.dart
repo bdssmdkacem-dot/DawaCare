@@ -293,38 +293,78 @@ class MedicationProvider extends ChangeNotifier {
 
   /// Stops the medication but keeps its database row, stock, history and image.
   Future<void> deactivate(Medication medication) async {
-    final now = DateTime.now();
-    final from = DateTime(now.year, now.month, now.day);
-    final to = from.add(const Duration(days: 14));
-    final futureDoses = await _doseRepo.fetchDosesForRange(medication.patientId, from: from, to: to);
-    for (final dose in futureDoses.where((d) => d.medicationId == medication.id && !isResolvedStatus(d.status))) {
-      await ReminderEngine.cancelFor(dose.id);
-    }
-    await _doseRepo.clearFutureUnresolvedDosesByMedication(medication.id, from);
-    await _repo.deactivateMedication(medication.id);
-    medications.removeWhere((m) => m.id == medication.id);
-    schedulesByMedicationId.remove(medication.id);
-    _notify();
-  }
+    debugPrint('DawaCare medication STOP START id=${medication.id} patient=${medication.patientId}');
 
-  /// Permanently removes the medication and all database dependents.
-  Future<void> deleteMedication(Medication medication) async {
+    // The database state is authoritative. Do this first so a reminder or dose
+    // cleanup failure can never prevent the medication from being stopped.
+    await _repo.deactivateMedication(medication.id);
+    debugPrint('DawaCare medication STOP DB SUCCESS id=${medication.id}');
+
     final now = DateTime.now();
     final from = DateTime(now.year, now.month, now.day);
     final to = from.add(const Duration(days: 14));
     try {
       final futureDoses = await _doseRepo.fetchDosesForRange(medication.patientId, from: from, to: to);
       for (final dose in futureDoses.where((d) => d.medicationId == medication.id && !isResolvedStatus(d.status))) {
-        await ReminderEngine.cancelFor(dose.id);
+        try {
+          await ReminderEngine.cancelFor(dose.id);
+        } catch (e, st) {
+          debugPrint('DawaCare medication STOP reminder cleanup failed dose=${dose.id}: $e');
+          debugPrintStack(stackTrace: st);
+        }
       }
-    } catch (_) {
-      // Reminder cleanup is best-effort; database deletion remains authoritative.
+      try {
+        await _doseRepo.clearFutureUnresolvedDosesByMedication(medication.id, from);
+      } catch (e, st) {
+        debugPrint('DawaCare medication STOP dose cleanup failed id=${medication.id}: $e');
+        debugPrintStack(stackTrace: st);
+      }
+    } catch (e, st) {
+      debugPrint('DawaCare medication STOP cleanup skipped id=${medication.id}: $e');
+      debugPrintStack(stackTrace: st);
     }
-    await _repo.deleteMedication(medication.id);
+
+    medications.removeWhere((m) => m.id == medication.id);
+    schedulesByMedicationId.remove(medication.id);
+    _notify();
+    debugPrint('DawaCare medication STOP SUCCESS id=${medication.id}');
+  }
+
+  /// Permanently removes the medication and all database dependents.
+  Future<void> deleteMedication(Medication medication) async {
+    debugPrint('DawaCare medication DELETE START id=${medication.id} patient=${medication.patientId}');
+    final now = DateTime.now();
+    final from = DateTime(now.year, now.month, now.day);
+    final to = from.add(const Duration(days: 14));
+    try {
+      final futureDoses = await _doseRepo.fetchDosesForRange(medication.patientId, from: from, to: to);
+      for (final dose in futureDoses.where((d) => d.medicationId == medication.id && !isResolvedStatus(d.status))) {
+        try {
+          await ReminderEngine.cancelFor(dose.id);
+        } catch (e, st) {
+          debugPrint('DawaCare medication DELETE reminder cleanup failed dose=${dose.id}: $e');
+          debugPrintStack(stackTrace: st);
+        }
+      }
+    } catch (e, st) {
+      debugPrint('DawaCare medication DELETE reminder cleanup skipped id=${medication.id}: $e');
+      debugPrintStack(stackTrace: st);
+    }
+
+    try {
+      await _repo.deleteMedication(medication.id);
+      debugPrint('DawaCare medication DELETE DB SUCCESS id=${medication.id}');
+    } catch (e, st) {
+      debugPrint('DawaCare medication DELETE FAILED id=${medication.id}: $e');
+      debugPrintStack(stackTrace: st);
+      rethrow;
+    }
+
     medications.removeWhere((m) => m.id == medication.id);
     schedulesByMedicationId.remove(medication.id);
     _imageUrlFutures.removeWhere((key, _) => key == medication.imageUrl);
     _notify();
+    debugPrint('DawaCare medication DELETE SUCCESS id=${medication.id}');
   }
 
   String _unitForDosageForm(String? form) {

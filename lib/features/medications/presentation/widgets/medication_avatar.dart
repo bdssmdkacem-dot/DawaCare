@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 
+/// Shared medication identity: real image when available, two-letter fallback otherwise.
 class MedicationAvatar extends StatelessWidget {
   final String name;
   final String? imageUrl;

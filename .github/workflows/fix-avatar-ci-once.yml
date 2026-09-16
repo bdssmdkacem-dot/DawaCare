@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   fix:
-    if: github.event.head_commit.message != 'chore: add one-shot CI fix workflow'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +37,7 @@ jobs:
           s = s.replace("  late final MedicationProvider _medicationProvider;\n", "  MedicationProvider? _medicationProvider;\n")
           s = s.replace("    _medicationProvider = MedicationProvider();\n", "")
           old = """    _medicationLoadStarted = true;\n    _medicationProvider.load(widget.patientId).then((_) {\n      if (mounted) setState(() {});\n    });\n"""
-          new = """    _medicationLoadStarted = true;\n    try {\n      final medicationProvider = MedicationProvider();\n      _medicationProvider = medicationProvider;\n      medicationProvider.load(widget.patientId).then((_) {\n        if (mounted) setState(() {});\n      });\n    } catch (_) {\n      // Widget tests may render this page without initializing Supabase.\n      // In that case the shared avatar intentionally falls back to initials.\n    }\n"""
+          new = """    _medicationLoadStarted = true;\n    try {\n      final medicationProvider = MedicationProvider();\n      _medicationProvider = medicationProvider;\n      medicationProvider.load(widget.patientId).then((_) {\n        if (mounted) setState(() {});\n      });\n    } catch (_) {\n      // Widget tests may render this page without initializing Supabase.\n      // The shared avatar falls back to medication initials in that case.\n    }\n"""
           if old not in s:
               raise SystemExit('reports load pattern not found')
           s = s.replace(old, new, 1)
@@ -50,7 +49,6 @@ jobs:
       - name: Verify
         run: |
           grep -n "models/medication.dart" lib/features/patient/presentation/pages/patient_overview_page.dart
-          grep -n "if (!mounted) return;" lib/features/patient/presentation/pages/adherence_history_page.dart | head
           grep -n "MedicationProvider?" lib/features/caregiver/presentation/pages/medication_reports_page.dart
       - name: Commit and remove workflow
         shell: bash

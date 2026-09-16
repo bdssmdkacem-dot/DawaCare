@@ -141,10 +141,7 @@ class _CaregiverMedicationDetailPageState
               children: [
                 _hero(data.medication),
                 const SizedBox(height: 18),
-                _section(
-                  Icons.medical_information_rounded,
-                  _tr('معلومات الدواء', 'Medication information', 'Informations du médicament'),
-                ),
+                _section(Icons.medical_information_rounded, _tr('معلومات الدواء', 'Medication information', 'Informations du médicament')),
                 const SizedBox(height: 8),
                 _infoGrid(data.medication),
                 const SizedBox(height: 18),
@@ -190,13 +187,41 @@ class _CaregiverMedicationDetailPageState
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  _tr(
-                    'هذه الصفحة للمتابعة فقط. بيانات الدواء المعروضة مأخوذة من سجل المريض.',
-                    'This page is read-only. Medication data comes from the patient record.',
-                    'Cette page est en lecture seule. Les données proviennent du dossier du patient.',
+                if (widget.canManageDoses) ...[
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: data.medication.active ? _confirmDeactivate : null,
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    label: Text(_tr('إيقاف الدواء', 'Stop medication', 'Arrêter le médicament')),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                      foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
                   ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: _confirmDelete,
+                    icon: const Icon(Icons.delete_forever_rounded),
+                    label: Text(_tr('إزالة الدواء نهائيًا', 'Delete medicine permanently', 'Supprimer définitivement le médicament')),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                      side: BorderSide(color: Theme.of(context).colorScheme.error),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                Text(
+                  widget.canManageDoses
+                      ? _tr(
+                          'لديك صلاحية إدارة دواء هذا المريض. الإيقاف يبقي السجل والمخزون والصورة، أما الإزالة النهائية فتحذف الدواء نهائيًا.',
+                          'You can manage this patient medication. Stopping keeps history, stock and image; permanent deletion removes the medicine.',
+                          'Vous pouvez gérer ce médicament. L’arrêt conserve l’historique, le stock et l’image ; la suppression définitive retire le médicament.',
+                        )
+                      : _tr(
+                          'هذه الصفحة للمتابعة فقط. بيانات الدواء المعروضة مأخوذة من سجل المريض.',
+                          'This page is read-only. Medication data comes from the patient record.',
+                          'Cette page est en lecture seule. Les données proviennent du dossier du patient.',
+                        ),
                   style: Theme.of(context).textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
@@ -206,6 +231,66 @@ class _CaregiverMedicationDetailPageState
         );
       },
     );
+  }
+
+  Future<void> _confirmDeactivate() async {
+    if (!widget.canManageDoses) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_tr('إيقاف الدواء؟', 'Stop medication?', 'Arrêter le médicament ?')),
+        content: Text(_tr(
+          'سيتم إيقاف الدواء وإلغاء الجرعات والتذكيرات المستقبلية، مع الاحتفاظ بسجل الدواء والمخزون والصورة.',
+          'The medication will be stopped and future doses/reminders cancelled. Its record, stock and image will be kept.',
+          'Le médicament sera arrêté et les futures doses/rappels annulés. Son historique, son stock et son image seront conservés.',
+        )),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context).cancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(_tr('إيقاف', 'Stop', 'Arrêter'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await context.read<MedicationProvider>().deactivate(widget.medication);
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_tr('تعذر إيقاف الدواء. حاول مرة أخرى.', 'Could not stop the medication. Please try again.', 'Impossible d’arrêter le médicament. Réessayez.'))),
+      );
+    }
+  }
+
+  Future<void> _confirmDelete() async {
+    if (!widget.canManageDoses) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_tr('إزالة الدواء نهائيًا؟', 'Delete this medicine permanently?', 'Supprimer définitivement ce médicament ?')),
+        content: Text(_tr(
+          'سيتم حذف الدواء وجدوله وجرعاته وسجلات مخزونه وصورته نهائيًا. لا يمكن التراجع عن هذا الإجراء.',
+          'The medicine, its schedules, doses, stock records and image will be permanently deleted. This cannot be undone.',
+          'Le médicament, ses plannings, doses, mouvements de stock et son image seront supprimés définitivement. Cette action est irréversible.',
+        )),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context).cancel)),
+          FilledButton.tonal(onPressed: () => Navigator.pop(ctx, true), child: Text(_tr('إزالة نهائيًا', 'Delete permanently', 'Supprimer définitivement'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await context.read<MedicationProvider>().deleteMedication(widget.medication);
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_tr('تعذر إزالة الدواء. حاول مرة أخرى.', 'Could not delete the medicine. Please try again.', 'Impossible de supprimer le médicament. Réessayez.'))),
+      );
+    }
   }
 
   Widget _hero(Medication medication) {
@@ -219,12 +304,7 @@ class _CaregiverMedicationDetailPageState
               future: context.read<MedicationProvider>().signedMedicationImageUrl(medication.imageUrl),
               builder: (context, snapshot) {
                 final url = snapshot.data;
-                return MedicationAvatar(
-                  name: medication.name,
-                  imageUrl: url,
-                  size: 104,
-                  radius: 22,
-                );
+                return MedicationAvatar(name: medication.name, imageUrl: url, size: 104, radius: 22);
               },
             ),
             const SizedBox(width: 16),

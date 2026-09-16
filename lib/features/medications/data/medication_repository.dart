@@ -43,7 +43,6 @@ class MedicationRepository {
     return created;
   }
 
-  /// Updates prescription/metadata only. Stock is changed only by stock transactions.
   Future<Medication> updateMedication(Medication medication) async {
     final data = medication.toInsertMap()..remove('stock_quantity');
     final row = await _client.from('medications').update(data).eq('id', medication.id).select().single();
@@ -83,11 +82,16 @@ class MedicationRepository {
   }
   Future<void> deleteFuturePendingDoses(String scheduleId, DateTime from) async { await _client.from('dose_instances').delete().eq('schedule_id', scheduleId).eq('status', 'PENDING').gte('scheduled_at', from.toUtc().toIso8601String()); }
 
-  /// Legacy deactivate entry point used by the current UI. Removing a medication
-  /// now permanently deletes its database row; dependent schedules, doses,
-  /// stock transactions and caregiver alerts are removed by their CASCADE FKs.
-  /// The image is removed through the Storage API as a best-effort cleanup.
+  /// Stops a medication without deleting its history, stock, schedules or image.
+  /// Future unresolved doses are handled by MedicationProvider before this call.
   Future<void> deactivateMedication(String medicationId) async {
+    await _client.from('medications').update({'active': false}).eq('id', medicationId);
+  }
+
+  /// Permanently deletes the medication row. Database CASCADE constraints remove
+  /// schedules, doses, stock transactions and caregiver alerts. The image is
+  /// removed through the Storage API as a best-effort cleanup.
+  Future<void> deleteMedication(String medicationId) async {
     final row = await _client.from('medications').select('image_url').eq('id', medicationId).single();
     final imagePath = row['image_url'] as String?;
     await _client.from('medications').delete().eq('id', medicationId);
@@ -95,10 +99,8 @@ class MedicationRepository {
       try {
         await _imageService.delete(imagePath);
       } catch (_) {
-        // Database deletion already succeeded; an image cleanup failure must
-        // not make the user think the medication still exists.
+        // Database deletion already succeeded; do not report a false failure.
       }
     }
   }
-  Future<void> deleteMedication(String medicationId) async => deactivateMedication(medicationId);
 }

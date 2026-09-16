@@ -8,6 +8,7 @@ import '../../../../models/family_link_request.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/caregiver_provider.dart';
 import '../widgets/family_link_requests_section.dart';
+import '../widgets/link_code_sheet.dart';
 import 'patient_detail_page.dart';
 
 class CaregiverHomePage extends StatefulWidget {
@@ -59,11 +60,11 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
 
   Future<void> _openGenerateCodeSheet() async {
     final provider = context.read<CaregiverProvider>();
-    final l = AppLocalizations.of(context);
     await provider.generateCode();
     if (!mounted) return;
     final code = provider.activeCode;
     if (code == null) {
+      final l = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(provider.error ?? l.unexpectedError)),
       );
@@ -75,18 +76,12 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(l.linkCode, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            SelectableText(code.code, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            Text(l.linkCodeHint, textAlign: TextAlign.center),
-          ],
-        ),
+      builder: (_) => LinkCodeSheet(
+        initialCode: code,
+        onRegenerate: () async {
+          await provider.generateCode();
+          return provider.activeCode;
+        },
       ),
     );
   }
@@ -278,6 +273,15 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                   label: const Text('إضافة برمز'),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: provider.isCodeLoading ? null : _openGenerateCodeSheet,
+                icon: const Icon(Icons.vpn_key_rounded),
+                label: const Text('إنشاء رمز ربط لإرساله'),
+              ),
             ),
             const SizedBox(height: 12),
             if (provider.isLoading)

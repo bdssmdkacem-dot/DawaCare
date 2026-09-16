@@ -123,6 +123,13 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
               label: Text(AppLocalizations.of(context).deactivateMedicine),
               style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.errorContainer, foregroundColor: Theme.of(context).colorScheme.onErrorContainer),
             ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _confirmDelete,
+              icon: const Icon(Icons.delete_forever_rounded),
+              label: Text(_tr('إزالة الدواء نهائيًا', 'Delete medicine permanently', 'Supprimer définitivement le médicament')),
+              style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error, side: BorderSide(color: Theme.of(context).colorScheme.error)),
+            ),
           ],
         ),
       ),
@@ -140,12 +147,7 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
               future: context.read<MedicationProvider>().signedMedicationImageUrl(med.imageUrl),
               builder: (context, snapshot) {
                 final url = snapshot.data;
-                return MedicationAvatar(
-                  name: med.name,
-                  imageUrl: url,
-                  size: 76,
-                  radius: 20,
-                );
+                return MedicationAvatar(name: med.name, imageUrl: url, size: 76, radius: 20);
               },
             ),
             const SizedBox(width: 14),
@@ -378,5 +380,27 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
     if (confirmed != true || !mounted) return;
     await context.read<MedicationProvider>().deactivate(widget.medication);
     if (mounted) Navigator.of(context).pop(true);
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_tr('إزالة الدواء نهائيًا؟', 'Delete this medicine permanently?', 'Supprimer définitivement ce médicament ?')),
+        content: Text(_tr('سيتم حذف الدواء وجميع جرعاته المستقبلية وسجلاته المرتبطة وصورته نهائيًا. لا يمكن التراجع عن هذا الإجراء.', 'The medicine, its linked schedules, doses, stock records and image will be permanently deleted. This cannot be undone.', 'Le médicament, ses plannings, doses, mouvements de stock et son image seront supprimés définitivement. Cette action est irréversible.')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context).cancel)),
+          FilledButton.tonal(onPressed: () => Navigator.pop(ctx, true), child: Text(_tr('إزالة نهائيًا', 'Delete permanently', 'Supprimer définitivement'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await context.read<MedicationProvider>().deleteMedication(widget.medication);
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_tr('تعذر إزالة الدواء. حاول مرة أخرى.', 'Could not delete the medicine. Please try again.', 'Impossible de supprimer le médicament. Réessayez.'))));
+    }
   }
 }

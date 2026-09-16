@@ -225,7 +225,7 @@ class _CaregiverMedicationDetailPageState
                   size: 104,
                   radius: 22,
                 );
-                );
+                )
               },
             ),
             const SizedBox(width: 16),

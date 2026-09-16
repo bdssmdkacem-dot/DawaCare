@@ -1,0 +1,98 @@
+name: Medication avatar unification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/medication-avatar-unify-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.sha == '20b84ec00a7772b85101efe42d2a69daa6034fd5'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply medication avatar changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def edit(path, replacements):
+              p = Path(path)
+              s = p.read_text(encoding='utf-8')
+              for old, new in replacements:
+                  if old not in s:
+                      raise SystemExit(f'Missing expected text in {path}: {old[:120]!r}')
+                  s = s.replace(old, new, 1)
+              p.write_text(s, encoding='utf-8')
+
+          edit('lib/features/medications/presentation/pages/medication_list_page.dart', [
+              ("import '../widgets/medication_stock_badge.dart';", "import '../widgets/medication_avatar.dart';\nimport '../widgets/medication_stock_badge.dart';"),
+              ("""                return Container(\n                  width: 64,\n                  height: 64,\n                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), borderRadius: BorderRadius.circular(16)),\n                  clipBehavior: Clip.antiAlias,\n                  child: image == null\n                      ? const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 30)\n                      : Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 30)),\n                );""", """                return MedicationAvatar(\n                  name: medication.name,\n                  imageUrl: image,\n                  size: 64,\n                  radius: 16,\n                );"""),
+          ])
+
+          edit('lib/features/medications/presentation/pages/medication_detail_page.dart', [
+              ("import '../providers/medication_provider.dart';", "import '../providers/medication_provider.dart';\nimport '../widgets/medication_avatar.dart';"),
+              ("""                return Container(\n                  width: 76,\n                  height: 76,\n                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .09), borderRadius: BorderRadius.circular(20)),\n                  clipBehavior: Clip.antiAlias,\n                  child: url == null ? const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 38) : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 38)),\n                );""", """                return MedicationAvatar(\n                  name: med.name,\n                  imageUrl: url,\n                  size: 76,\n                  radius: 20,\n                );"""),
+          ])
+
+          edit('lib/features/medications/presentation/pages/medication_stock_detail_page.dart', [
+              ("import '../widgets/medication_stock_history.dart';", "import '../widgets/medication_avatar.dart';\nimport '../widgets/medication_stock_history.dart';"),
+              ("""                            children: [\n                              Row(\n                                mainAxisAlignment: MainAxisAlignment.spaceBetween,""", """                            children: [\n                              FutureBuilder<String?>(\n                                future: context.read<MedicationProvider>().signedMedicationImageUrl(_medication.imageUrl),\n                                builder: (context, snapshot) => MedicationAvatar(\n                                  name: _medication.name,\n                                  imageUrl: snapshot.data,\n                                  size: 72,\n                                  radius: 18,\n                                ),\n                              ),\n                              const SizedBox(height: 14),\n                              Row(\n                                mainAxisAlignment: MainAxisAlignment.spaceBetween,"""),
+          ])
+
+          edit('lib/features/patient/presentation/pages/patient_overview_page.dart', [
+              ("import '../../../medications/presentation/pages/medication_list_page.dart';", "import '../../../medications/presentation/pages/medication_list_page.dart';\nimport '../../../medications/presentation/widgets/medication_avatar.dart';"),
+              ("""    final progress = doses.todayAdherenceRate;\n\n    return Scaffold(""", """    final progress = doses.todayAdherenceRate;\n    Medication? nextMedication;\n    if (next != null) {\n      nextMedication = medications.medications.where((m) => m.id == next.medicationId).firstOrNull;\n    }\n\n    return Scaffold("""),
+              ("""                dose: next,\n                onConfirm:""", """                dose: next,\n                medication: nextMedication,\n                imageUrlFuture: nextMedication == null\n                    ? null\n                    : medications.signedMedicationImageUrl(nextMedication.imageUrl),\n                onConfirm:"""),
+              ("""                      leading: CircleAvatar(\n                        backgroundColor: AppColors.primary.withValues(alpha: .10),\n                        child: const Icon(Icons.medication_rounded, color: AppColors.primary),\n                      ),""", """                      leading: FutureBuilder<String?>(\n                        future: medications.signedMedicationImageUrl(medication.imageUrl),\n                        builder: (context, snapshot) => MedicationAvatar(\n                          name: medication.name,\n                          imageUrl: snapshot.data,\n                          size: 48,\n                          radius: 14,\n                        ),\n                      ),"""),
+          ])
+
+          edit('lib/features/patient/presentation/pages/adherence_history_page.dart', [
+              ("import '../../../doses/domain/adherence_report.dart';", "import '../../../doses/domain/adherence_report.dart';\nimport '../../../medications/presentation/providers/medication_provider.dart';\nimport '../../../medications/presentation/widgets/medication_avatar.dart';"),
+              ("""      final doses = await _repository.fetchDosesForRange(\n        patientId,\n        from: from,\n        to: to,\n      );""", """      final doses = await _repository.fetchDosesForRange(\n        patientId,\n        from: from,\n        to: to,\n      );\n      await context.read<MedicationProvider>().load(patientId);"""),
+              ("""            _medicationSection(medicationReport),""", """            _medicationSection(medicationReport),"""),
+              ("""  Widget _medicationSection(List<MedicationAdherence> report) {\n    return Card(""", """  Widget _medicationSection(List<MedicationAdherence> report) {\n    final medications = context.read<MedicationProvider>();\n    return Card("""),
+              ("""                  leading: CircleAvatar(\n                    backgroundColor: AppColors.primary.withValues(alpha: .10),\n                    child: const Icon(Icons.medication_rounded, color: AppColors.primary),\n                  ),""", """                  leading: (() {\n                    final medication = medications.medications.where((m) => m.id == item.medicationId).firstOrNull;\n                    return FutureBuilder<String?>(\n                      future: medication == null ? null : medications.signedMedicationImageUrl(medication.imageUrl),\n                      builder: (context, snapshot) => MedicationAvatar(\n                        name: item.medicationName,\n                        imageUrl: snapshot.data,\n                        size: 48,\n                        radius: 14,\n                      ),\n                    );\n                  })(),"""),
+          ])
+
+          edit('lib/features/patient/presentation/widgets/next_dose_card.dart', [
+              ("import '../../../../models/dose_instance.dart';", "import '../../../../models/dose_instance.dart';\nimport '../../../../models/medication.dart';\nimport '../../../medications/presentation/widgets/medication_avatar.dart';"),
+              ("""  final DoseInstance dose;\n  final VoidCallback? onConfirm;""", """  final DoseInstance dose;\n  final Medication? medication;\n  final Future<String?>? imageUrlFuture;\n  final VoidCallback? onConfirm;"""),
+              ("""    required this.dose,\n    this.onConfirm,""", """    required this.dose,\n    this.medication,\n    this.imageUrlFuture,\n    this.onConfirm,"""),
+              ("""                Container(\n                  width: 42,\n                  height: 42,\n                  decoration: BoxDecoration(\n                    color: AppColors.primary.withValues(alpha: .14),\n                    borderRadius: BorderRadius.circular(14),\n                  ),\n                  child: const Icon(Icons.notifications_active_rounded, color: AppColors.primary),\n                ),""", """                if (medication != null)\n                  FutureBuilder<String?>(\n                    future: imageUrlFuture,\n                    builder: (context, snapshot) => MedicationAvatar(\n                      name: medication!.name,\n                      imageUrl: snapshot.data,\n                      size: 42,\n                      radius: 14,\n                    ),\n                  )\n                else\n                  Container(\n                    width: 42,\n                    height: 42,\n                    decoration: BoxDecoration(\n                      color: AppColors.primary.withValues(alpha: .14),\n                      borderRadius: BorderRadius.circular(14),\n                    ),\n                    child: const Icon(Icons.notifications_active_rounded, color: AppColors.primary),\n                  ),"""),
+          ])
+
+          edit('lib/features/caregiver/presentation/pages/caregiver_medication_detail_page.dart', [
+              ("import '../../../medications/presentation/providers/medication_provider.dart';", "import '../../../medications/presentation/providers/medication_provider.dart';\nimport '../../../medications/presentation/widgets/medication_avatar.dart';"),
+              ("""                return Container(\n                  width: 104,\n                  height: 104,\n                  decoration: BoxDecoration(\n                    color: AppColors.primary.withValues(alpha: .09),\n                    borderRadius: BorderRadius.circular(22),\n                  ),\n                  clipBehavior: Clip.antiAlias,\n                  child: url == null || url.isEmpty\n                      ? const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 48)\n                      : Image.network(\n                          url,\n                          fit: BoxFit.cover,\n                          cacheWidth: 312,\n                          cacheHeight: 312,\n                          errorBuilder: (_, __, ___) => const Icon(Icons.medication_liquid_rounded, color: AppColors.primary, size: 48),\n                        ),""", """                return MedicationAvatar(\n                  name: medication.name,\n                  imageUrl: url,\n                  size: 104,\n                  radius: 22,\n                );"""),
+          ])
+
+          edit('lib/features/caregiver/presentation/pages/caregiver_medication_refill_page.dart', [
+              ("import '../../../medications/presentation/providers/medication_provider.dart';", "import '../../../medications/presentation/providers/medication_provider.dart';\nimport '../../../medications/presentation/widgets/medication_avatar.dart';"),
+              ("""                    crossAxisAlignment: CrossAxisAlignment.start,\n                    children: [\n                      Text(\n                        medication.name,""", """                    crossAxisAlignment: CrossAxisAlignment.start,\n                    children: [\n                      FutureBuilder<String?>(\n                        future: _provider.signedMedicationImageUrl(medication.imageUrl),\n                        builder: (context, snapshot) => MedicationAvatar(\n                          name: medication.name,\n                          imageUrl: snapshot.data,\n                          size: 64,\n                          radius: 16,\n                        ),\n                      ),\n                      const SizedBox(height: 12),\n                      Text(\n                        medication.name,"""),
+          ])
+
+          edit('lib/features/caregiver/presentation/pages/medication_reports_page.dart', [
+              ("import '../../domain/medication_report.dart';", "import '../../domain/medication_report.dart';\nimport '../../../medications/presentation/providers/medication_provider.dart';\nimport '../../../medications/presentation/widgets/medication_avatar.dart';"),
+              ("""  late final MedicationReportProvider _provider;\n""", """  late final MedicationReportProvider _provider;\n  late final MedicationProvider _medicationProvider;\n"""),
+              ("""    _provider = widget.provider ?? MedicationReportProvider();\n""", """    _provider = widget.provider ?? MedicationReportProvider();\n    _medicationProvider = MedicationProvider();\n    _medicationProvider.load(widget.patientId);\n"""),
+              ("""  Widget _medicationCard(MedicationReport medication) {\n    final percent = (medication.adherence * 100).round();""", """  Widget _medicationCard(MedicationReport medication) {\n    final percent = (medication.adherence * 100).round();\n    final model = _medicationProvider.medications.where((m) => m.id == medication.medicationId).firstOrNull;"""),
+              ("""                Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.medication_rounded, color: AppColors.primary)),""", """                FutureBuilder<String?>(\n                  future: model == null ? null : _medicationProvider.signedMedicationImageUrl(model.imageUrl),\n                  builder: (context, snapshot) => MedicationAvatar(\n                    name: medication.medicationName,\n                    imageUrl: snapshot.data,\n                    size: 42,\n                    radius: 13,\n                  ),\n                ),"""),
+          ])
+
+          # Temporary workflow is one-shot; the generated commit will be built by the next push.
+          p = Path('.github/workflows/medication-avatar-unify-once.yml')
+          p.unlink()
+          
+          import subprocess
+          subprocess.run(['git', 'config', 'user.name', 'github-actions[bot]'], check=True)
+          subprocess.run(['git', 'config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'], check=True)
+          subprocess.run(['git', 'add', 'lib'], check=True)
+          subprocess.run(['git', 'rm', '.github/workflows/medication-avatar-unify-once.yml'], check=False)
+          subprocess.run(['git', 'commit', '-m', 'feat(medications): unify medication avatars across app'], check=True)
+          subprocess.run(['git', 'push'], check=True)
+          PY

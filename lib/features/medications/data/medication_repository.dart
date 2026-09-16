@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../models/medication.dart';
 import '../../../models/medication_schedule.dart';
@@ -85,22 +86,75 @@ class MedicationRepository {
   /// Stops a medication without deleting its history, stock, schedules or image.
   /// Future unresolved doses are handled by MedicationProvider before this call.
   Future<void> deactivateMedication(String medicationId) async {
-    await _client.from('medications').update({'active': false}).eq('id', medicationId);
+    debugPrint('DawaCare medication DEACTIVATE START id=$medicationId');
+    try {
+      final rows = await _client
+          .from('medications')
+          .update({'active': false})
+          .eq('id', medicationId)
+          .select('id, active');
+
+      debugPrint('DawaCare medication DEACTIVATE RESULT id=$medicationId rows=${rows.length} data=$rows');
+      if (rows.isEmpty) {
+        throw StateError('DEACTIVATE_NO_ROWS_UPDATED medication_id=$medicationId. Check medication RLS/update policy and patient permissions.');
+      }
+      final active = rows.first['active'];
+      if (active != false) {
+        throw StateError('DEACTIVATE_VERIFY_FAILED medication_id=$medicationId active=$active');
+      }
+    } on PostgrestException catch (e, st) {
+      debugPrint('DawaCare medication DEACTIVATE POSTGREST id=$medicationId code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}');
+      debugPrintStack(stackTrace: st);
+      rethrow;
+    } catch (e, st) {
+      debugPrint('DawaCare medication DEACTIVATE FAILED id=$medicationId error=$e');
+      debugPrintStack(stackTrace: st);
+      rethrow;
+    }
   }
 
   /// Permanently deletes the medication row. Database CASCADE constraints remove
   /// schedules, doses, stock transactions and caregiver alerts. The image is
   /// removed through the Storage API as a best-effort cleanup.
   Future<void> deleteMedication(String medicationId) async {
-    final row = await _client.from('medications').select('image_url').eq('id', medicationId).single();
-    final imagePath = row['image_url'] as String?;
-    await _client.from('medications').delete().eq('id', medicationId);
-    if (imagePath != null && imagePath.isNotEmpty) {
-      try {
-        await _imageService.delete(imagePath);
-      } catch (_) {
-        // Database deletion already succeeded; do not report a false failure.
+    debugPrint('DawaCare medication DELETE START id=$medicationId');
+    String? imagePath;
+    try {
+      final rows = await _client.from('medications').select('id, image_url').eq('id', medicationId);
+      debugPrint('DawaCare medication DELETE FETCH id=$medicationId rows=${rows.length}');
+      if (rows.isEmpty) {
+        throw StateError('DELETE_NOT_FOUND medication_id=$medicationId');
       }
+      imagePath = rows.first['image_url'] as String?;
+
+      final deleted = await _client
+          .from('medications')
+          .delete()
+          .eq('id', medicationId)
+          .select('id');
+      debugPrint('DawaCare medication DELETE RESULT id=$medicationId rows=${deleted.length} data=$deleted');
+      if (deleted.isEmpty) {
+        throw StateError('DELETE_NO_ROWS_DELETED medication_id=$medicationId. Check medication RLS/delete policy and patient permissions.');
+      }
+
+      if (imagePath != null && imagePath.isNotEmpty) {
+        try {
+          await _imageService.delete(imagePath);
+          debugPrint('DawaCare medication DELETE IMAGE OK id=$medicationId path=$imagePath');
+        } catch (e, st) {
+          debugPrint('DawaCare medication DELETE IMAGE FAILED id=$medicationId path=$imagePath error=$e');
+          debugPrintStack(stackTrace: st);
+        }
+      }
+      debugPrint('DawaCare medication DELETE SUCCESS id=$medicationId');
+    } on PostgrestException catch (e, st) {
+      debugPrint('DawaCare medication DELETE POSTGREST id=$medicationId code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}');
+      debugPrintStack(stackTrace: st);
+      rethrow;
+    } catch (e, st) {
+      debugPrint('DawaCare medication DELETE FAILED id=$medicationId error=$e');
+      debugPrintStack(stackTrace: st);
+      rethrow;
     }
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/app_localizations.dart';
+
 import '../../../../app/theme/app_colors.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
@@ -28,6 +30,7 @@ class NextDoseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final actionable = onConfirm != null || onSnooze != null || onSkip != null;
 
@@ -77,7 +80,7 @@ class NextDoseCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'الجرعة التالية',
+                    l.tr('الجرعة التالية', 'Next dose', 'Prochaine dose'),
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -109,7 +112,7 @@ class NextDoseCard extends StatelessWidget {
                       child: FilledButton.icon(
                         onPressed: onConfirm,
                         icon: const Icon(Icons.check_rounded),
-                        label: const Text('تم أخذها'),
+                        label: Text(l.tr('تم أخذها', 'Taken', 'Prise')),
                       ),
                     ),
                   if (onConfirm != null && onSnooze != null) const SizedBox(width: 8),
@@ -118,7 +121,7 @@ class NextDoseCard extends StatelessWidget {
                       child: OutlinedButton.icon(
                         onPressed: onSnooze,
                         icon: const Icon(Icons.snooze_rounded),
-                        label: const Text('تأجيل'),
+                        label: Text(l.tr('تأجيل', 'Snooze', 'Reporter')),
                       ),
                     ),
                 ],
@@ -128,7 +131,7 @@ class NextDoseCard extends StatelessWidget {
                 TextButton.icon(
                   onPressed: onSkip,
                   icon: const Icon(Icons.skip_next_rounded, size: 18),
-                  label: const Text('تخطي الجرعة'),
+                  label: Text(l.tr('تخطي الجرعة', 'Skip dose', 'Ignorer la dose')),
                 ),
               ],
             ],
@@ -141,7 +144,7 @@ class NextDoseCard extends StatelessWidget {
   String _formatTime(DateTime value) {
     final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
     final minute = value.minute.toString().padLeft(2, '0');
-    final suffix = value.hour >= 12 ? 'م' : 'ص';
+    final suffix = value.hour >= 12 ? l.tr('م', 'PM', 'PM') : l.tr('ص', 'AM', 'AM');
     return '$hour:$minute $suffix';
   }
 }

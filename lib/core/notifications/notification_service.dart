@@ -310,7 +310,7 @@ class NotificationService {
       category: AndroidNotificationCategory.reminder,
       largeIcon: imagePath == null ? null : FilePathAndroidBitmap(imagePath),
       styleInformation: imagePath == null ? null : BigPictureStyleInformation(FilePathAndroidBitmap(imagePath), hideExpandedLargeIcon: false, contentTitle: dose.medicationName, summaryText: dose.doseAmount),
-      actions: const [
+      actions: [
         AndroidNotificationAction(_actionTaken, _tr(language, 'تم أخذ الدواء', 'Taken', 'Prise effectuée'), showsUserInterface: false, cancelNotification: true),
         AndroidNotificationAction(_actionSnooze, _tr(language, 'تأجيل 10 دقائق', 'Snooze 10 minutes', 'Reporter de 10 minutes'), showsUserInterface: false, cancelNotification: true),
       ],
@@ -329,6 +329,7 @@ class NotificationService {
     await cancelDoseReminders(dose.id);
     if (dose.status == DoseStatus.taken || dose.status == DoseStatus.skipped || dose.status == DoseStatus.cancelled || dose.status == DoseStatus.snoozed) return;
     final imagePath = await _prepareMedicationImage(dose);
+    final language = await _language();
     final now = tz.TZDateTime.now(tz.local);
     final baseTime = tz.TZDateTime.from(dose.scheduledAt, tz.local);
     final beforeTime = baseTime.subtract(const Duration(minutes: _beforeDoseMinutes));
@@ -337,16 +338,16 @@ class NotificationService {
 
     final androidDetails = AndroidNotificationDetails(
       _channelId,
-      'تذكير الجرعات',
-      channelDescription: 'إشعارات تذكير بمواعيد الأدوية',
+      _tr(language, 'تذكير الجرعات', 'Dose reminders', 'Rappels de médicaments'),
+      channelDescription: _tr(language, 'إشعارات تذكير بمواعيد الأدوية', 'Medicine schedule reminders', 'Notifications de rappel des prises'),
       importance: Importance.max,
       priority: Priority.high,
       category: AndroidNotificationCategory.reminder,
       largeIcon: imagePath == null ? null : FilePathAndroidBitmap(imagePath),
       styleInformation: imagePath == null ? null : BigPictureStyleInformation(FilePathAndroidBitmap(imagePath), hideExpandedLargeIcon: false, contentTitle: dose.medicationName, summaryText: dose.doseAmount),
-      actions: const [
-        AndroidNotificationAction(_actionTaken, 'تم أخذ الدواء', showsUserInterface: false, cancelNotification: true),
-        AndroidNotificationAction(_actionSnooze, 'تأجيل 10 دقائق', showsUserInterface: false, cancelNotification: true),
+      actions: [
+        AndroidNotificationAction(_actionTaken, _tr(language, 'تم أخذ الدواء', 'Taken', 'Prise effectuée'), showsUserInterface: false, cancelNotification: true),
+        AndroidNotificationAction(_actionSnooze, _tr(language, 'تأجيل 10 دقائق', 'Snooze 10 minutes', 'Reporter de 10 minutes'), showsUserInterface: false, cancelNotification: true),
       ],
     );
 

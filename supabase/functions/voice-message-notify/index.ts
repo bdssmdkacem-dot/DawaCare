@@ -4,21 +4,24 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const FCM_SERVICE_ACCOUNT_JSON = Deno.env.get('FCM_SERVICE_ACCOUNT_JSON');
 
-Deno.serve(async (req) => {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+}
 
+Deno.serve(async (req) => {
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) return new Response('Unauthorized', { status: 401 });
+  if (!authHeader) return json({ error: 'Unauthorized' }, 401);
 
   const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: authHeader } },
   });
   const { data: { user } } = await userClient.auth.getUser();
-  if (!user) return new Response('Unauthorized', { status: 401 });
+  if (!user) return json({ error: 'Unauthorized' }, 401);
 
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
   const messageId = body?.voice_message_id as string | undefined;
-  if (!messageId) return new Response('voice_message_id is required', { status: 400 });
+  if (!messageId) return json({ error: 'voice_message_id is required' }, 400);
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const { data: message, error } = await admin
@@ -26,9 +29,11 @@ Deno.serve(async (req) => {
     .select('id, sender_id, patient_id')
     .eq('id', messageId)
     .single();
-  if (error || !message || message.sender_id !== user.id) {
-    return new Response('Forbidden', { status: 403 });
+  if (error || !message) {
+    console.error('voice-message-notify: message not found', messageId, error?.message);
+    return json({ error: 'MESSAGE_NOT_FOUND' }, 404);
   }
+  if (message.sender_id !== user.id) return json({ error: 'Forbidden' }, 403);
 
   const { data: link } = await admin
     .from('caregiver_patient')
@@ -37,33 +42,60 @@ Deno.serve(async (req) => {
     .eq('patient_id', message.patient_id)
     .in('role', ['PRIMARY_CAREGIVER', 'CAREGIVER'])
     .maybeSingle();
-  if (!link) return new Response('Forbidden', { status: 403 });
+  if (!link) return json({ error: 'Forbidden' }, 403);
 
+  // Fail loud instead of silently returning 200 with sent:0 — a caregiver
+  // hitting this path in production means every voice message push is
+  // silently dropped, which is exactly the bug this rewrite fixes.
   if (!FCM_SERVICE_ACCOUNT_JSON) {
-    return new Response(JSON.stringify({ sent: false, reason: 'FCM_NOT_CONFIGURED' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.error('voice-message-notify: FCM_SERVICE_ACCOUNT_JSON secret is not configured on this project');
+    return json({ sent: 0, reason: 'FCM_NOT_CONFIGURED' }, 500);
+  }
+
+  // Idempotency guard: the Flutter client retries this call up to 3 times
+  // if it can't confirm success (e.g. a flaky network read of *our
+  // response*, even though FCM already accepted the message). Without this
+  // guard a retry would re-push and the patient gets duplicate pings for
+  // one voice message.
+  const eventKey = `voice-message:${messageId}`;
+  const { data: existingEvent } = await admin
+    .from('push_notification_events')
+    .select('sent_count')
+    .eq('event_key', eventKey)
+    .maybeSingle();
+  if (existingEvent && existingEvent.sent_count > 0) {
+    return json({ sent: existingEvent.sent_count, duplicate: true });
   }
 
   const { data: sender } = await admin.from('profiles').select('full_name').eq('id', user.id).single();
   const { data: recipientProfile } = await admin.from('profiles').select('language').eq('id', message.patient_id).maybeSingle();
   const language = recipientProfile?.language === 'en' || recipientProfile?.language === 'fr' ? recipientProfile.language : 'ar';
   const senderName = sender?.full_name || (language === 'en' ? 'Your caregiver' : language === 'fr' ? 'Votre accompagnant' : 'متابعك');
-  const { data: devices } = await admin
+
+  const { data: devices, error: devicesError } = await admin
     .from('devices')
-    .select('push_token')
+    .select('id, push_token')
     .eq('user_id', message.patient_id)
     .not('push_token', 'is', null);
+  if (devicesError) {
+    console.error('voice-message-notify: failed to load devices', devicesError.message);
+    return json({ error: devicesError.message }, 500);
+  }
+  const validDevices = (devices ?? []).filter((d) => typeof d.push_token === 'string' && d.push_token.trim().length > 0);
+  if (validDevices.length === 0) {
+    console.warn('voice-message-notify: patient has no registered push device', message.patient_id);
+    return json({ sent: 0, devices: 0, reason: 'NO_PUSH_DEVICES' });
+  }
 
   const account = JSON.parse(FCM_SERVICE_ACCOUNT_JSON);
   const accessToken = await getAccessToken(account);
   let sent = 0;
+  let invalid = 0;
+  const failures: Array<{ device_id: string; status: number; body: string }> = [];
 
-  for (const device of devices ?? []) {
-    const response = await fetch(
-      `https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`,
-      {
+  for (const device of validDevices) {
+    try {
+      const response = await fetch(`https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -73,19 +105,51 @@ Deno.serve(async (req) => {
               title: language === 'en' ? 'New voice message 🎙️' : language === 'fr' ? 'Nouveau message vocal 🎙️' : 'رسالة صوتية جديدة 🎙️',
               body: language === 'en' ? `${senderName} sent you a voice message.` : language === 'fr' ? `${senderName} vous a envoyé un message vocal.` : `${senderName} أرسل لك رسالة صوتية.`,
             },
-            data: { type: 'VOICE_MESSAGE', voice_message_id: message.id },
-            android: { priority: 'high', notification: { channel_id: 'caregiver_alerts' } },
+            data: { type: 'VOICE_MESSAGE', voice_message_id: message.id, sender_name: senderName },
+            android: {
+              priority: 'high',
+              notification: {
+                channel_id: 'caregiver_alerts_v2',
+                sound: 'default',
+                notification_priority: 'PRIORITY_HIGH',
+              },
+            },
           },
         }),
-      },
-    );
-    if (response.ok) sent++;
+      });
+      if (response.ok) {
+        sent++;
+      } else {
+        const responseBody = await response.text();
+        failures.push({ device_id: device.id, status: response.status, body: responseBody.slice(0, 500) });
+        console.error('voice-message-notify: FCM send failed', device.id, response.status, responseBody.slice(0, 500));
+        if (response.status === 404 || response.status === 410) {
+          invalid++;
+          const { error: deleteError } = await admin.from('devices').delete().eq('id', device.id);
+          if (deleteError) console.error('voice-message-notify: failed to prune stale device', device.id, deleteError.message);
+        }
+      }
+    } catch (err) {
+      failures.push({ device_id: device.id, status: 0, body: String(err) });
+      console.error('voice-message-notify: FCM send threw', device.id, err);
+    }
   }
 
-  return new Response(JSON.stringify({ sent }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const { error: eventError } = await admin.from('push_notification_events').upsert({
+    event_key: eventKey,
+    event_type: 'VOICE_MESSAGE',
+    sender_id: user.id,
+    recipient_id: message.patient_id,
+    sent_at: sent > 0 ? new Date().toISOString() : null,
+    sent_count: sent,
+  }, { onConflict: 'event_key' });
+  if (eventError) console.error('voice-message-notify: failed to record push event', eventError.message);
+
+  if (sent === 0) {
+    console.error('voice-message-notify: delivery failed for all devices', message.patient_id, JSON.stringify(failures));
+    return json({ error: 'FCM_DELIVERY_FAILED', sent, devices: validDevices.length, invalid, failures }, 502);
+  }
+  return json({ sent, devices: validDevices.length, invalid, failed: failures.length });
 });
 
 interface ServiceAccount {
@@ -124,13 +188,10 @@ async function getAccessToken(account: ServiceAccount): Promise<string> {
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt }),
   });
   if (!response.ok) throw new Error(`OAuth token exchange failed: ${await response.text()}`);
-  const json = await response.json();
-  cachedAccessToken = { token: json.access_token, expiresAt: now + (json.expires_in ?? 3600) };
+  const tokenJson = await response.json();
+  cachedAccessToken = { token: tokenJson.access_token, expiresAt: now + (tokenJson.expires_in ?? 3600) };
   return cachedAccessToken.token;
 }

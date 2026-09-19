@@ -140,8 +140,8 @@ class _ChatListPageState extends State<ChatListPage> {
               onRefresh: _load,
               child: _contacts.isEmpty
                   ? ListView(
-                      children: const [
-                        SizedBox(height: 120),
+                      children: [
+                        const SizedBox(height: 120),
                         Center(child: Text(AppLocalizations.of(context).tr('لا توجد جهات مرتبطة للمحادثة.', 'No linked contacts for chat.', 'Aucun contact lié pour discuter.'))),
                       ],
                     )

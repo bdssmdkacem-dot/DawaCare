@@ -64,12 +64,12 @@ jobs:
 
       - name: Decode keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          echo "${{ secrets.DAWACARE_UPLOAD_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
 
       - name: Validate release keystore
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.DAWACARE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.DAWACARE_KEY_ALIAS }}
         run: |
           test -s android/app/upload-keystore.jks
           keytool -list -v -keystore android/app/upload-keystore.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /tmp/keystore-check.txt
@@ -79,9 +79,9 @@ jobs:
       - name: Write key.properties
         run: |
           cat > android/key.properties <<EOF
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
+          storePassword=${{ secrets.DAWACARE_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.DAWACARE_KEY_PASSWORD }}
+          keyAlias=${{ secrets.DAWACARE_KEY_ALIAS }}
           storeFile=app/upload-keystore.jks
           storeType=JKS
           EOF

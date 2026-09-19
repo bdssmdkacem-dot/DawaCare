@@ -87,6 +87,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
   }
 
   Future<void> _openAddMemberDialog() async {
+    final l = AppLocalizations.of(context);
     final codeController = TextEditingController();
     final relationshipController = TextEditingController();
     var selectedRole = CaregiverRole.caregiver;
@@ -95,7 +96,6 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
         context: context,
         builder: (dialogContext) => StatefulBuilder(
           builder: (context, setDialogState) {
-            final l = AppLocalizations.of(context);
             return AlertDialog(
             title: Text(l.tr('إضافة فرد من العائلة', 'Add family member', 'Ajouter un membre de la famille')),
             content: SingleChildScrollView(
@@ -190,7 +190,8 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                 label: Text(l.tr('إرسال الطلب', 'Send request', 'Envoyer la demande')),
               ),
             ],
-          ),
+          );
+          },
         ),
       );
       if (!mounted) return;
@@ -210,6 +211,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
   }
 
   Future<void> _respondToRequest(FamilyLinkRequest request, bool approve) async {
+    final l = AppLocalizations.of(context);
     final provider = context.read<CaregiverProvider>();
     final success = await provider.respondToRequest(request, approve: approve);
     if (!mounted) return;
@@ -229,6 +231,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
   }
 
   Future<void> _cancelSentRequest(FamilyLinkRequest request) async {
+    final l = AppLocalizations.of(context);
     final provider = context.read<CaregiverProvider>();
     final success = await provider.cancelSentRequest(request);
     if (!mounted) return;

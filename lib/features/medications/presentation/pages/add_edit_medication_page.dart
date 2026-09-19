@@ -231,7 +231,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
   String? _validatePositive(String? value, String label) {
     final number = _number(value ?? '');
-    if (number == null || number <= 0) return l.tr('$label يجب أن يكون أكبر من صفر', '$label must be greater than zero', '$label doit être supérieur à zéro');
+    if (number == null || number <= 0) final localizations = AppLocalizations.of(context); return localizations.tr('$label يجب أن يكون أكبر من صفر', '$label must be greater than zero', '$label doit être supérieur à zéro');
     return null;
   }
 
@@ -241,7 +241,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
     if (_form == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(localizations.tr('اختر شكل الدواء أولًا.','Choose the medicine form first.','Choisissez d’abord la forme du médicament.'))),
+        SnackBar(content: Text(localizations.tr('اختر شكل الدواء أولًا.','Choose the medicine form first.','Choisissez d’abord la forme du médicament.'))),
       );
       return;
     }
@@ -267,7 +267,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       final hours = int.tryParse(_hours.text) ?? 0;
       if (hours <= 0 || hours > 24 || 24 % hours != 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(localizations.tr('الفاصل يجب أن يقسم 24، مثل 4 أو 6 أو 8 أو 12.','The interval must divide 24, such as 4, 6, 8, or 12.','L’intervalle doit diviser 24, par exemple 4, 6, 8 ou 12.')),
           ),
         );
@@ -487,7 +487,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                       child: TextFormField(
                         controller: _times,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: localizations.tr('مرات/اليوم','Times/day','Prises/jour'),
                           suffixText: localizations.tr('مرات','times','fois'),
                         ),
@@ -506,7 +506,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                       child: TextFormField(
                         controller: _hours,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: localizations.tr('الفاصل','Interval','Intervalle'),
                           suffixText: localizations.tr('ساعات','hours','heures'),
                         ),

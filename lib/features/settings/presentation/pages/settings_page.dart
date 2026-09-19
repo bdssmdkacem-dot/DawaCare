@@ -249,6 +249,16 @@ class SettingsPage extends StatelessWidget {
 
     if (selected != null) {
       await controller.setLanguage(selected);
+      if (!context.mounted) return;
+      final auth = context.read<AuthProvider>();
+      if (auth.profile != null) {
+        try {
+          await auth.updateLanguage(selected);
+        } catch (e) {
+          // Keep the local language change even if the remote profile update fails.
+          debugPrint('DawaCare language profile update failed: $e');
+        }
+      }
     }
   }
 }

@@ -602,6 +602,7 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final (label, icon) = switch (status) {
       _MedicationStatus.active => (l.tr('نشط', 'Active', 'Actif'), Icons.check_circle_outline_rounded),
       _MedicationStatus.lowStock => (l.tr('مخزون منخفض', 'Low stock', 'Stock faible'), Icons.warning_amber_rounded),

@@ -406,17 +406,27 @@ class NotificationService {
   }
 
   Future<void> showCaregiverAlert({required String title, required String body, String? payload}) async {
+    await init();
+    final language = await _language();
+    final channelName = _tr(language, 'تنبيهات العائلة', 'Family alerts', 'Alertes familiales');
+    final channelDescription = _tr(
+      language,
+      'تنبيه عند تفويت أحد أفراد العائلة لجرعة دواء',
+      'Alerts when a family member misses a medicine dose',
+      'Alerte lorsqu’un membre de la famille oublie une dose',
+    );
     await _plugin.show(
       DateTime.now().millisecondsSinceEpoch.remainder(100000),
       title,
       body,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           _caregiverChannelId,
-          'Family alerts',
-          channelDescription: 'Family medicine alerts',
+          channelName,
+          channelDescription: channelDescription,
           importance: Importance.high,
           priority: Priority.high,
+          playSound: true,
         ),
       ),
       payload: payload,

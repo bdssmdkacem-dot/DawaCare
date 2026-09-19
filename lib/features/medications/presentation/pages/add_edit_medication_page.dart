@@ -231,7 +231,14 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
   String? _validatePositive(String? value, String label) {
     final number = _number(value ?? '');
-    if (number == null || number <= 0) final localizations = AppLocalizations.of(context); return localizations.tr('$label يجب أن يكون أكبر من صفر', '$label must be greater than zero', '$label doit être supérieur à zéro');
+    if (number == null || number <= 0) {
+      final localizations = AppLocalizations.of(context);
+      return localizations.tr(
+        '$label يجب أن يكون أكبر من صفر',
+        '$label must be greater than zero',
+        '$label doit être supérieur à zéro',
+      );
+    }
     return null;
   }
 
@@ -257,7 +264,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       final count = int.tryParse(_times.text) ?? 0;
       if (count < 1 || count > 6) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(localizations.tr('عدد المرات يجب أن يكون بين 1 و6.','The number of times must be between 1 and 6.','Le nombre de prises doit être compris entre 1 et 6.'))),
+          SnackBar(content: Text(localizations.tr('عدد المرات يجب أن يكون بين 1 و6.','The number of times must be between 1 and 6.','Le nombre de prises doit être compris entre 1 et 6.'))),
         );
         return;
       }
@@ -277,7 +284,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
     if (_end != null && _end!.isBefore(_start)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(localizations.tr('تاريخ الانتهاء يجب أن يكون بعد البداية.','The end date must be after the start date.','La date de fin doit être après la date de début.'))),
+        SnackBar(content: Text(localizations.tr('تاريخ الانتهاء يجب أن يكون بعد البداية.','The end date must be after the start date.','La date de fin doit être après la date de début.'))),
       );
       return;
     }
@@ -289,7 +296,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     final dose = _number(_dose.text);
     if (dose == null || dose <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(localizations.tr('الجرعة يجب أن تكون أكبر من صفر.','The dose must be greater than zero.','La dose doit être supérieure à zéro.'))),
+        SnackBar(content: Text(localizations.tr('الجرعة يجب أن تكون أكبر من صفر.','The dose must be greater than zero.','La dose doit être supérieure à zéro.'))),
       );
       return;
     }
@@ -300,7 +307,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     if (_stockEnabled &&
         (stock < 0 || (pack != null && pack <= 0) || threshold < 0)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(localizations.tr('تحقق من قيم المخزون.','Check the stock values.','Vérifiez les valeurs du stock.'))),
+        SnackBar(content: Text(localizations.tr('تحقق من قيم المخزون.','Check the stock values.','Vérifiez les valeurs du stock.'))),
       );
       return;
     }

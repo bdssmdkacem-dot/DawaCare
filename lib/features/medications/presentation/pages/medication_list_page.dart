@@ -415,11 +415,11 @@ class _SmartOverview extends StatelessWidget {
     return Card(child: Padding(
       padding: const EdgeInsets.all(14),
       child: Row(children: [
-        Expanded(child: _metric(context, Icons.medication_rounded, '$total', 'الأدوية')),
+        Expanded(child: _metric(context, Icons.medication_rounded, '$total', l.medicines)),
         _divider(context),
-        Expanded(child: _metric(context, Icons.warning_amber_rounded, '${low + out}', 'المخزون')),
+        Expanded(child: _metric(context, Icons.warning_amber_rounded, '${low + out}', l.tr('المخزون','Stock','Stock'))),
         _divider(context),
-        Expanded(child: _metric(context, Icons.event_busy_rounded, '$ending', 'ينتهي قريبًا')),
+        Expanded(child: _metric(context, Icons.event_busy_rounded, '$ending', l.tr('ينتهي قريبًا','Ending soon','Bientôt épuisé'))),
       ]),
     ));
   }

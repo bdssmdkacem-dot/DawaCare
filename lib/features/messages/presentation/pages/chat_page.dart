@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/localization/app_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/message_service.dart';
 
@@ -79,7 +80,7 @@ class _ChatPageState extends State<ChatPage> {
     } catch (e) {
       debugPrint('chat load: $e');
       if (mounted && _messages.isEmpty) {
-        _error('تعذر تحميل المحادثة.');
+        _error(AppLocalizations.of(context).tr('تعذر تحميل المحادثة.', 'Could not load conversation.', 'Impossible de charger la conversation.'));
       }
     } finally {
       if (mounted && generation == _loadGeneration) {
@@ -120,11 +121,11 @@ class _ChatPageState extends State<ChatPage> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('تأكيد إرسال الصورة'),
+        title: Text(AppLocalizations.of(context).tr('تأكيد إرسال الصورة', 'Confirm image send', 'Confirmer l’envoi de l’image')),
         content: ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(image.path), height: 280, fit: BoxFit.contain)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('إرسال')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(AppLocalizations.of(context).cancel)),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(AppLocalizations.of(context).tr('إرسال', 'Send', 'Envoyer'))),
         ],
       ),
     );
@@ -160,7 +161,7 @@ class _ChatPageState extends State<ChatPage> {
           });
         }
       } catch (_) {
-        _error('تعذر بدء التسجيل.');
+        _error(AppLocalizations.of(context).tr('تعذر بدء التسجيل.', 'Could not start recording.', 'Impossible de démarrer l’enregistrement.'));
       }
     }
   }
@@ -184,9 +185,9 @@ class _ChatPageState extends State<ChatPage> {
       if (e is ChatSendException) {
         _error(e.diagnostic);
       } else if (e is StateError) {
-        _error('خطأ في الإرسال: ${e.message}');
+        _error(AppLocalizations.of(context).tr('خطأ في الإرسال: ${e.message}', 'Send error: ${e.message}', 'Erreur d’envoi : ${e.message}'));
       } else {
-        _error('خطأ في الإرسال: $e');
+        _error(AppLocalizations.of(context).tr('خطأ في الإرسال: $e', 'Send error: $e', 'Erreur d’envoi : $e'));
       }
     } finally {
       if (mounted) {
@@ -229,7 +230,7 @@ class _ChatPageState extends State<ChatPage> {
         }
       });
     } catch (e) {
-      _error('تعذر تشغيل الرسالة الصوتية: $e');
+      _error(AppLocalizations.of(context).tr('تعذر تشغيل الرسالة الصوتية: $e', 'Could not play voice message: $e', 'Impossible de lire le message vocal : $e'));
     }
   }
 
@@ -238,7 +239,7 @@ class _ChatPageState extends State<ChatPage> {
     appBar: AppBar(title: Text(widget.otherName)),
     body: _loading ? const Center(child: CircularProgressIndicator()) : RefreshIndicator(
       onRefresh: _refresh,
-      child: ListView(controller: _scroll, physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), children: _messages.isEmpty ? [const SizedBox(height: 300, child: Center(child: Text('لا توجد رسائل بعد.')))] : _messages.map(_bubble).toList()),
+      child: ListView(controller: _scroll, physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), children: _messages.isEmpty ? [const SizedBox(height: 300, child: Center(child: Text(AppLocalizations.of(context).tr('لا توجد رسائل بعد.', 'No messages yet.', 'Aucun message pour le moment.'))))] : _messages.map(_bubble).toList()),
     ),
     bottomNavigationBar: _composer(),
   );
@@ -251,7 +252,7 @@ class _ChatPageState extends State<ChatPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (m.type == 'text') Text(m.body!),
         if (m.type == 'image') FutureBuilder<String>(future: _urlFor(m.storagePath!), builder: (c, s) => s.hasData ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(s.data!, width: 250, height: 250, fit: BoxFit.cover)) : SizedBox(width: 250, height: 100, child: Center(child: s.hasError ? const Icon(Icons.broken_image_outlined) : const CircularProgressIndicator()))),
-        if (m.type == 'voice') Row(mainAxisSize: MainAxisSize.min, children: [IconButton(onPressed: () => _play(m), icon: Icon(_playing == m.id ? Icons.stop_circle_outlined : Icons.play_circle_fill_rounded, size: 38)), if (m.durationMs != null) Text('${(m.durationMs! / 1000).ceil()} ث')]),
+        if (m.type == 'voice') Row(mainAxisSize: MainAxisSize.min, children: [IconButton(onPressed: () => _play(m), icon: Icon(_playing == m.id ? Icons.stop_circle_outlined : Icons.play_circle_fill_rounded, size: 38)), if (m.durationMs != null) Text('${(m.durationMs! / 1000).ceil()} ${AppLocalizations.of(context).tr('ث', 's', 's')}')]),
         Text('${m.createdAt.hour.toString().padLeft(2, '0')}:${m.createdAt.minute.toString().padLeft(2, '0')}', style: Theme.of(context).textTheme.labelSmall),
       ]),
     ));
@@ -260,7 +261,7 @@ class _ChatPageState extends State<ChatPage> {
   Widget _composer() => SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(8, 6, 8, 8), child: Row(children: [
     IconButton(onPressed: _sending || _recording ? null : _sendImage, icon: const Icon(Icons.image_rounded)),
     IconButton(onPressed: _sending ? null : _toggleRecording, icon: Icon(_recording ? Icons.stop_circle_rounded : Icons.mic_rounded)),
-    Expanded(child: TextField(controller: _text, enabled: !_recording, textInputAction: TextInputAction.send, onSubmitted: (_) => _sendText(), decoration: const InputDecoration(hintText: 'اكتب رسالة...', border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(24))), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10)))),
+    Expanded(child: TextField(controller: _text, enabled: !_recording, textInputAction: TextInputAction.send, onSubmitted: (_) => _sendText(), decoration: InputDecoration(hintText: AppLocalizations.of(context).tr('اكتب رسالة...', 'Write a message...', 'Écrire un message...'), border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(24))), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10)))),
     const SizedBox(width: 5), IconButton(onPressed: _sending || _recording ? null : _sendText, icon: const Icon(Icons.send_rounded)),
   ])));
 }

@@ -94,22 +94,24 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
       final result = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: const Text('إضافة فرد من العائلة'),
+          builder: (context, setDialogState) {
+            final l = AppLocalizations.of(context);
+            return AlertDialog(
+            title: Text(l.tr('إضافة فرد من العائلة', 'Add family member', 'Ajouter un membre de la famille')),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('أدخل رمز الربط الذي أرسله لك فرد العائلة من تطبيقه.'),
+                  Text(l.tr('أدخل رمز الربط الذي أرسله لك فرد العائلة من تطبيقه.', 'Enter the link code sent by your family member from their app.', 'Saisissez le code de liaison envoyé par votre proche depuis son application.')),
                   const SizedBox(height: 16),
                   TextField(
                     controller: codeController,
                     autofocus: true,
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'رمز الربط',
-                      hintText: 'مثال: 123456',
+                    decoration: InputDecoration(
+                      labelText: l.tr('رمز الربط', 'Link code', 'Code de liaison'),
+                      hintText: l.tr('مثال: 123456', 'Example: 123456', 'Exemple : 123456'),
                       prefixIcon: Icon(Icons.link_rounded),
                     ),
                   ),
@@ -117,27 +119,27 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                   TextField(
                     controller: relationshipController,
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'صلة القرابة (اختياري)',
-                      hintText: 'مثال: ابني، والدتي، زوجتي',
+                    decoration: InputDecoration(
+                      labelText: l.tr('صلة القرابة (اختياري)', 'Relationship (optional)', 'Lien familial (facultatif)'),
+                      hintText: l.tr('مثال: ابني، والدتي، زوجتي', 'Example: son, mother, wife', 'Exemple : fils, mère, épouse'),
                       prefixIcon: Icon(Icons.people_alt_outlined),
                     ),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<CaregiverRole>(
                     initialValue: selectedRole,
-                    decoration: const InputDecoration(
-                      labelText: 'نوع الوصول',
+                    decoration: InputDecoration(
+                      labelText: l.tr('نوع الوصول', 'Access type', 'Type d’accès'),
                       prefixIcon: Icon(Icons.admin_panel_settings_outlined),
                     ),
-                    items: const [
+                    items: [
                       DropdownMenuItem(
                         value: CaregiverRole.caregiver,
-                        child: Text('مرافق — يستطيع التعديل'),
+                        child: Text(l.tr('مرافق — يستطيع التعديل', 'Caregiver — can edit', 'Accompagnant — peut modifier')),
                       ),
                       DropdownMenuItem(
                         value: CaregiverRole.viewer,
-                        child: Text('مشاهد — عرض فقط'),
+                        child: Text(l.tr('مشاهد — عرض فقط', 'Viewer — view only', 'Observateur — lecture seule')),
                       ),
                     ],
                     onChanged: (value) {
@@ -150,8 +152,8 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                     alignment: AlignmentDirectional.centerStart,
                     child: Text(
                       selectedRole == CaregiverRole.viewer
-                          ? 'المشاهد يستطيع الاطلاع على بيانات فرد العائلة دون تعديل الأدوية أو الجرعات أو المخزون.'
-                          : 'المرافق يستطيع إدارة الأدوية والجرعات والجدول والمخزون حسب صلاحياته.',
+                          ? l.tr('المشاهد يستطيع الاطلاع على بيانات فرد العائلة دون تعديل الأدوية أو الجرعات أو المخزون.', 'The viewer can see family member data without editing medicines, doses or stock.', 'L’observateur peut consulter les données sans modifier les médicaments, doses ou stocks.')
+                          : l.tr('المرافق يستطيع إدارة الأدوية والجرعات والجدول والمخزون حسب صلاحياته.', 'The caregiver can manage medicines, doses, schedules and stock according to permissions.', 'L’accompagnant peut gérer les médicaments, doses, planning et stock selon ses permissions.'),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
@@ -161,7 +163,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('إلغاء'),
+                child: Text(l.cancel),
               ),
               FilledButton.icon(
                 onPressed: () async {
@@ -180,12 +182,12 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                     Navigator.pop(dialogContext, true);
                   } else {
                     ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      SnackBar(content: Text(provider.error ?? 'تعذّر إرسال طلب الربط.')),
+                      SnackBar(content: Text(provider.error ?? l.tr('تعذّر إرسال طلب الربط.', 'Could not send the link request.', 'Impossible d’envoyer la demande de liaison.'))),
                     );
                   }
                 },
                 icon: const Icon(Icons.person_add_alt_1_rounded),
-                label: const Text('إرسال الطلب'),
+                label: Text(l.tr('إرسال الطلب', 'Send request', 'Envoyer la demande')),
               ),
             ],
           ),
@@ -198,7 +200,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
         await _load();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم إرسال طلب الربط. بانتظار موافقة فرد العائلة.')),
+          SnackBar(content: Text(l.tr('تم إرسال طلب الربط. بانتظار موافقة فرد العائلة.', 'Link request sent. Waiting for family member approval.', 'Demande envoyée. En attente de l’approbation du membre de la famille.'))),
         );
       }
     } finally {
@@ -217,11 +219,11 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(approve ? 'تم قبول الدعوة وإضافة فرد العائلة.' : 'تم رفض دعوة الربط.')),
+        SnackBar(content: Text(approve ? l.tr('تم قبول الدعوة وإضافة فرد العائلة.', 'Invitation accepted and family member added.', 'Invitation acceptée et membre de la famille ajouté.') : l.tr('تم رفض دعوة الربط.', 'Link request rejected.', 'Demande de liaison refusée.'))),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'تعذّر تنفيذ العملية. حاول مرة أخرى.')),
+        SnackBar(content: Text(provider.error ?? l.tr('تعذّر تنفيذ العملية. حاول مرة أخرى.', 'Could not complete the operation. Please try again.', 'Impossible de terminer l’opération. Réessayez.'))),
       );
     }
   }
@@ -231,7 +233,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
     final success = await provider.cancelSentRequest(request);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(success ? 'تم إلغاء طلب الربط.' : (provider.error ?? 'تعذّر إلغاء الطلب.'))),
+      SnackBar(content: Text(success ? l.tr('تم إلغاء طلب الربط.', 'Link request cancelled.', 'Demande de liaison annulée.') : (provider.error ?? l.tr('تعذّر إلغاء الطلب.', 'Could not cancel the request.', 'Impossible d’annuler la demande.')))),
     );
   }
 
@@ -244,7 +246,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
         title: Text(l.family),
         actions: [
           IconButton(
-            tooltip: 'إضافة فرد برمز',
+            tooltip: l.tr('إضافة فرد برمز', 'Add member by code', 'Ajouter un membre avec un code'),
             icon: const Icon(Icons.person_add_alt_1_rounded),
             onPressed: provider.isSubmittingCode ? null : _openAddMemberDialog,
           ),
@@ -270,7 +272,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
                 FilledButton.tonalIcon(
                   onPressed: provider.isSubmittingCode ? null : _openAddMemberDialog,
                   icon: const Icon(Icons.person_add_alt_1_rounded),
-                  label: const Text('إضافة برمز'),
+                  label: Text(l.tr('إضافة برمز', 'Add by code', 'Ajouter avec un code')),
                 ),
               ],
             ),
@@ -280,7 +282,7 @@ class _CaregiverHomePageState extends State<CaregiverHomePage> {
               child: OutlinedButton.icon(
                 onPressed: provider.isCodeLoading ? null : _openGenerateCodeSheet,
                 icon: const Icon(Icons.vpn_key_rounded),
-                label: const Text('إنشاء رمز ربط لإرساله'),
+                label: Text(l.tr('إنشاء رمز ربط لإرساله', 'Create a link code to send', 'Créer un code de liaison à envoyer')),
               ),
             ),
             const SizedBox(height: 12),
@@ -325,20 +327,20 @@ class _EmptyState extends StatelessWidget {
         const Icon(Icons.people_outline, size: 64),
         const SizedBox(height: 16),
         const Text(
-          'لا يوجد أفراد مرتبطون بعد. يمكنك إنشاء رمز لإرساله، أو إدخال رمز أرسله لك أحد أفراد العائلة.',
+          l.tr('لا يوجد أفراد مرتبطون بعد. يمكنك إنشاء رمز لإرساله، أو إدخال رمز أرسله لك أحد أفراد العائلة.', 'No linked family members yet. You can create a code to send or enter a code from a family member.', 'Aucun membre de la famille lié. Vous pouvez créer un code à envoyer ou saisir un code reçu.'),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: onAddMember,
           icon: const Icon(Icons.person_add_alt_1_rounded),
-          label: const Text('إضافة فرد برمز'),
+          label: Text(AppLocalizations.of(context).tr('إضافة فرد برمز', 'Add member by code', 'Ajouter un membre avec un code')),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: onGenerateCode,
           icon: const Icon(Icons.qr_code_rounded),
-          label: const Text('إنشاء رمز لإرساله'),
+          label: Text(AppLocalizations.of(context).tr('إنشاء رمز لإرساله', 'Create a code to send', 'Créer un code à envoyer')),
         ),
       ],
     );

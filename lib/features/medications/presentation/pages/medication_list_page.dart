@@ -138,7 +138,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
     final quantity = await showDialog<double>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(medication.stockEnabled ? 'إضافة مخزون ${medication.name}' : 'تفعيل عداد ${medication.name}'),
+        title: Text(medication.stockEnabled ? l.tr('إضافة مخزون ${medication.name}', 'Add stock for ${medication.name}', 'Ajouter du stock pour ${medication.name}') : l.tr('تفعيل عداد ${medication.name}', 'Enable tracking for ${medication.name}', 'Activer le suivi de ${medication.name}')),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -487,7 +487,7 @@ class _SmartMedicationTile extends StatelessWidget {
               Wrap(spacing: 5, runSpacing: 4, children: [
                 if (medication.strength != null && medication.strength!.trim().isNotEmpty) _chip(medication.strength!.trim()),
                 if (medication.dosageForm != null && medication.dosageForm!.trim().isNotEmpty) _chip(l.dosageFormLabel(medication.dosageForm!.trim())),
-                if (item.schedules.isNotEmpty) _chip('${item.schedules.length} ${item.schedules.length == 1 ? 'جدول' : 'جداول'}'),
+                if (item.schedules.isNotEmpty) _chip(l.tr('${item.schedules.length} ${item.schedules.length == 1 ? 'جدول' : 'جداول'}', '${item.schedules.length} ${item.schedules.length == 1 ? 'schedule' : 'schedules'}', '${item.schedules.length} ${item.schedules.length == 1 ? 'planning' : 'plannings'}')),
               ]),
             ])),
             PopupMenuButton<String>(
@@ -541,7 +541,7 @@ class _NextDoseRow extends StatelessWidget {
     final sameDay = DateTimeUtils.isSameDate(nextDose!, now);
     final date = DateTimeUtils.formatShortDate(nextDose!);
     final time = '${nextDose!.hour.toString().padLeft(2, '0')}:${nextDose!.minute.toString().padLeft(2, '0')}';
-    final label = sameDay ? 'اليوم $time' : '$date · $time';
+    final label = sameDay ? l.tr('اليوم $time', 'Today $time', 'Aujourd’hui $time') : '$date · $time';
     return Row(children: [const Icon(Icons.schedule_rounded, size: 19), const SizedBox(width: 7), Expanded(child: Text(l.tr('الجرعة التالية: $label','Next dose: $label','Prochaine dose : $label'), maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)))]);
   }
 }
@@ -561,7 +561,7 @@ class _StockSummary extends StatelessWidget {
     if (!medication.stockEnabled) return MedicationStockBadge(medication: medication, schedules: schedules, onAdd: onAdd, onDetails: onDetails);
     final unit = _unit(medication.stockUnit);
     final stock = _format(medication.stockQuantity);
-    final days = daysRemaining == null ? 'غير محسوب' : daysRemaining! <= 0 ? 'نفد' : daysRemaining! < 1 ? '< يوم' : '${daysRemaining!.floor()} يوم';
+    final days = daysRemaining == null ? l.tr('غير محسوب', 'Not calculated', 'Non calculé') : daysRemaining! <= 0 ? l.tr('نفد', 'Out', 'Épuisé') : daysRemaining! < 1 ? l.tr('< يوم', '< 1 day', '< 1 jour') : l.tr('${daysRemaining!.floor()} يوم', '${daysRemaining!.floor()} days', '${daysRemaining!.floor()} jours');
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: onDetails,
@@ -574,9 +574,9 @@ class _StockSummary extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(l.tr('المخزون: $stock $unit','Stock: $stock $unit','Stock : $stock $unit'), style: const TextStyle(fontWeight: FontWeight.w800)),
             const SizedBox(height: 2),
-            Text(dailyConsumption > 0 ? 'يكفي تقريبًا $days · استهلاك ${_format(dailyConsumption)}/يوم' : 'لا يمكن تقدير الاستهلاك اليومي', style: Theme.of(context).textTheme.bodySmall),
+            Text(dailyConsumption > 0 ? l.tr('يكفي تقريبًا $days · استهلاك ${_format(dailyConsumption)}/يوم', 'Approximately $days remaining · consumption ${_format(dailyConsumption)}/day', 'Environ $days restants · consommation ${_format(dailyConsumption)}/jour') : l.tr('لا يمكن تقدير الاستهلاك اليومي', 'Daily consumption cannot be estimated', 'La consommation quotidienne ne peut pas être estimée'), style: Theme.of(context).textTheme.bodySmall),
           ])),
-          IconButton(tooltip: 'إضافة مخزون', onPressed: onAdd, icon: const Icon(Icons.add_box_outlined)),
+          IconButton(tooltip: l.tr('إضافة مخزون', 'Add stock', 'Ajouter du stock'), onPressed: onAdd, icon: const Icon(Icons.add_box_outlined)),
         ]),
       ),
     );
@@ -603,10 +603,10 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, icon) = switch (status) {
-      _MedicationStatus.active => ('نشط', Icons.check_circle_outline_rounded),
-      _MedicationStatus.lowStock => ('مخزون منخفض', Icons.warning_amber_rounded),
-      _MedicationStatus.outOfStock => ('نفد المخزون', Icons.error_outline_rounded),
-      _MedicationStatus.endingSoon => ('ينتهي قريبًا', Icons.event_busy_rounded),
+      _MedicationStatus.active => (l.tr('نشط', 'Active', 'Actif'), Icons.check_circle_outline_rounded),
+      _MedicationStatus.lowStock => (l.tr('مخزون منخفض', 'Low stock', 'Stock faible'), Icons.warning_amber_rounded),
+      _MedicationStatus.outOfStock => (l.tr('نفد المخزون', 'Out of stock', 'Stock épuisé'), Icons.error_outline_rounded),
+      _MedicationStatus.endingSoon => (l.tr('ينتهي قريبًا', 'Ending soon', 'Bientôt épuisé'), Icons.event_busy_rounded),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),

@@ -104,7 +104,7 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
           children: [
-            _welcome(profile.fullName),
+            _welcome(profile.fullName, AppLocalizations.of(context)),
             const SizedBox(height: 16),
             _todayCard(taken: taken, total: adherence.resolved, missed: missed, pending: pending, progress: progress),
             const SizedBox(height: 12),
@@ -170,7 +170,7 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
     );
   }
 
-  Widget _welcome(String name) => Card(
+  Widget _welcome(String name, AppLocalizations l) => Card(
         elevation: 0,
         color: AppColors.primary.withValues(alpha: .08),
         child: Padding(
@@ -179,7 +179,7 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
             children: [
               _avatar(context.read<AuthProvider>().profile?.avatarUrl, 28),
               const SizedBox(width: 12),
-              Expanded(child: Text('مرحبًا، ${name.trim().isEmpty ? 'عزيزي' : name}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900))),
+              Expanded(child: Text(l.tr('مرحبًا، ${name.trim().isEmpty ? 'عزيزي' : name}', 'Hello, ${name.trim().isEmpty ? 'there' : name}', 'Bonjour, ${name.trim().isEmpty ? 'cher utilisateur' : name}'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900))),
             ],
           ),
         ),

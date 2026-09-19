@@ -85,7 +85,7 @@ class NextDoseCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  _formatTime(dose.scheduledAt),
+                  _formatTime(dose.scheduledAt, l),
                   style: theme.textTheme.titleLarge?.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w900,
@@ -141,7 +141,7 @@ class NextDoseCard extends StatelessWidget {
     );
   }
 
-  String _formatTime(DateTime value) {
+  String _formatTime(DateTime value, AppLocalizations l) {
     final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
     final minute = value.minute.toString().padLeft(2, '0');
     final suffix = value.hour >= 12 ? l.tr('م', 'PM', 'PM') : l.tr('ص', 'AM', 'AM');

@@ -86,7 +86,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
     final l = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l.tr('سجل الالتزام','Adherence history','Historique de l’observance'))),
+      appBar: AppBar(title: Text(AppLocalizations.of(context).tr('سجل الالتزام','Adherence history','Historique de l’observance'))),
       body: RefreshIndicator(
         onRefresh: () async {
           setState(() {
@@ -126,16 +126,16 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
               children: [
                 Icon(Icons.insights_rounded, color: AppColors.primary),
                 SizedBox(width: 8),
-                Text(l.tr('هذا الأسبوع','This week','Cette semaine'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                Text(AppLocalizations.of(context).tr('هذا الأسبوع','This week','Cette semaine'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
               ],
             ),
             const SizedBox(height: 14),
             Row(
               children: [
-                Expanded(child: _metric('${report.percentage.round()}%', l.tr('الالتزام','Adherence','Observance'), Icons.percent_rounded)),
-                Expanded(child: _metric('${report.taken}', l.tr('تم أخذها','Taken','Prises'), Icons.check_circle_rounded)),
-                Expanded(child: _metric('${report.missed}', l.tr('فائتة','Missed','Manquées'), Icons.warning_rounded)),
-                Expanded(child: _metric('${report.pending}', l.tr('مفتوحة','Pending','En attente'), Icons.schedule_rounded)),
+                Expanded(child: _metric('${report.percentage.round()}%', AppLocalizations.of(context).tr('الالتزام','Adherence','Observance'), Icons.percent_rounded)),
+                Expanded(child: _metric('${report.taken}', AppLocalizations.of(context).tr('تم أخذها','Taken','Prises'), Icons.check_circle_rounded)),
+                Expanded(child: _metric('${report.missed}', AppLocalizations.of(context).tr('فائتة','Missed','Manquées'), Icons.warning_rounded)),
+                Expanded(child: _metric('${report.pending}', AppLocalizations.of(context).tr('مفتوحة','Pending','En attente'), Icons.schedule_rounded)),
               ],
             ),
           ],
@@ -152,7 +152,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l.tr('الالتزام اليومي','Daily adherence','Observance quotidienne'), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+            Text(AppLocalizations.of(context).tr('الالتزام اليومي','Daily adherence','Observance quotidienne'), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
             const SizedBox(height: 14),
             ...report.days.map(_dayRow),
           ],
@@ -164,7 +164,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
   Widget _dayRow(DailyAdherence day) {
     final summary = day.summary;
     final progress = summary.resolved == 0 ? 0.0 : summary.percentage / 100;
-    final label = l.weekdayLabel(day.day.weekday);
+    final label = AppLocalizations.of(context).weekdayLabel(day.day.weekday);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -199,10 +199,10 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l.tr('الالتزام حسب الدواء','Adherence by medicine','Observance par médicament'), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+            Text(AppLocalizations.of(context).tr('الالتزام حسب الدواء','Adherence by medicine','Observance par médicament'), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
             const SizedBox(height: 10),
             if (report.isEmpty)
-              Text(l.tr('لا توجد بيانات كافية خلال آخر 7 أيام.','Not enough data for the last 7 days.','Pas assez de données pour les 7 derniers jours.'))
+              Text(AppLocalizations.of(context).tr('لا توجد بيانات كافية خلال آخر 7 أيام.','Not enough data for the last 7 days.','Pas assez de données pour les 7 derniers jours.'))
             else
               ...report.map(
                 (item) => ListTile(
@@ -220,7 +220,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
                     );
                   })(),
                   title: Text(item.medicationName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
-                  subtitle: Text(l.tr('${item.summary.taken} مأخوذة · ${item.summary.missed} فائتة','${item.summary.taken} taken · ${item.summary.missed} missed','${item.summary.taken} prises · ${item.summary.missed} manquées')),
+                  subtitle: Text(AppLocalizations.of(context).tr('${item.summary.taken} مأخوذة · ${item.summary.missed} فائتة','${item.summary.taken} taken · ${item.summary.missed} missed','${item.summary.taken} prises · ${item.summary.missed} manquées')),
                   trailing: Text('${item.percentage.round()}%', style: const TextStyle(fontWeight: FontWeight.w900)),
                 ),
               ),
@@ -250,7 +250,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
               const Icon(Icons.wifi_off_rounded),
               const SizedBox(width: 10),
               Expanded(child: Text(message)),
-              TextButton(onPressed: _load, child: Text(l.tr('إعادة المحاولة','Retry','Réessayer'))),
+              TextButton(onPressed: _load, child: Text(AppLocalizations.of(context).tr('إعادة المحاولة','Retry','Réessayer'))),
             ],
           ),
         ),

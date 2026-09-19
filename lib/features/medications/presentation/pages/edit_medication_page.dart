@@ -250,7 +250,9 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Scaffold(
         appBar: AppBar(title: Text(l.tr('تعديل الدواء','Edit medicine','Modifier le médicament'))),
         body: Form(
           key: _formKey,
@@ -326,7 +328,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
                 TextFormField(
                   controller: _times,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: l.tr('عدد المرات يوميًا','Times per day','Nombre de prises par jour')),
+                  decoration: InputDecoration(labelText: l.tr('عدد المرات يوميًا','Times per day','Nombre de prises par jour')),
                 ),
               ],
               if (_frequency == _EditFrequency.everyHours) ...[
@@ -334,7 +336,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
                 TextFormField(
                   controller: _hours,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: l.tr('كل كم ساعة؟','Every how many hours?','Toutes les combien d’heures ?')),
+                  decoration: InputDecoration(labelText: l.tr('كل كم ساعة؟','Every how many hours?','Toutes les combien d’heures ?')),
                 ),
               ],
               if (_frequency != _EditFrequency.prn) ...[
@@ -357,15 +359,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
                   spacing: 6,
                   children: List.generate(7, (i) {
                     final day = i + 1;
-                    const labels = [
-                      'الأحد',
-                      'الاثنين',
-                      'الثلاثاء',
-                      'الأربعاء',
-                      'الخميس',
-                      'الجمعة',
-                      'السبت',
-                    ];
+                    final labels = [l.sunday, l.monday, l.tuesday, l.wednesday, l.thursday, l.friday, l.saturday];
                     return FilterChip(
                       label: Text(labels[i]),
                       selected: _days.contains(day),
@@ -379,7 +373,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
               TextFormField(
                 controller: _instructions,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: l.tr('تعليمات إضافية','Additional instructions','Instructions supplémentaires')),
+                decoration: InputDecoration(labelText: l.tr('تعليمات إضافية','Additional instructions','Instructions supplémentaires')),
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
@@ -397,4 +391,5 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
           ),
         ),
       );
+  }
 }

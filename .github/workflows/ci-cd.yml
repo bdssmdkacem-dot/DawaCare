@@ -73,7 +73,7 @@ jobs:
           storePassword=${{ secrets.KEYSTORE_STORE_PASSWORD }}
           keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
           keyAlias=${{ secrets.KEYSTORE_KEY_ALIAS }}
-          storeFile=upload-keystore.jks
+          storeFile=app/upload-keystore.jks
           EOF
 
       - name: Write google-services.json

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/app_localizations.dart';
+
 import '../../../../models/family_link_request.dart';
 import '../providers/caregiver_provider.dart';
 
@@ -17,6 +19,7 @@ class FamilyLinkRequestsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final incoming = provider.incomingRequests;
     final sent = provider.sentRequests;
     if (incoming.isEmpty && sent.isEmpty) return const SizedBox.shrink();
@@ -88,8 +91,8 @@ class _IncomingCard extends StatelessWidget {
               title: Text(request.caregiverName),
               subtitle: Text(
                 request.relationshipLabel?.isNotEmpty == true
-                    ? 'صلة القرابة: ${request.relationshipLabel}'
-                    : 'يريد إضافتك إلى العائلة.',
+                    ? l.tr('صلة القرابة: ${request.relationshipLabel}', 'Relationship: ${request.relationshipLabel}', 'Lien familial : ${request.relationshipLabel}')
+                    : l.tr('يريد إضافتك إلى العائلة.', 'Wants to add you to the family.', 'Souhaite vous ajouter à la famille.'),
               ),
             ),
             if (busy)
@@ -101,7 +104,7 @@ class _IncomingCard extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: () => onRespond(request, true),
                       icon: const Icon(Icons.check_rounded),
-                      label: const Text('قبول'),
+                      label: Text(AppLocalizations.of(context).tr('قبول', 'Accept', 'Accepter')),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -109,7 +112,7 @@ class _IncomingCard extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () => onRespond(request, false),
                       icon: const Icon(Icons.close_rounded),
-                      label: const Text('رفض'),
+                      label: Text(AppLocalizations.of(context).tr('رفض', 'Reject', 'Refuser')),
                     ),
                   ),
                 ],
@@ -135,12 +138,12 @@ class _SentCard extends StatelessWidget {
         title: Text(request.patientName),
         subtitle: Text(
           request.relationshipLabel?.isNotEmpty == true
-              ? 'صلة القرابة: ${request.relationshipLabel}'
-              : 'بانتظار موافقة فرد العائلة',
+              ? AppLocalizations.of(context).tr('صلة القرابة: ${request.relationshipLabel}', 'Relationship: ${request.relationshipLabel}', 'Lien familial : ${request.relationshipLabel}')
+              : AppLocalizations.of(context).tr('بانتظار موافقة فرد العائلة', 'Waiting for family member approval', 'En attente de l’approbation du membre de la famille'),
         ),
         trailing: TextButton(
           onPressed: () => onCancel(request),
-          child: const Text('إلغاء'),
+          child: Text(AppLocalizations.of(context).cancel),
         ),
       ),
     );

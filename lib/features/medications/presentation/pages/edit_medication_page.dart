@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
@@ -125,6 +126,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
   }
 
   Future<void> _save() async {
+    final l = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
 
     final patientId = context.read<AuthProvider>().profile?.id;
@@ -133,7 +135,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
 
     if (_frequency == _EditFrequency.specificDays && _days.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('اختر يومًا واحدًا على الأقل.')),
+        SnackBar(content: Text(l.tr('اختر يومًا واحدًا على الأقل.','Select at least one day.','Sélectionnez au moins un jour.'))),
       );
       return;
     }
@@ -141,7 +143,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
     final times = _buildTimes();
     if (times.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تحقق من عدد الجرعات أو الفاصل الزمني.')),
+        SnackBar(content: Text(l.tr('تحقق من عدد الجرعات أو الفاصل الزمني.','Check the number of doses or interval.','Vérifiez le nombre de doses ou l’intervalle.'))),
       );
       return;
     }
@@ -239,7 +241,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذّر حفظ تعديل الدواء.')),
+          SnackBar(content: Text(l.tr('تعذّر حفظ تعديل الدواء.','Could not save medicine changes.','Impossible d’enregistrer les modifications du médicament.'))),
         );
       }
     } finally {
@@ -249,7 +251,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('تعديل الدواء')),
+        appBar: AppBar(title: Text(l.tr('تعديل الدواء','Edit medicine','Modifier le médicament'))),
         body: Form(
           key: _formKey,
           child: ListView(
@@ -257,19 +259,19 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
             children: [
               TextFormField(
                 controller: _name,
-                decoration: const InputDecoration(labelText: 'اسم الدواء'),
+                decoration: InputDecoration(labelText: l.tr('اسم الدواء','Medicine name','Nom du médicament')),
                 validator: (v) => v == null || v.trim().isEmpty ? 'أدخل اسم الدواء' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _strength,
-                decoration: const InputDecoration(labelText: 'التركيز'),
+                decoration: InputDecoration(labelText: l.tr('التركيز','Strength','Dosage')),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _form,
-                decoration: const InputDecoration(labelText: 'شكل الدواء'),
-                items: const [
+                decoration: InputDecoration(labelText: l.tr('شكل الدواء','Medicine form','Forme du médicament')),
+                items: [
                   'قرص',
                   'كبسولة',
                   'شراب',
@@ -293,19 +295,19 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
                 }),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'طريقة الجرعة',
+              Text(
+                l.tr('طريقة الجرعة','Dose schedule','Schéma de prise'),
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
               ),
               DropdownButtonFormField<_EditFrequency>(
                 initialValue: _frequency,
-                items: const [
-                  DropdownMenuItem(value: _EditFrequency.daily, child: Text('مرة يوميًا')),
-                  DropdownMenuItem(value: _EditFrequency.timesPerDay, child: Text('عدة مرات يوميًا')),
-                  DropdownMenuItem(value: _EditFrequency.everyHours, child: Text('كل X ساعات')),
-                  DropdownMenuItem(value: _EditFrequency.specificDays, child: Text('أيام محددة')),
-                  DropdownMenuItem(value: _EditFrequency.once, child: Text('مرة واحدة')),
-                  DropdownMenuItem(value: _EditFrequency.prn, child: Text('عند الحاجة PRN')),
+                items: [
+                  DropdownMenuItem(value: _EditFrequency.daily, child: Text(l.tr('مرة يوميًا','Once daily','Une fois par jour'))),
+                  DropdownMenuItem(value: _EditFrequency.timesPerDay, child: Text(l.tr('عدة مرات يوميًا','Several times a day','Plusieurs fois par jour'))),
+                  DropdownMenuItem(value: _EditFrequency.everyHours, child: Text(l.tr('كل X ساعات','Every X hours','Toutes les X heures'))),
+                  DropdownMenuItem(value: _EditFrequency.specificDays, child: Text(l.tr('أيام محددة','Specific days','Jours spécifiques'))),
+                  DropdownMenuItem(value: _EditFrequency.once, child: Text(l.tr('مرة واحدة','Once','Une fois'))),
+                  DropdownMenuItem(value: _EditFrequency.prn, child: Text(l.tr('عند الحاجة PRN','As needed (PRN)','Si nécessaire (PRN)'))),
                 ],
                 onChanged: (v) => setState(() => _frequency = v ?? _EditFrequency.daily),
               ),
@@ -314,17 +316,17 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
                 controller: _dose,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  labelText: 'الكمية في الجرعة',
-                  suffixText: _unit == 'ml' ? 'مل' : _unit == 'drop' ? 'قطرة' : 'وحدة',
+                  labelText: l.tr('الكمية في الجرعة','Dose amount','Quantité par dose'),
+                  suffixText: _unit == 'ml' ? l.tr('مل','mL','ml') : _unit == 'drop' ? l.tr('قطرة','drop','goutte') : l.tr('وحدة','unit','unité'),
                 ),
-                validator: (v) => _number(v ?? '') == null ? 'أدخل كمية صحيحة' : null,
+                validator: (v) => _number(v ?? '') == null ? l.tr('أدخل كمية صحيحة','Enter a valid amount','Saisissez une quantité valide') : null,
               ),
               if (_frequency == _EditFrequency.timesPerDay) ...[
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _times,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'عدد المرات يوميًا'),
+                  decoration: const InputDecoration(labelText: l.tr('عدد المرات يوميًا','Times per day','Nombre de prises par jour')),
                 ),
               ],
               if (_frequency == _EditFrequency.everyHours) ...[
@@ -332,14 +334,14 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
                 TextFormField(
                   controller: _hours,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'كل كم ساعة؟'),
+                  decoration: const InputDecoration(labelText: l.tr('كل كم ساعة؟','Every how many hours?','Toutes les combien d’heures ?')),
                 ),
               ],
               if (_frequency != _EditFrequency.prn) ...[
                 const SizedBox(height: 12),
                 ListTile(
                   leading: const Icon(Icons.schedule_rounded),
-                  title: Text('وقت البداية: ${_timeValue(_time)}'),
+                  title: Text(l.tr('وقت البداية: ${_timeValue(_time)}','Start time: ${_timeValue(_time)}','Heure de début : ${_timeValue(_time)}')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () async {
                     final t = await showTimePicker(
@@ -377,7 +379,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
               TextFormField(
                 controller: _instructions,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: 'تعليمات إضافية'),
+                decoration: const InputDecoration(labelText: l.tr('تعليمات إضافية','Additional instructions','Instructions supplémentaires')),
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
@@ -389,7 +391,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save_rounded),
-                label: Text(_saving ? 'جاري الحفظ...' : 'حفظ التعديلات'),
+                label: Text(_saving ? l.tr('جاري الحفظ...','Saving...','Enregistrement...') : l.tr('حفظ التعديلات','Save changes','Enregistrer les modifications')),
               ),
             ],
           ),

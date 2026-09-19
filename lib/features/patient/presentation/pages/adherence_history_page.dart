@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/loading_indicator.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../doses/data/dose_repository.dart';
@@ -58,7 +59,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'تعذّر تحميل سجل الالتزام.';
+        _error = AppLocalizations.of(context).tr('تعذّر تحميل سجل الالتزام.','Could not load adherence history.','Impossible de charger l’historique de l’observance.');
       });
     }
   }
@@ -82,8 +83,10 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
       to: today.add(const Duration(days: 1)),
     );
 
+    final l = AppLocalizations.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('سجل الالتزام')),
+      appBar: AppBar(title: Text(l.tr('سجل الالتزام','Adherence history','Historique de l’observance'))),
       body: RefreshIndicator(
         onRefresh: () async {
           setState(() {
@@ -123,16 +126,16 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
               children: [
                 Icon(Icons.insights_rounded, color: AppColors.primary),
                 SizedBox(width: 8),
-                Text('هذا الأسبوع', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                Text(l.tr('هذا الأسبوع','This week','Cette semaine'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
               ],
             ),
             const SizedBox(height: 14),
             Row(
               children: [
-                Expanded(child: _metric('${report.percentage.round()}%', 'الالتزام', Icons.percent_rounded)),
-                Expanded(child: _metric('${report.taken}', 'تم أخذها', Icons.check_circle_rounded)),
-                Expanded(child: _metric('${report.missed}', 'فائتة', Icons.warning_rounded)),
-                Expanded(child: _metric('${report.pending}', 'مفتوحة', Icons.schedule_rounded)),
+                Expanded(child: _metric('${report.percentage.round()}%', l.tr('الالتزام','Adherence','Observance'), Icons.percent_rounded)),
+                Expanded(child: _metric('${report.taken}', l.tr('تم أخذها','Taken','Prises'), Icons.check_circle_rounded)),
+                Expanded(child: _metric('${report.missed}', l.tr('فائتة','Missed','Manquées'), Icons.warning_rounded)),
+                Expanded(child: _metric('${report.pending}', l.tr('مفتوحة','Pending','En attente'), Icons.schedule_rounded)),
               ],
             ),
           ],
@@ -149,7 +152,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('الالتزام اليومي', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+            Text(l.tr('الالتزام اليومي','Daily adherence','Observance quotidienne'), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
             const SizedBox(height: 14),
             ...report.days.map(_dayRow),
           ],
@@ -161,7 +164,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
   Widget _dayRow(DailyAdherence day) {
     final summary = day.summary;
     final progress = summary.resolved == 0 ? 0.0 : summary.percentage / 100;
-    final label = _weekday(day.day.weekday);
+    final label = l.weekdayLabel(day.day.weekday);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -196,10 +199,10 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('الالتزام حسب الدواء', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+            Text(l.tr('الالتزام حسب الدواء','Adherence by medicine','Observance par médicament'), style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
             const SizedBox(height: 10),
             if (report.isEmpty)
-              const Text('لا توجد بيانات كافية خلال آخر 7 أيام.')
+              Text(l.tr('لا توجد بيانات كافية خلال آخر 7 أيام.','Not enough data for the last 7 days.','Pas assez de données pour les 7 derniers jours.'))
             else
               ...report.map(
                 (item) => ListTile(
@@ -217,7 +220,7 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
                     );
                   })(),
                   title: Text(item.medicationName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
-                  subtitle: Text('${item.summary.taken} مأخوذة · ${item.summary.missed} فائتة'),
+                  subtitle: Text(l.tr('${item.summary.taken} مأخوذة · ${item.summary.missed} فائتة','${item.summary.taken} taken · ${item.summary.missed} missed','${item.summary.taken} prises · ${item.summary.missed} manquées')),
                   trailing: Text('${item.percentage.round()}%', style: const TextStyle(fontWeight: FontWeight.w900)),
                 ),
               ),
@@ -247,13 +250,15 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
               const Icon(Icons.wifi_off_rounded),
               const SizedBox(width: 10),
               Expanded(child: Text(message)),
-              TextButton(onPressed: _load, child: const Text('إعادة المحاولة')),
+              TextButton(onPressed: _load, child: Text(l.tr('إعادة المحاولة','Retry','Réessayer'))),
             ],
           ),
         ),
       );
 
-  String _weekday(int value) => switch (value) {
+  String _weekday(int value) => AppLocalizations.of(context).weekdayLabel(value);
+
+  /* String _weekday(int value) => switch (value) {
         DateTime.monday => 'الإثنين',
         DateTime.tuesday => 'الثلاثاء',
         DateTime.wednesday => 'الأربعاء',
@@ -261,5 +266,5 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
         DateTime.friday => 'الجمعة',
         DateTime.saturday => 'السبت',
         _ => 'الأحد',
-      };
+      }; */
 }

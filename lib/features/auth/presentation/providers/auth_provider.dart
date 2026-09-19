@@ -102,6 +102,13 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateLanguage(String languageCode) async {
+    final current = profile;
+    if (current == null || !['ar', 'en', 'fr'].contains(languageCode)) return;
+    if (current.language == languageCode) return;
+    await updateProfile(current.copyWith(language: languageCode));
+  }
+
   Future<bool> _run(Future<void> Function() action) async {
     if (isLoading) return false;
     isLoading = true;

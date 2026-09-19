@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/caregiver_link.dart';
 import '../../../../models/dose_instance.dart';
@@ -133,7 +134,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
       });
     } catch (_) {
       if (mounted) {
-        setState(() => _followedError = 'تعذّر تحميل أدوية الأشخاص الذين تتابعهم.');
+        setState(() => _followedError = AppLocalizations.of(context).tr('تعذّر تحميل أدوية الأشخاص الذين تتابعهم.','Could not load medicines for followed patients.','Impossible de charger les médicaments des patients suivis.'));
       }
     } finally {
       if (mounted) setState(() => _loadingFollowed = false);
@@ -218,17 +219,17 @@ class _PatientHomePageState extends State<PatientHomePage> {
         _dayHeader(l, taken: taken, total: total),
         const SizedBox(height: 20),
         if (today.isNotEmpty) ...[
-          _sectionTitle('الجرعة الحالية والقادمة', Icons.access_time_rounded),
+          _sectionTitle(l.tr('الجرعة الحالية والقادمة','Current and next dose','Dose actuelle et prochaine'), Icons.access_time_rounded),
           const SizedBox(height: 10),
           ..._buildOwnDoses(today, medicationProvider),
         ] else ...[
-          _sectionTitle('جرعاتي اليوم', Icons.medication_rounded),
+          _sectionTitle(l.tr('جرعاتي اليوم','My doses today','Mes doses aujourd’hui'), Icons.medication_rounded),
           const SizedBox(height: 10),
-          _emptySection('لا توجد جرعات مجدولة لك اليوم.'),
+          _emptySection(l.noScheduledMedicines),
         ],
         if (_loadingFollowed || hasFollowedPatients) ...[
           const SizedBox(height: 22),
-          _sectionTitle('الأشخاص الذين أتابعهم', Icons.groups_rounded),
+          _sectionTitle(l.tr('الأشخاص الذين أتابعهم','People I follow','Personnes que je suis'), Icons.groups_rounded),
           const SizedBox(height: 10),
           if (_loadingFollowed && !hasFollowedPatients)
             const Padding(
@@ -301,7 +302,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
       final doses = _followedDoses[link.patientId] ?? const <DoseInstance>[];
       final taken = doses.where((d) => d.status == DoseStatus.taken).length;
       final summary = doses.isEmpty
-          ? 'لا توجد جرعات مجدولة اليوم'
+          ? l.noScheduledMedicines
           : '$taken / ${doses.length} مكتملة';
 
       widgets.add(_patientHeader(link, subtitle: summary));
@@ -347,7 +348,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
   }
 
   Widget _patientHeader(CaregiverLink link, {required String subtitle}) {
-    final name = link.patientName.trim().isEmpty ? 'مريض' : link.patientName.trim();
+    final name = link.patientName.trim().isEmpty ? l.tr('مريض','Patient','Patient') : link.patientName.trim();
     final initials = _initials(name);
     final avatarUrl = link.patientAvatarUrl;
 
@@ -373,9 +374,9 @@ class _PatientHomePageState extends State<PatientHomePage> {
 
   Widget _roleChip(CaregiverRole role) {
     final text = switch (role) {
-      CaregiverRole.primary => 'مرافق أساسي',
-      CaregiverRole.caregiver => 'مرافق',
-      CaregiverRole.viewer => 'مشاهد',
+      CaregiverRole.primary => l.tr('مرافق أساسي','Primary caregiver','Accompagnant principal'),
+      CaregiverRole.caregiver => l.tr('مرافق','Caregiver','Accompagnant'),
+      CaregiverRole.viewer => l.tr('مشاهد','Viewer','Observateur'),
     };
     return Chip(
       label: Text(text),
@@ -400,7 +401,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذّر تحديث حالة الجرعة.')),
+        SnackBar(content: Text(AppLocalizations.of(context).tr('تعذّر تحديث حالة الجرعة.','Could not update the dose status.','Impossible de mettre à jour le statut de la dose.'))),
       );
     }
   }
@@ -484,7 +485,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
               ),
               const SizedBox(width: 8),
               const Text(
-                'جرعات مكتملة',
+                l.tr('جرعات مكتملة','Doses completed','Doses terminées'),
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
               ),
             ],

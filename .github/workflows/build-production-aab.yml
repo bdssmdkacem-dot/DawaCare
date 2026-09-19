@@ -66,6 +66,16 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
 
+      - name: Validate release keystore
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          test -s android/app/upload-keystore.jks
+          keytool -list -v -keystore android/app/upload-keystore.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /tmp/keystore-check.txt
+          grep -q "Alias name: $KEY_ALIAS" /tmp/keystore-check.txt
+          echo "Release keystore validation passed."
+
       - name: Write key.properties
         run: |
           cat > android/key.properties <<EOF

@@ -133,6 +133,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
   }
 
   Future<void> _addStock(Medication medication) async {
+    final l = AppLocalizations.of(context);
     final controller = TextEditingController();
     final quantity = await showDialog<double>(
       context: context,
@@ -268,6 +269,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
   }
 
   Widget _buildBody(MedicationProvider provider, List<_MedicationItem> items, {required int total, required int low, required int out, required int ending}) {
+    final l = AppLocalizations.of(context);
     if (provider.isLoading && provider.medications.isEmpty) return const LoadingIndicator();
     if (provider.medications.isEmpty) {
       final l = AppLocalizations.of(context);
@@ -409,6 +411,7 @@ class _SmartOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Card(child: Padding(
       padding: const EdgeInsets.all(14),
       child: Row(children: [
@@ -498,7 +501,7 @@ class _SmartMedicationTile extends StatelessWidget {
                 }
               },
               itemBuilder: (_) => [
-                const PopupMenuItem(value: 'edit', child: Text('تعديل الدواء')),
+                PopupMenuItem(value: 'edit', child: Text(l.tr('تعديل الدواء','Edit medicine','Modifier le médicament'))),
                 PopupMenuItem(value: 'change_image', child: Text(l.changeMedicineImage)),
                 if (onRemoveImage != null) PopupMenuItem(value: 'remove_image', child: Text(l.deleteMedicineImage)),
                 PopupMenuItem(value: 'deactivate', child: Text(l.deactivateMedicine)),
@@ -528,6 +531,7 @@ class _NextDoseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     if (schedules.any((s) => s.type == ScheduleType.prn) && nextDose == null) {
       return Row(children: [const Icon(Icons.event_available_rounded, size: 19), const SizedBox(width: 7), Text(l.tr('الجرعة التالية: عند الحاجة','Next dose: as needed','Prochaine dose : selon les besoins'), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700))]);
@@ -553,6 +557,7 @@ class _StockSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (!medication.stockEnabled) return MedicationStockBadge(medication: medication, schedules: schedules, onAdd: onAdd, onDetails: onDetails);
     final unit = _unit(medication.stockUnit);
     final stock = _format(medication.stockQuantity);

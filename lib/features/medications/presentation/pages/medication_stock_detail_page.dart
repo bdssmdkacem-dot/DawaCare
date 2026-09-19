@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../models/medication.dart';
 import '../../../../models/medication_schedule.dart';
 import '../providers/medication_provider.dart';
@@ -54,7 +55,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'تعذّر تحميل بيانات المخزون.';
+        _error = AppLocalizations.of(context).tr('تعذّر تحميل بيانات المخزون.','Could not load stock data.','Impossible de charger les données du stock.');
       });
     }
   }
@@ -99,10 +100,10 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
           .replaceFirst(RegExp(r'0+$'), '')
           .replaceFirst(RegExp(r'\.$'), '');
 
-  String _stockStatus() {
-    if (_medication.stockQuantity <= 0) return 'منتهي';
-    if (_medication.stockQuantity <= _medication.lowStockThreshold) return 'منخفض';
-    return 'جيد';
+  String _stockStatus(AppLocalizations l) {
+    if (_medication.stockQuantity <= 0) return l.tr('منتهي','Out of stock','Épuisé');
+    if (_medication.stockQuantity <= _medication.lowStockThreshold) return l.tr('منخفض','Low','Faible');
+    return l.tr('جيد','Good','Bon');
   }
 
   Future<void> _editMedication() async {
@@ -124,27 +125,28 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
   }
 
   Future<void> _addStock() async {
+    final l = AppLocalizations.of(context);
     final c = TextEditingController();
     final result = await showDialog<double>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('إضافة مخزون'),
+        title: Text(l.tr('إضافة مخزون','Add stock','Ajouter du stock')),
         content: TextField(
           controller: c,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(labelText: 'الكمية (${_medication.stockUnit})'),
+          decoration: InputDecoration(labelText: l.tr('الكمية (${_medication.stockUnit})','Quantity (${_medication.stockUnit})','Quantité (${_medication.stockUnit})')),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء'),
+            child: Text(l.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(
               ctx,
               double.tryParse(c.text.trim().replaceAll(',', '.')),
             ),
-            child: const Text('إضافة'),
+            child: Text(l.tr('إضافة','Add','Ajouter')),
           ),
         ],
       ),
@@ -173,12 +175,13 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       if (mounted) _historyKey.currentState?.refresh();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'تعذر تحديث المخزون')),
+        SnackBar(content: Text(provider.error ?? l.tr('تعذر تحديث المخزون','Could not update stock','Impossible de mettre à jour le stock'))),
       );
     }
   }
 
   Future<void> _editSettings() async {
+    final l = AppLocalizations.of(context);
     final package = TextEditingController(
       text: _medication.packageQuantity?.toString() ?? '',
     );
@@ -190,20 +193,20 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('إعدادات المخزون'),
+          title: Text(l.tr('إعدادات المخزون','Stock settings','Paramètres du stock')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
                 initialValue: unit,
-                decoration: const InputDecoration(labelText: 'الوحدة'),
+                decoration: const InputDecoration(labelText: l.tr('الوحدة','Unit','Unité')),
                 items: const [
-                  DropdownMenuItem(value: 'unit', child: Text('وحدة')),
-                  DropdownMenuItem(value: 'tablet', child: Text('قرص')),
-                  DropdownMenuItem(value: 'capsule', child: Text('كبسولة')),
-                  DropdownMenuItem(value: 'ml', child: Text('مل')),
-                  DropdownMenuItem(value: 'drop', child: Text('قطرة')),
-                  DropdownMenuItem(value: 'injection', child: Text('حقنة')),
+                  DropdownMenuItem(value: 'unit', child: Text(l.tr('وحدة','Unit','Unité'))),
+                  DropdownMenuItem(value: 'tablet', child: Text(l.tr('قرص','Tablet','Comprimé'))),
+                  DropdownMenuItem(value: 'capsule', child: Text(l.tr('كبسولة','Capsule','Gélule'))),
+                  DropdownMenuItem(value: 'ml', child: Text(l.tr('مل','ml','ml'))),
+                  DropdownMenuItem(value: 'drop', child: Text(l.tr('قطرة','Drop','Goutte'))),
+                  DropdownMenuItem(value: 'injection', child: Text(l.tr('حقنة','Injection','Injection'))),
                 ],
                 onChanged: (v) {
                   if (v != null) setDialogState(() => unit = v);
@@ -212,12 +215,12 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
               TextField(
                 controller: package,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'كمية العبوة'),
+                decoration: const InputDecoration(labelText: l.tr('كمية العبوة','Package quantity','Quantité de la boîte')),
               ),
               TextField(
                 controller: threshold,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'حد المخزون المنخفض'),
+                decoration: const InputDecoration(labelText: l.tr('حد المخزون المنخفض','Low-stock threshold','Seuil de stock faible')),
               ),
             ],
           ),
@@ -228,7 +231,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('حفظ'),
+              child: Text(l.tr('حفظ','Save','Enregistrer')),
             ),
           ],
         ),
@@ -261,6 +264,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final daily = _calculateDailyConsumption();
     final daysRemaining = daily > 0 ? _medication.stockQuantity / daily : null;
 
@@ -269,7 +273,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
         title: Text(_medication.name),
         actions: [
           IconButton(
-            tooltip: 'تعديل الدواء',
+            tooltip: l.tr('تعديل الدواء','Edit medicine','Modifier le médicament'),
             onPressed: _editMedication,
             icon: const Icon(Icons.edit_rounded),
           ),
@@ -312,7 +316,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                                     'المخزون الحالي',
                                     style: TextStyle(fontWeight: FontWeight.bold),
                                   ),
-                                  Chip(label: Text(_stockStatus())),
+                                  Chip(label: Text(_stockStatus(l))),
                                 ],
                               ),
                               const SizedBox(height: 12),
@@ -322,23 +326,23 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                               ),
                               const SizedBox(height: 12),
                               _InfoRow(
-                                label: 'حد المخزون المنخفض',
+                                label: l.tr('حد المخزون المنخفض','Low-stock threshold','Seuil de stock faible'),
                                 value: '${_formatNumber(_medication.lowStockThreshold)} ${_medication.stockUnit}',
                               ),
                               if (_medication.packageQuantity != null)
                                 _InfoRow(
-                                  label: 'كمية العبوة',
+                                  label: l.tr('كمية العبوة','Package quantity','Quantité de la boîte'),
                                   value: '${_formatNumber(_medication.packageQuantity!)} ${_medication.stockUnit}',
                                 ),
                               _InfoRow(
-                                label: 'الاستهلاك اليومي المتوقع',
+                                label: l.tr('الاستهلاك اليومي المتوقع','Expected daily use','Consommation quotidienne prévue'),
                                 value: daily > 0
                                     ? '${_formatNumber(daily)} ${_medication.stockUnit}'
-                                    : 'غير متاح',
+                                    : l.tr('غير متاح','Unavailable','Indisponible'),
                               ),
                               if (daysRemaining != null)
                                 _InfoRow(
-                                  label: 'الأيام المتبقية تقديريًا',
+                                  label: l.tr('الأيام المتبقية تقديريًا','Estimated days remaining','Jours restants estimés'),
                                   value: _formatNumber(daysRemaining),
                                 ),
                               const SizedBox(height: 12),
@@ -348,7 +352,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                                     child: FilledButton.icon(
                                       onPressed: _addStock,
                                       icon: const Icon(Icons.add),
-                                      label: const Text('إضافة مخزون'),
+                                      label: Text(l.tr('إضافة مخزون','Add stock','Ajouter du stock')),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -356,7 +360,7 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
                                     child: OutlinedButton.icon(
                                       onPressed: _editSettings,
                                       icon: const Icon(Icons.settings),
-                                      label: const Text('الإعدادات'),
+                                      label: Text(l.tr('الإعدادات','Settings','Paramètres')),
                                     ),
                                   ),
                                 ],

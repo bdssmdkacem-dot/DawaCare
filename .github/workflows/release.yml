@@ -1,0 +1,92 @@
+name: Build DawaCare Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build signed Android release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Generate DawaCare launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Verify generated launcher resources
+        run: |
+          test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Prepare Android signing
+        env:
+          KEYSTORE_B64: ${{ secrets.DAWACARE_UPLOAD_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.DAWACARE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.DAWACARE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.DAWACARE_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64"
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+
+          echo "$KEYSTORE_B64" | base64 --decode > android/dawacare-release.jks
+
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=dawacare-release.jks
+          EOF
+
+          test -s android/dawacare-release.jks
+          test -s android/key.properties
+
+      - name: Build signed APK
+        run: flutter build apk --release
+
+      - name: Build signed AAB
+        run: flutter build appbundle --release
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dawacare-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: dawacare-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Cleanup signing files
+        if: always()
+        run: |
+          rm -f android/dawacare-release.jks
+          rm -f android/key.properties

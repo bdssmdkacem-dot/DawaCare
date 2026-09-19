@@ -96,49 +96,49 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   String _timeValue(TimeOfDay time) =>
       '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 
-  String _unitLabel(String unit) => <String, String>{
-        'tablet': 'قرص',
-        'capsule': 'كبسولة',
-        'ml': 'مل',
-        'drop': 'قطرة',
-        'injection': 'حقنة',
-        'unit': 'وحدة',
-      }[unit] ?? 'وحدة';
+  String _unitLabel(String unit, AppLocalizations l) => <String, String>{
+        'tablet': l.tr('قرص', 'Tablet', 'Comprimé'),
+        'capsule': l.tr('كبسولة', 'Capsule', 'Gélule'),
+        'ml': l.tr('مل', 'mL', 'mL'),
+        'drop': l.tr('قطرة', 'drop', 'gouttes'),
+        'injection': l.tr('حقنة', 'injection', 'injection'),
+        'unit': l.tr('وحدة', 'unit', 'unité'),
+      }[unit] ?? l.tr('وحدة', 'unit', 'unité');
 
-  String _formHint() {
+  String _formHint(AppLocalizations l) {
     switch (_form) {
       case 'قرص':
       case 'كبسولة':
-        return 'مثال: 1 ${_unitLabel(_unit)} في كل جرعة';
+        return l.tr('مثال: 1 ${_unitLabel(_unit, l)} في كل جرعة','Example: 1 ${_unitLabel(_unit, l)} per dose','Exemple : 1 ${_unitLabel(_unit, l)} par dose');
       case 'شراب':
-        return 'مثال: 5 مل في كل جرعة';
+        return l.tr('مثال: 5 مل في كل جرعة','Example: 5 mL per dose','Exemple : 5 mL par dose');
       case 'قطرة':
-        return 'مثال: 2 قطرة في كل جرعة';
+        return l.tr('مثال: 2 قطرة في كل جرعة','Example: 2 drops per dose','Exemple : 2 gouttes par dose');
       case 'حقنة':
-        return 'مثال: 1 حقنة في كل جرعة';
+        return l.tr('مثال: 1 حقنة في كل جرعة','Example: 1 injection per dose','Exemple : 1 injection par dose');
       case 'كريم/مرهم':
-        return 'مثال: كمية مناسبة في كل استعمال';
+        return l.tr('مثال: كمية مناسبة في كل استعمال','Example: an appropriate amount per use','Exemple : quantité appropriée par utilisation');
       case 'بخاخ':
-        return 'مثال: 2 بخة في كل استعمال';
+        return l.tr('مثال: 2 بخة في كل استعمال','Example: 2 sprays per use','Exemple : 2 pulvérisations par utilisation');
       default:
-        return 'أدخل الكمية في كل جرعة';
+        return l.tr('أدخل الكمية في كل جرعة','Enter the amount per dose','Saisissez la quantité par dose');
     }
   }
 
-  String _frequencyHint() {
+  String _frequencyHint(AppLocalizations l) {
     switch (_frequency) {
       case _Frequency.daily:
-        return 'جرعة واحدة يوميًا في الوقت الذي تختاره.';
+        return l.tr('جرعة واحدة يوميًا في الوقت الذي تختاره.','One dose per day at the time you choose.','Une dose par jour à l’heure choisie.');
       case _Frequency.timesPerDay:
-        return 'سيتم توزيع الجرعات تلقائيًا على اليوم بدءًا من الوقت المحدد.';
+        return l.tr('سيتم توزيع الجرعات تلقائيًا على اليوم بدءًا من الوقت المحدد.','Doses will be distributed automatically throughout the day starting from the selected time.','Les doses seront réparties automatiquement dans la journée à partir de l’heure choisie.');
       case _Frequency.everyHours:
-        return 'الفاصل يجب أن يقسم 24 ساعة، مثل 4 أو 6 أو 8 أو 12.';
+        return l.tr('الفاصل يجب أن يقسم 24 ساعة، مثل 4 أو 6 أو 8 أو 12.','The interval must divide 24 hours, such as 4, 6, 8, or 12.','L’intervalle doit diviser 24 heures, par exemple 4, 6, 8 ou 12.');
       case _Frequency.specificDays:
-        return 'اختر الأيام التي يجب أن تظهر فيها الجرعة.';
+        return l.tr('اختر الأيام التي يجب أن تظهر فيها الجرعة.','Choose the days on which the dose should appear.','Choisissez les jours où la dose doit apparaître.');
       case _Frequency.once:
-        return 'هذه الجرعة تُنشأ مرة واحدة فقط.';
+        return l.tr('هذه الجرعة تُنشأ مرة واحدة فقط.','This dose is created only once.','Cette dose ne sera créée qu’une seule fois.');
       case _Frequency.prn:
-        return 'للأدوية عند الحاجة. سجّل الاستعمال يدويًا عند أخذ الجرعة.';
+        return l.tr('للأدوية عند الحاجة. سجّل الاستعمال يدويًا عند أخذ الجرعة.','For as-needed medicines. Record the use manually when you take the dose.','Pour les médicaments à prendre si nécessaire. Enregistrez l’utilisation manuellement lorsque vous prenez la dose.');
     }
   }
 
@@ -231,7 +231,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
   String? _validatePositive(String? value, String label) {
     final number = _number(value ?? '');
-    if (number == null || number <= 0) return '$label يجب أن يكون أكبر من صفر';
+    if (number == null || number <= 0) return l.tr('$label يجب أن يكون أكبر من صفر', '$label must be greater than zero', '$label doit être supérieur à zéro');
     return null;
   }
 
@@ -241,7 +241,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
     if (_form == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('اختر شكل الدواء أولًا.')),
+        const SnackBar(content: Text(localizations.tr('اختر شكل الدواء أولًا.','Choose the medicine form first.','Choisissez d’abord la forme du médicament.'))),
       );
       return;
     }
@@ -257,7 +257,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       final count = int.tryParse(_times.text) ?? 0;
       if (count < 1 || count > 6) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('عدد المرات يجب أن يكون بين 1 و6.')),
+          const SnackBar(content: Text(localizations.tr('عدد المرات يجب أن يكون بين 1 و6.','The number of times must be between 1 and 6.','Le nombre de prises doit être compris entre 1 et 6.'))),
         );
         return;
       }
@@ -268,7 +268,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       if (hours <= 0 || hours > 24 || 24 % hours != 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('الفاصل يجب أن يقسم 24، مثل 4 أو 6 أو 8 أو 12.'),
+            content: Text(localizations.tr('الفاصل يجب أن يقسم 24، مثل 4 أو 6 أو 8 أو 12.','The interval must divide 24, such as 4, 6, 8, or 12.','L’intervalle doit diviser 24, par exemple 4, 6, 8 ou 12.')),
           ),
         );
         return;
@@ -277,7 +277,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
     if (_end != null && _end!.isBefore(_start)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تاريخ الانتهاء يجب أن يكون بعد البداية.')),
+        const SnackBar(content: Text(localizations.tr('تاريخ الانتهاء يجب أن يكون بعد البداية.','The end date must be after the start date.','La date de fin doit être après la date de début.'))),
       );
       return;
     }
@@ -289,7 +289,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     final dose = _number(_dose.text);
     if (dose == null || dose <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الجرعة يجب أن تكون أكبر من صفر.')),
+        const SnackBar(content: Text(localizations.tr('الجرعة يجب أن تكون أكبر من صفر.','The dose must be greater than zero.','La dose doit être supérieure à zéro.'))),
       );
       return;
     }
@@ -300,7 +300,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     if (_stockEnabled &&
         (stock < 0 || (pack != null && pack <= 0) || threshold < 0)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تحقق من قيم المخزون.')),
+        const SnackBar(content: Text(localizations.tr('تحقق من قيم المخزون.','Check the stock values.','Vérifiez les valeurs du stock.'))),
       );
       return;
     }
@@ -421,7 +421,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
             children: [
               _imageCard(),
               const SizedBox(height: 22),
-              _header('1', 'بيانات الدواء'),
+              _header('1', localizations.tr('بيانات الدواء','Medicine details','Informations du médicament')),
               const SizedBox(height: 10),
               _formSelector(),
               const SizedBox(height: 14),
@@ -440,12 +440,12 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 controller: _strength,
                 decoration: InputDecoration(
                   labelText: localizations.strength,
-                  hintText: 'مثال: 500 mg',
+                  hintText: localizations.tr('مثال: 500 mg','Example: 500 mg','Exemple : 500 mg'),
                   prefixIcon: const Icon(Icons.science_rounded),
                 ),
               ),
               const SizedBox(height: 22),
-              _header('2', 'الجرعة والتوقيت'),
+              _header('2', localizations.tr('الجرعة والتوقيت','Dose and timing','Dose et horaires')),
               const SizedBox(height: 10),
               _frequencySelector(),
               const SizedBox(height: 10),
@@ -472,9 +472,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         decimal: true,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'كمية الجرعة',
+                        labelText: localizations.doseAmount,
                         prefixIcon: const Icon(Icons.exposure_plus_1_rounded),
-                        suffixText: _unitLabel(_unit),
+                        suffixText: _unitLabel(_unit, localizations),
                         helperText: _formHint(),
                       ),
                       validator: (value) =>
@@ -488,13 +488,13 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         controller: _times,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          labelText: 'مرات/اليوم',
-                          suffixText: 'مرات',
+                          labelText: localizations.tr('مرات/اليوم','Times/day','Prises/jour'),
+                          suffixText: localizations.tr('مرات','times','fois'),
                         ),
                         validator: (value) {
                           final count = int.tryParse(value ?? '');
                           return count == null || count < 1 || count > 6
-                              ? '1 إلى 6'
+                              ? localizations.tr('1 إلى 6','1 to 6','1 à 6')
                               : null;
                         },
                       ),
@@ -507,8 +507,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         controller: _hours,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
-                          labelText: 'الفاصل',
-                          suffixText: 'ساعات',
+                          labelText: localizations.tr('الفاصل','Interval','Intervalle'),
+                          suffixText: localizations.tr('ساعات','hours','heures'),
                         ),
                         validator: (value) {
                           final hours = int.tryParse(value ?? '');
@@ -529,8 +529,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.access_time_rounded),
-                    title: const Text('أول وقت للجرعة'),
-                    subtitle: const Text('سيتم إنشاء بقية الأوقات تلقائيًا حسب النمط.'),
+                    title: Text(localizations.tr('أول وقت للجرعة','First dose time','Première heure de prise')),
+                    subtitle: Text(localizations.tr('سيتم إنشاء بقية الأوقات تلقائيًا حسب النمط.','The remaining times will be created automatically based on the pattern.','Les autres horaires seront créés automatiquement selon le schéma.')),
                     trailing: Text(
                       _time.format(context),
                       style: const TextStyle(fontWeight: FontWeight.w900),
@@ -567,24 +567,21 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.health_and_safety_rounded),
-                    title: const Text('دواء عند الحاجة'),
-                    subtitle: const Text(
-                      'لن يتم إنشاء أوقات ثابتة. استخدم تسجيل الجرعة عند استعمال الدواء.',
-                    ),
+                    title: Text(localizations.asNeeded),
+                    subtitle: Text(localizations.tr('لن يتم إنشاء أوقات ثابتة. استخدم تسجيل الجرعة عند استعمال الدواء.','No fixed times will be created. Record the dose when you use the medicine.','Aucun horaire fixe ne sera créé. Enregistrez la dose lorsque vous utilisez le médicament.')),
                   ),
                 ),
               ],
               const SizedBox(height: 22),
-              _header('3', 'المخزون'),
+              _header('3', localizations.tr('المخزون','Stock','Stock')),
               const SizedBox(height: 8),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
-                title: const Text(
-                  'تتبع المخزون',
+                title: Text(localizations.tr('تتبع المخزون','Track stock','Suivre le stock'),
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
                 subtitle: Text(
-                  'الوحدة الحالية: ${_unitLabel(_unit)} — سيُستخدم معدل الجرعة لعرض الأيام المتبقية.',
+                  localizations.tr('الوحدة الحالية: ${_unitLabel(_unit, localizations)} — سيُستخدم معدل الجرعة لعرض الأيام المتبقية.','Current unit: ${_unitLabel(_unit, localizations)} — the dose rate will be used to show remaining days.','Unité actuelle : ${_unitLabel(_unit, localizations)} — le rythme de dose servira à afficher les jours restants.'),
                 ),
                 value: _stockEnabled,
                 onChanged: (value) => setState(() => _stockEnabled = value),
@@ -599,13 +596,13 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                           decimal: true,
                         ),
                         decoration: InputDecoration(
-                          labelText: 'الكمية الحالية',
+                          labelText: localizations.tr('الكمية الحالية','Current quantity','Quantité actuelle'),
                           suffixText: _unitLabel(_unit),
                         ),
                         validator: (value) {
                           final number = _number(value ?? '');
                           return number == null || number < 0
-                              ? 'قيمة صحيحة'
+                              ? localizations.tr('قيمة صحيحة','Enter a valid value','Valeur valide')
                               : null;
                         },
                       ),
@@ -618,7 +615,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                           decimal: true,
                         ),
                         decoration: InputDecoration(
-                          labelText: 'محتوى العبوة',
+                          labelText: localizations.tr('محتوى العبوة','Package quantity','Contenu de la boîte'),
                           suffixText: _unitLabel(_unit),
                         ),
                         validator: (value) {
@@ -639,7 +636,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                     decimal: true,
                   ),
                   decoration: InputDecoration(
-                    labelText: 'حد المخزون المنخفض',
+                    labelText: localizations.tr('حد المخزون المنخفض','Low stock threshold','Seuil de stock faible'),
                     suffixText: _unitLabel(_unit),
                   ),
                   validator: (value) {
@@ -651,16 +648,16 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 ),
               ],
               const SizedBox(height: 22),
-              _header('4', 'مدة العلاج والتعليمات'),
+              _header('4', localizations.tr('مدة العلاج والتعليمات','Treatment duration and instructions','Durée du traitement et instructions')),
               const SizedBox(height: 8),
               _dateTile(
-                'تاريخ البدء',
+                localizations.startDate,
                 DateTimeUtils.formatShortDate(_start),
                 () => _pickDate(true),
               ),
               _dateTile(
-                'تاريخ الانتهاء',
-                _end == null ? 'بدون تاريخ انتهاء' : DateTimeUtils.formatShortDate(_end!),
+                localizations.endDateOptional,
+                _end == null ? localizations.tr('بدون تاريخ انتهاء','No end date','Sans date de fin') : DateTimeUtils.formatShortDate(_end!),
                 () => _pickDate(false),
               ),
               const SizedBox(height: 12),
@@ -669,7 +666,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 maxLines: 3,
                 decoration: InputDecoration(
                   labelText: localizations.instructionsOptional,
-                  hintText: 'مثال: بعد الأكل، مع كوب ماء…',
+                  hintText: localizations.tr('مثال: بعد الأكل، مع كوب ماء…','Example: after food, with a glass of water…','Exemple : après le repas, avec un verre d’eau…'),
                   prefixIcon: const Icon(Icons.notes_rounded),
                 ),
               ),
@@ -707,13 +704,13 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         ],
       );
 
-  Widget _formSelector() => Wrap(
+  Widget _formSelector() { final localizations = AppLocalizations.of(context); return Wrap(
         spacing: 8,
         runSpacing: 8,
         children: _forms.map((form) {
           return ChoiceChip(
             avatar: Icon(_formIcon(form), size: 18),
-            label: Text(form),
+            label: Text(localizations.dosageFormLabel(form)),
             selected: _form == form,
             onSelected: (_) {
               setState(() {
@@ -730,7 +727,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
             },
           );
         }).toList(),
-      );
+      ); }
 
   IconData _formIcon(String form) {
     switch (form) {
@@ -753,18 +750,18 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     }
   }
 
-  Widget _frequencySelector() => Wrap(
+  Widget _frequencySelector() { final localizations = AppLocalizations.of(context); return Wrap(
         spacing: 8,
         runSpacing: 8,
         children: [
-          _freq('مرة يوميًا', _Frequency.daily),
-          _freq('مرات في اليوم', _Frequency.timesPerDay),
-          _freq('كل X ساعات', _Frequency.everyHours),
-          _freq('أيام محددة', _Frequency.specificDays),
-          _freq('مرة واحدة', _Frequency.once),
-          _freq('عند الحاجة', _Frequency.prn),
+          _freq(localizations.daily, _Frequency.daily),
+          _freq(localizations.tr('مرات في اليوم','Times per day','Fois par jour'), _Frequency.timesPerDay),
+          _freq(localizations.tr('كل X ساعات','Every X hours','Toutes les X heures'), _Frequency.everyHours),
+          _freq(localizations.specificDays, _Frequency.specificDays),
+          _freq(localizations.once, _Frequency.once),
+          _freq(localizations.asNeeded, _Frequency.prn),
         ],
-      );
+      ); }
 
   Widget _freq(String text, _Frequency frequency) => ChoiceChip(
         label: Text(text),
@@ -784,7 +781,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         ),
       );
 
-  Widget _imageCard() => InkWell(
+  Widget _imageCard() { final localizations = AppLocalizations.of(context); return InkWell(
         onTap: _pickImage,
         borderRadius: BorderRadius.circular(22),
         child: Container(
@@ -807,7 +804,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'إضافة صورة الدواء',
+                      localizations.addMedicinePhoto,
                       style: TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ],
@@ -821,5 +818,5 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   ),
                 ),
         ),
-      );
+      ); } 
 }

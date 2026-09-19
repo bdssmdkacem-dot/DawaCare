@@ -5,6 +5,7 @@ class UserProfile {
   final String? avatarUrl;
   final String timezone;
   final String familyCode;
+  final String language;
   final DateTime createdAt;
 
   const UserProfile({
@@ -14,10 +15,12 @@ class UserProfile {
     this.avatarUrl,
     required this.timezone,
     required this.familyCode,
+    this.language = 'ar',
     required this.createdAt,
   });
 
   factory UserProfile.fromMap(Map<String, dynamic> map) {
+    final language = (map['language'] as String?) ?? 'ar';
     return UserProfile(
       id: map['id'] as String,
       fullName: (map['full_name'] as String?) ?? '',
@@ -25,6 +28,7 @@ class UserProfile {
       avatarUrl: map['avatar_url'] as String?,
       timezone: (map['timezone'] as String?) ?? 'Africa/Casablanca',
       familyCode: (map['family_code'] as String?) ?? '',
+      language: ['ar', 'en', 'fr'].contains(language) ? language : 'ar',
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
@@ -34,9 +38,17 @@ class UserProfile {
         'phone': phone,
         'avatar_url': avatarUrl,
         'timezone': timezone,
+        'language': language,
       };
 
-  UserProfile copyWith({String? fullName, String? phone, String? avatarUrl, String? timezone}) {
+  UserProfile copyWith({
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    String? timezone,
+    String? language,
+  }) {
+    final nextLanguage = language ?? this.language;
     return UserProfile(
       id: id,
       fullName: fullName ?? this.fullName,
@@ -44,6 +56,7 @@ class UserProfile {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       timezone: timezone ?? this.timezone,
       familyCode: familyCode,
+      language: ['ar', 'en', 'fr'].contains(nextLanguage) ? nextLanguage : this.language,
       createdAt: createdAt,
     );
   }

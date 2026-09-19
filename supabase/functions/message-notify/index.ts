@@ -27,10 +27,16 @@ Deno.serve(async (req) => {
   if (old && old.sent_count > 0) return json({ sent: old.sent_count, duplicate: true });
 
   const { data: sender } = await admin.from('profiles').select('full_name,avatar_url').eq('id', message.sender_id).single();
-  const senderName = sender?.full_name || 'جهة اتصالك';
+  const { data: recipientProfile } = await admin.from('profiles').select('language').eq('id', message.recipient_id).maybeSingle();
+  const language = recipientProfile?.language === 'en' || recipientProfile?.language === 'fr' ? recipientProfile.language : 'ar';
+  const senderName = sender?.full_name || (language === 'en' ? 'Your contact' : language === 'fr' ? 'Votre contact' : 'جهة اتصالك');
   const avatarUrl = typeof sender?.avatar_url === 'string' && sender.avatar_url.length > 0 ? sender.avatar_url : undefined;
   const title = senderName;
-  const text = message.message_type === 'text' ? (message.body || 'لديك رسالة جديدة.') : message.message_type === 'voice' ? '🎙️ رسالة صوتية' : '🖼️ صورة';
+  const text = message.message_type === 'text'
+    ? (message.body || (language === 'en' ? 'You have a new message.' : language === 'fr' ? 'Vous avez un nouveau message.' : 'لديك رسالة جديدة.'))
+    : message.message_type === 'voice'
+      ? (language === 'en' ? '🎙️ Voice message' : language === 'fr' ? '🎙️ Message vocal' : '🎙️ رسالة صوتية')
+      : (language === 'en' ? '🖼️ Image' : language === 'fr' ? '🖼️ Image' : '🖼️ صورة');
 
   const { data: devices, error: devicesError } = await admin.from('devices').select('id,push_token').eq('user_id', message.recipient_id).not('push_token', 'is', null);
   if (devicesError) return json({ error: devicesError.message }, 500);

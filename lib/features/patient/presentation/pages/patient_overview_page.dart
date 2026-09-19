@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/loading_indicator.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../models/dose_instance.dart';
 import '../../../../models/medication.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -60,6 +61,7 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final profile = context.watch<AuthProvider>().profile;
     final doses = context.watch<DoseProvider>();
     final medications = context.watch<MedicationProvider>();
@@ -88,10 +90,10 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('حالتي اليوم'),
+        title: Text(l.tr('حالتي اليوم','My day','Ma journée')),
         actions: [
           IconButton(
-            tooltip: 'الملف الشخصي',
+            tooltip: l.tr('الملف الشخصي','Profile','Profil'),
             icon: _avatar(profile.avatarUrl, 20),
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfilePage())),
           ),
@@ -123,12 +125,12 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
             else
               _allDone(today.isNotEmpty),
             const SizedBox(height: 18),
-            _sectionHeader('أدويتي', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MedicationListPage()))),
+            _sectionHeader(l.medicines, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MedicationListPage()))),
             const SizedBox(height: 10),
             if (medications.isLoading && medications.medications.isEmpty)
               const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
             else if (medications.medications.isEmpty)
-              _emptyCard('لا توجد أدوية مسجلة حاليًا.')
+              _emptyCard(l.tr('لا توجد أدوية مسجلة حاليًا.','No medicines are currently registered.','Aucun médicament n’est actuellement enregistré.'))
             else
               ...medications.medications.take(4).map((medication) {
                 final schedules = medications.schedulesByMedicationId[medication.id] ?? const [];
@@ -161,7 +163,7 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
               TextButton.icon(
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MedicationListPage())),
                 icon: const Icon(Icons.arrow_forward_rounded),
-                label: const Text('عرض كل الأدوية'),
+                label: Text(l.tr('عرض كل الأدوية','View all medicines','Voir tous les médicaments')),
               ),
           ],
         ),
@@ -191,11 +193,11 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [const Icon(Icons.today_rounded, color: AppColors.primary), const SizedBox(width: 8), const Text('ملخص اليوم', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const Spacer(), Text('$taken / $total', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary))]),
+              Row(children: [const Icon(Icons.today_rounded, color: AppColors.primary), const SizedBox(width: 8), Text(l.tr('ملخص اليوم','Today’s summary','Résumé du jour'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const Spacer(), Text('$taken / $total', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary))]),
               const SizedBox(height: 14),
               ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: progress, minHeight: 9)),
               const SizedBox(height: 12),
-              Row(children: [Expanded(child: _metric(Icons.check_circle_rounded, '$taken', 'تم أخذها', AppColors.success)), Expanded(child: _metric(Icons.schedule_rounded, '$pending', 'مفتوحة', AppColors.warning)), Expanded(child: _metric(Icons.warning_rounded, '$missed', 'فائتة', AppColors.danger))]),
+              Row(children: [Expanded(child: _metric(Icons.check_circle_rounded, '$taken', l.tr('تم أخذها','Taken','Prises'), AppColors.success)), Expanded(child: _metric(Icons.schedule_rounded, '$pending', l.tr('مفتوحة','Pending','En attente'), AppColors.warning)), Expanded(child: _metric(Icons.warning_rounded, '$missed', l.tr('فائتة','Missed','Manquées'), AppColors.danger))]),
             ],
           ),
         ),
@@ -208,8 +210,8 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
             backgroundColor: AppColors.primary.withValues(alpha: .10),
             child: const Icon(Icons.insights_rounded, color: AppColors.primary),
           ),
-          title: Text('الالتزام اليومي · ${summary.percentage.round()}%', style: const TextStyle(fontWeight: FontWeight.w900)),
-          subtitle: Text(summary.resolved == 0 ? 'لا توجد جرعات محسومة بعد.' : '${summary.taken} مأخوذة من ${summary.resolved} جرعات محسومة'),
+          title: Text(l.tr('الالتزام اليومي · ${summary.percentage.round()}%','Daily adherence · ${summary.percentage.round()}%','Observance quotidienne · ${summary.percentage.round()}%'), style: const TextStyle(fontWeight: FontWeight.w900)),
+          subtitle: Text(summary.resolved == 0 ? l.tr('لا توجد جرعات محسومة بعد.','No resolved doses yet.','Aucune dose traitée pour le moment.') : l.tr('${summary.taken} مأخوذة من ${summary.resolved} جرعات محسومة','${summary.taken} taken out of ${summary.resolved} resolved doses','${summary.taken} prises sur ${summary.resolved} doses traitées')),
           trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdherenceHistoryPage())),
         ),
@@ -219,18 +221,18 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
 
   Widget _allDone(bool hadDoses) => Card(
         elevation: 0,
-        child: Padding(padding: const EdgeInsets.all(22), child: Column(children: [Icon(hadDoses ? Icons.celebration_rounded : Icons.event_available_rounded, size: 40, color: AppColors.success), const SizedBox(height: 8), Text(hadDoses ? 'أكملت الجرعات المحسومة اليوم 🎉' : 'لا توجد جرعات اليوم', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(hadDoses ? 'يمكنك مراجعة سجل الالتزام لمتابعة تقدمك.' : 'يمكنك مراجعة أدويتك أو إضافة دواء جديد.')])) ,
+        child: Padding(padding: const EdgeInsets.all(22), child: Column(children: [Icon(hadDoses ? Icons.celebration_rounded : Icons.event_available_rounded, size: 40, color: AppColors.success), const SizedBox(height: 8), Text(hadDoses ? l.tr('أكملت الجرعات المحسومة اليوم 🎉','You completed today’s resolved doses 🎉','Vous avez terminé les doses traitées du jour 🎉') : l.tr('لا توجد جرعات اليوم','No doses today','Aucune dose aujourd’hui'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(hadDoses ? l.tr('يمكنك مراجعة سجل الالتزام لمتابعة تقدمك.','You can review your adherence history to track your progress.','Vous pouvez consulter votre historique d’observance pour suivre vos progrès.') : l.tr('يمكنك مراجعة أدويتك أو إضافة دواء جديد.','You can review your medicines or add a new one.','Vous pouvez consulter vos médicaments ou en ajouter un nouveau.'))])) ,
       );
 
-  Widget _sectionHeader(String title, VoidCallback onMore) => Row(children: [Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900)), const Spacer(), TextButton(onPressed: onMore, child: const Text('عرض الكل'))]);
+  Widget _sectionHeader(String title, VoidCallback onMore) => Row(children: [Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900)), const Spacer(), TextButton(onPressed: onMore, child: Text(l.tr('عرض الكل','View all','Voir tout')))]);
 
   Widget _emptyCard(String text) => Card(elevation: 0, child: Padding(padding: const EdgeInsets.all(18), child: Text(text)));
 
   Widget _stockSummary(dynamic medication, double? days, bool low, bool empty) {
     if (!medication.stockEnabled) return const Icon(Icons.inventory_2_outlined, size: 22);
-    if (empty) return const Tooltip(message: 'نفد المخزون', child: Icon(Icons.error_rounded, color: AppColors.danger));
-    if (low) return Tooltip(message: 'المخزون منخفض', child: const Icon(Icons.warning_rounded, color: AppColors.warning));
-    if (days != null) return Text('${days.floor()} يوم', style: const TextStyle(fontWeight: FontWeight.w800));
+    if (empty) return const Tooltip(message: l.tr('نفد المخزون','Out of stock','Stock épuisé'), child: Icon(Icons.error_rounded, color: AppColors.danger));
+    if (low) return Tooltip(message: l.tr('المخزون منخفض','Low stock','Stock faible'), child: const Icon(Icons.warning_rounded, color: AppColors.warning));
+    if (days != null) return Text(l.tr('${days.floor()} يوم','${days.floor()} days','${days.floor()} jours'), style: const TextStyle(fontWeight: FontWeight.w800));
     return Text('${medication.stockQuantity}', style: const TextStyle(fontWeight: FontWeight.w800));
   }
 

@@ -229,7 +229,7 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
 
   Widget _stockSummary(dynamic medication, double? days, bool low, bool empty) {
     if (!medication.stockEnabled) return const Icon(Icons.inventory_2_outlined, size: 22);
-    if (empty) return const Tooltip(message: AppLocalizations.of(context).tr('نفد المخزون','Out of stock','Stock épuisé'), child: Icon(Icons.error_rounded, color: AppColors.danger));
+    if (empty) return Tooltip(message: AppLocalizations.of(context).tr('نفد المخزون','Out of stock','Stock épuisé'), child: const Icon(Icons.error_rounded, color: AppColors.danger));
     if (low) return Tooltip(message: AppLocalizations.of(context).tr('المخزون منخفض','Low stock','Stock faible'), child: const Icon(Icons.warning_rounded, color: AppColors.warning));
     if (days != null) return Text(AppLocalizations.of(context).tr('${days.floor()} يوم','${days.floor()} days','${days.floor()} jours'), style: const TextStyle(fontWeight: FontWeight.w800));
     return Text('${medication.stockQuantity}', style: const TextStyle(fontWeight: FontWeight.w800));

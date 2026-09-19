@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
         notification: { title, body: text.slice(0, 180), ...(avatarUrl ? { image: avatarUrl } : {}) },
         data: { type: 'CHAT_MESSAGE', message_id: message.id, patient_id: message.patient_id, chat_message_type: message.message_type, sender_id: message.sender_id, ...(avatarUrl ? { sender_avatar_url: avatarUrl } : {}) },
         android: { priority: 'high', notification: { channel_id: 'caregiver_alerts_v2', sound: 'default', notification_priority: 'PRIORITY_HIGH', ...(avatarUrl ? { image: avatarUrl } : {}) } },
-      }});
+      }}) });
       if (response.ok) sent++;
       else if (response.status === 404 || response.status === 410) await admin.from('devices').delete().eq('id', device.id);
     } catch (e) { console.error('FCM', e); }

@@ -324,12 +324,13 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Column(
       children: [
         const SizedBox(height: 32),
         const Icon(Icons.people_outline, size: 64),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           l.tr('لا يوجد أفراد مرتبطون بعد. يمكنك إنشاء رمز لإرساله، أو إدخال رمز أرسله لك أحد أفراد العائلة.', 'No linked family members yet. You can create a code to send or enter a code from a family member.', 'Aucun membre de la famille lié. Vous pouvez créer un code à envoyer ou saisir un code reçu.'),
           textAlign: TextAlign.center,
         ),

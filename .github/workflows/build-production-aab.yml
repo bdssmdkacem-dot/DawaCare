@@ -1,0 +1,125 @@
+name: Build DawaCare Production AAB
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-production-aab.yml"
+
+env:
+  FLUTTER_VERSION: "3.44.0"
+  SUPABASE_URL_DEFAULT: "https://lwdwlfhytdetziqfbgje.supabase.co"
+  SUPABASE_ANON_KEY_DEFAULT: "sb_publishable_NqPkzToL2OQo5Zs3UOTkYw_vd0HAHdY"
+
+jobs:
+  analyze_and_test:
+    name: Analyze & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze
+        continue-on-error: true
+
+      - name: Unit tests
+        run: flutter test
+
+  build_aab:
+    name: Build production AAB
+    needs: analyze_and_test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Generate DawaCare launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Verify generated launcher resources
+        run: |
+          test -f android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+
+      - name: Write key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.KEYSTORE_STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEYSTORE_KEY_ALIAS }}
+          storeFile=app/upload-keystore.jks
+          EOF
+
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          else
+            echo "GOOGLE_SERVICES_JSON is not configured; skipping Firebase config."
+          fi
+
+      - name: Resolve Supabase build configuration
+        env:
+          SUPABASE_URL_SECRET: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY_SECRET: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          SUPABASE_URL="${SUPABASE_URL_SECRET:-${SUPABASE_URL_DEFAULT}}"
+          SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY_SECRET:-${SUPABASE_ANON_KEY_DEFAULT}}"
+
+          case "$SUPABASE_URL" in
+            https://*.supabase.co) ;;
+            *)
+              echo "ERROR: SUPABASE_URL must be an absolute https://*.supabase.co URL."
+              exit 1
+              ;;
+          esac
+
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "ERROR: SUPABASE_ANON_KEY is empty."
+            exit 1
+          fi
+
+          {
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Build Android App Bundle
+        run: |
+          flutter build appbundle --release \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dawacare-production-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30

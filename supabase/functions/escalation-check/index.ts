@@ -228,6 +228,16 @@ async function sendPushToUser(
   if (!FCM_SERVICE_ACCOUNT_JSON) return;
   const account: ServiceAccount = JSON.parse(FCM_SERVICE_ACCOUNT_JSON);
   const accessToken = await getAccessToken(account);
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('language')
+    .eq('id', userId)
+    .maybeSingle();
+  const language =
+    profile?.language === 'en' || profile?.language === 'fr'
+      ? profile.language
+      : 'ar';
+
   const { data: devices } = await supabase
     .from('devices')
     .select('push_token')

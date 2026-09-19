@@ -199,8 +199,8 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: unit,
-                decoration: const InputDecoration(labelText: l.tr('الوحدة','Unit','Unité')),
-                items: const [
+                decoration: InputDecoration(labelText: l.tr('الوحدة','Unit','Unité')),
+                items: [
                   DropdownMenuItem(value: 'unit', child: Text(l.tr('وحدة','Unit','Unité'))),
                   DropdownMenuItem(value: 'tablet', child: Text(l.tr('قرص','Tablet','Comprimé'))),
                   DropdownMenuItem(value: 'capsule', child: Text(l.tr('كبسولة','Capsule','Gélule'))),
@@ -215,19 +215,19 @@ class _MedicationStockDetailPageState extends State<MedicationStockDetailPage> {
               TextField(
                 controller: package,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: l.tr('كمية العبوة','Package quantity','Quantité de la boîte')),
+                decoration: InputDecoration(labelText: l.tr('كمية العبوة','Package quantity','Quantité de la boîte')),
               ),
               TextField(
                 controller: threshold,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: l.tr('حد المخزون المنخفض','Low-stock threshold','Seuil de stock faible')),
+                decoration: InputDecoration(labelText: l.tr('حد المخزون المنخفض','Low-stock threshold','Seuil de stock faible')),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء'),
+              child: Text(l.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),

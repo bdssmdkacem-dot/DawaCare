@@ -296,6 +296,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
   }
 
   List<Widget> _buildFollowedPatients() {
+    final l = AppLocalizations.of(context);
     final widgets = <Widget>[];
     for (final link in _followedPatients) {
       final doses = _followedDoses[link.patientId] ?? const <DoseInstance>[];
@@ -372,6 +373,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
   }
 
   Widget _roleChip(CaregiverRole role) {
+    final l = AppLocalizations.of(context);
     final text = switch (role) {
       CaregiverRole.primary => l.tr('مرافق أساسي','Primary caregiver','Accompagnant principal'),
       CaregiverRole.caregiver => l.tr('مرافق','Caregiver','Accompagnant'),
@@ -483,9 +485,9 @@ class _PatientHomePageState extends State<PatientHomePage> {
                 style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 l.tr('جرعات مكتملة','Doses completed','Doses terminées'),
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
               ),
             ],
           ),

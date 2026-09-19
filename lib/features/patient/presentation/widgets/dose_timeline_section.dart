@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/app_localizations.dart';
+
 import '../../../../app/theme/app_colors.dart';
 import '../../../../models/dose_instance.dart';
 
@@ -14,6 +16,7 @@ class DoseTimelineSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final ordered = [...doses]..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
 
     return Card(
@@ -24,8 +27,8 @@ class DoseTimelineSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'الجدول اليومي',
+            Text(
+              l.tr('الجدول اليومي', 'Daily schedule', 'Planning quotidien'),
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),

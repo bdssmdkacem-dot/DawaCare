@@ -135,6 +135,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _toggleRecording() async {
+    final l = AppLocalizations.of(context);
     if (_sending) return;
     if (_recording) {
       final path = await _service.stopVoiceRecording();
@@ -161,12 +162,13 @@ class _ChatPageState extends State<ChatPage> {
           });
         }
       } catch (_) {
-        _error(AppLocalizations.of(context).tr('تعذر بدء التسجيل.', 'Could not start recording.', 'Impossible de démarrer l’enregistrement.'));
+        _error(l.tr('تعذر بدء التسجيل.', 'Could not start recording.', 'Impossible de démarrer l’enregistrement.'));
       }
     }
   }
 
   Future<void> _run(Future<ChatMessage> Function() action, {bool clearText = false}) async {
+    final l = AppLocalizations.of(context);
     if (!mounted) return;
     setState(() => _sending = true);
     try {
@@ -185,9 +187,9 @@ class _ChatPageState extends State<ChatPage> {
       if (e is ChatSendException) {
         _error(e.diagnostic);
       } else if (e is StateError) {
-        _error(AppLocalizations.of(context).tr('خطأ في الإرسال: ${e.message}', 'Send error: ${e.message}', 'Erreur d’envoi : ${e.message}'));
+        _error(l.tr('خطأ في الإرسال: ${e.message}', 'Send error: ${e.message}', 'Erreur d’envoi : ${e.message}'));
       } else {
-        _error(AppLocalizations.of(context).tr('خطأ في الإرسال: $e', 'Send error: $e', 'Erreur d’envoi : $e'));
+        _error(l.tr('خطأ في الإرسال: $e', 'Send error: $e', 'Erreur d’envoi : $e'));
       }
     } finally {
       if (mounted) {
@@ -205,6 +207,7 @@ class _ChatPageState extends State<ChatPage> {
   Future<String> _urlFor(String path) => _signedUrls.putIfAbsent(path, () => _service.signedUrl(path));
 
   Future<void> _play(ChatMessage m) async {
+    final l = AppLocalizations.of(context);
     try {
       if (_playing == m.id) {
         await _player.stop();
@@ -230,7 +233,7 @@ class _ChatPageState extends State<ChatPage> {
         }
       });
     } catch (e) {
-      _error(AppLocalizations.of(context).tr('تعذر تشغيل الرسالة الصوتية: $e', 'Could not play voice message: $e', 'Impossible de lire le message vocal : $e'));
+      _error(l.tr('تعذر تشغيل الرسالة الصوتية: $e', 'Could not play voice message: $e', 'Impossible de lire le message vocal : $e'));
     }
   }
 

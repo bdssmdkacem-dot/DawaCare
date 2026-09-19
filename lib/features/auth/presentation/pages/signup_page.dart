@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/localization/auth_error_localizer.dart';
+import '../../../../core/localization/locale_controller.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../providers/auth_provider.dart';
 
@@ -34,10 +35,16 @@ class _SignupPageState extends State<SignupPage> {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
     final l10n = AppLocalizations.of(context);
+    final localeController = context.read<LocaleController>();
+    final languageCode =
+        localeController.languageCode ?? Localizations.localeOf(context).languageCode;
+    final normalizedLanguage =
+        ['ar', 'en', 'fr'].contains(languageCode) ? languageCode : 'ar';
     final ok = await auth.signUp(
       email: _emailCtrl.text.trim(),
       password: _passwordCtrl.text,
       fullName: _nameCtrl.text.trim(),
+      languageCode: normalizedLanguage,
     );
     if (!mounted) return;
     if (ok) {

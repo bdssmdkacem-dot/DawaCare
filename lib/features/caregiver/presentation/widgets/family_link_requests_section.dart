@@ -77,6 +77,7 @@ class _IncomingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -104,7 +105,7 @@ class _IncomingCard extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: () => onRespond(request, true),
                       icon: const Icon(Icons.check_rounded),
-                      label: Text(AppLocalizations.of(context).tr('قبول', 'Accept', 'Accepter')),
+                      label: Text(l.tr('قبول', 'Accept', 'Accepter')),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -112,7 +113,7 @@ class _IncomingCard extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () => onRespond(request, false),
                       icon: const Icon(Icons.close_rounded),
-                      label: Text(AppLocalizations.of(context).tr('رفض', 'Reject', 'Refuser')),
+                      label: Text(l.tr('رفض', 'Reject', 'Refuser')),
                     ),
                   ),
                 ],

@@ -116,7 +116,7 @@ class DoseCard extends StatelessWidget {
       final messages = await VoiceMessageService.instance.fetchForDose(dose.patientId, dose.id);
       if (!context.mounted) return;
       if (messages.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يوجد تسجيل صوتي مرتبط بهذه الجرعة.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).tr('لا يوجد تسجيل صوتي مرتبط بهذه الجرعة.', 'No voice recording is linked to this dose.', 'Aucun enregistrement vocal n’est associé à cette dose.'))));
         return;
       }
       await showModalBottomSheet<void>(
@@ -126,7 +126,7 @@ class DoseCard extends StatelessWidget {
       );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذّر تحميل التسجيل الصوتي لهذه الجرعة.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).tr('تعذّر تحميل التسجيل الصوتي لهذه الجرعة.', 'Could not load the voice recording for this dose.', 'Impossible de charger l’enregistrement vocal de cette dose.'))));
     }
   }
 
@@ -158,7 +158,7 @@ class _DoseVoiceSheetState extends State<_DoseVoiceSheet> {
       await VoiceMessageService.instance.markRead(message.id);
       if (mounted) setState(() => _playingId = message.id);
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذّر تشغيل التسجيل الصوتي.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).tr('تعذّر تشغيل التسجيل الصوتي.', 'Could not play the voice recording.', 'Impossible de lire l’enregistrement vocal.'))));
     }
   }
 
@@ -171,14 +171,14 @@ class _DoseVoiceSheetState extends State<_DoseVoiceSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('التسجيل الصوتي للجرعة', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+            Text(AppLocalizations.of(context).tr('التسجيل الصوتي للجرعة', 'Dose voice recording', 'Enregistrement vocal de la dose'), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
             const SizedBox(height: 12),
             ...widget.messages.map((message) {
               final playing = _playingId == message.id;
               return Card(child: ListTile(
                 leading: CircleAvatar(child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded)),
                 title: Text(message.senderName, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text('${_duration(message.durationMs)} • استماع ${message.completedListens}/2'),
+                subtitle: Text('${_duration(message.durationMs)} • ${AppLocalizations.of(context).tr('استماع', 'Listens', 'Écoutes')} ${message.completedListens}/2'),
                 onTap: () => _toggle(message),
               ));
             }),

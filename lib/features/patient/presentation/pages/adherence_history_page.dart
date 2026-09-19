@@ -83,7 +83,6 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
       to: today.add(const Duration(days: 1)),
     );
 
-    final l = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(title: Text(AppLocalizations.of(context).tr('سجل الالتزام','Adherence history','Historique de l’observance'))),

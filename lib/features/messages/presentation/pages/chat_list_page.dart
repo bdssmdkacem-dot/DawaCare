@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/localization/app_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'chat_page.dart';
@@ -107,7 +109,7 @@ class _ChatListPageState extends State<ChatListPage> {
 
         list.add({
           'id': contactId,
-          'name': profile['full_name'] ?? 'مستخدم',
+          'name': profile['full_name'] ?? AppLocalizations.of(context).tr('مستخدم', 'User', 'Utilisateur'),
           'avatar': profile['avatar_url'],
           'patient_id': contact['patient_id'],
         });
@@ -120,7 +122,7 @@ class _ChatListPageState extends State<ChatListPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر تحميل جهات الاتصال.')),
+          SnackBar(content: Text(AppLocalizations.of(context).tr('تعذر تحميل جهات الاتصال.', 'Could not load contacts.', 'Impossible de charger les contacts.'))),
         );
       }
     } finally {
@@ -131,7 +133,7 @@ class _ChatListPageState extends State<ChatListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('المحادثات')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context).tr('المحادثات', 'Chats', 'Conversations'))),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -140,7 +142,7 @@ class _ChatListPageState extends State<ChatListPage> {
                   ? ListView(
                       children: const [
                         SizedBox(height: 120),
-                        Center(child: Text('لا توجد جهات مرتبطة للمحادثة.')),
+                        Center(child: Text(AppLocalizations.of(context).tr('لا توجد جهات مرتبطة للمحادثة.', 'No linked contacts for chat.', 'Aucun contact lié pour discuter.'))),
                       ],
                     )
                   : ListView.separated(
@@ -164,7 +166,7 @@ class _ChatListPageState extends State<ChatListPage> {
                               c['name'] as String,
                               style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
-                            subtitle: const Text('رسالة نصية أو صوتية أو صورة'),
+                            subtitle: Text(AppLocalizations.of(context).tr('رسالة نصية أو صوتية أو صورة', 'Text, voice or image message', 'Message texte, vocal ou image')),
                             trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(

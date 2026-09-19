@@ -24,6 +24,7 @@ class _ChatListPageState extends State<ChatListPage> {
   }
 
   Future<void> _load() async {
+    final l = AppLocalizations.of(context);
     final id = _db.auth.currentUser?.id;
     if (id == null) return;
 
@@ -109,7 +110,7 @@ class _ChatListPageState extends State<ChatListPage> {
 
         list.add({
           'id': contactId,
-          'name': profile['full_name'] ?? AppLocalizations.of(context).tr('مستخدم', 'User', 'Utilisateur'),
+          'name': profile['full_name'] ?? l.tr('مستخدم', 'User', 'Utilisateur'),
           'avatar': profile['avatar_url'],
           'patient_id': contact['patient_id'],
         });
@@ -122,7 +123,7 @@ class _ChatListPageState extends State<ChatListPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context).tr('تعذر تحميل جهات الاتصال.', 'Could not load contacts.', 'Impossible de charger les contacts.'))),
+          SnackBar(content: Text(l.tr('تعذر تحميل جهات الاتصال.', 'Could not load contacts.', 'Impossible de charger les contacts.'))),
         );
       }
     } finally {

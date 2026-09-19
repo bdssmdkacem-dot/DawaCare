@@ -44,6 +44,7 @@ android {
             keyPassword = keystoreProperties["keyPassword"] as String?
             storeFile = keystoreProperties["storeFile"]?.let { rootProject.file(it) }
             storePassword = keystoreProperties["storePassword"] as String?
+            storeType = keystoreProperties["storeType"] as String?
         }
     }
 

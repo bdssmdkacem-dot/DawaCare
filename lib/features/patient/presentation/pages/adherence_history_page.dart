@@ -121,11 +121,11 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Icon(Icons.insights_rounded, color: AppColors.primary),
                 SizedBox(width: 8),
-                Text(AppLocalizations.of(context).tr('هذا الأسبوع','This week','Cette semaine'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                Text(AppLocalizations.of(context).tr('هذا الأسبوع','This week','Cette semaine'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
               ],
             ),
             const SizedBox(height: 14),

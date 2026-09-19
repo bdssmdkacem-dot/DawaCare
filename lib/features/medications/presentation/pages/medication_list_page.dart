@@ -143,7 +143,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
-            labelText: medication.stockEnabled ? 'الكمية المضافة' : 'الكمية الموجودة الآن',
+            labelText: l.tr('الكمية المضافة','Added quantity','Quantité ajoutée'),
             suffixText: _unitLabel(medication.stockEnabled ? medication.stockUnit : medication.dosageForm),
           ),
         ),
@@ -154,7 +154,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
               final value = double.tryParse(controller.text.trim().replaceAll(',', '.'));
               if (value != null && value > 0) Navigator.pop(ctx, value);
             },
-            child: const Text('حفظ'),
+            child: Text(l.saveMedicine),
           ),
         ],
       ),
@@ -164,7 +164,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
     final ok = await context.read<MedicationProvider>().addMedicationStock(medication: medication, quantity: quantity);
     if (!mounted || ok) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(context.read<MedicationProvider>().error ?? 'تعذر تحديث المخزون')),
+      SnackBar(content: Text(context.read<MedicationProvider>().error ?? l.unexpectedError)),
     );
   }
 
@@ -241,15 +241,15 @@ class _MedicationListPageState extends State<MedicationListPage> {
         title: Text(l.medicines),
         actions: [
           PopupMenuButton<_MedicationSort>(
-            tooltip: 'ترتيب',
+            tooltip: l.tr('ترتيب','Sort','Trier'),
             icon: const Icon(Icons.sort_rounded),
             initialValue: _sort,
             onSelected: (value) => setState(() => _sort = value),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: _MedicationSort.nextDose, child: Text('أقرب جرعة')),
-              PopupMenuItem(value: _MedicationSort.name, child: Text('الاسم')),
-              PopupMenuItem(value: _MedicationSort.stock, child: Text('المخزون')),
-              PopupMenuItem(value: _MedicationSort.daysRemaining, child: Text('الأيام المتبقية')),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: _MedicationSort.nextDose, child: Text(l.tr('أقرب جرعة','Next dose','Prochaine dose'))),
+              PopupMenuItem(value: _MedicationSort.name, child: Text(l.tr('الاسم','Name','Nom'))),
+              PopupMenuItem(value: _MedicationSort.stock, child: Text(l.tr('المخزون','Stock','Stock'))),
+              PopupMenuItem(value: _MedicationSort.daysRemaining, child: Text(l.tr('الأيام المتبقية','Days remaining','Jours restants'))),
             ],
           ),
         ],
@@ -287,7 +287,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
             onChanged: (value) => setState(() => _query = value),
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search_rounded),
-              hintText: 'ابحث باسم الدواء أو التركيز أو الشكل',
+              hintText: l.tr('ابحث باسم الدواء أو التركيز أو الشكل','Search by medicine name, strength or form','Rechercher par nom, dosage ou forme'),
               suffixIcon: _query.isEmpty ? null : IconButton(onPressed: () => setState(() => _query = ''), icon: const Icon(Icons.clear_rounded)),
             ),
           ),
@@ -295,17 +295,17 @@ class _MedicationListPageState extends State<MedicationListPage> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(children: [
-              _filterChip('الكل', _MedicationFilter.all, total),
+              _filterChip(l.tr('الكل','All','Tous'), _MedicationFilter.all, total),
               const SizedBox(width: 8),
-              _filterChip('يحتاج انتباه', _MedicationFilter.attention, low + out + ending),
+              _filterChip(l.tr('يحتاج انتباه','Needs attention','Attention requise'), _MedicationFilter.attention, low + out + ending),
               const SizedBox(width: 8),
-              _filterChip('منخفض', _MedicationFilter.lowStock, low),
+              _filterChip(l.tr('منخفض','Low','Faible'), _MedicationFilter.lowStock, low),
               const SizedBox(width: 8),
-              _filterChip('نفد', _MedicationFilter.outOfStock, out),
+              _filterChip(l.tr('نفد','Out of stock','Épuisé'), _MedicationFilter.outOfStock, out),
               const SizedBox(width: 8),
-              _filterChip('ينتهي قريبًا', _MedicationFilter.endingSoon, ending),
+              _filterChip(l.tr('ينتهي قريبًا','Ending soon','Expire bientôt'), _MedicationFilter.endingSoon, ending),
               const SizedBox(width: 8),
-              _filterChip('بدون تتبع', _MedicationFilter.noStock, provider.medications.where((m) => !m.stockEnabled).length),
+              _filterChip(l.tr('بدون تتبع','Not tracked','Sans suivi'), _MedicationFilter.noStock, provider.medications.where((m) => !m.stockEnabled).length),
             ]),
           ),
           const SizedBox(height: 12),
@@ -313,9 +313,9 @@ class _MedicationListPageState extends State<MedicationListPage> {
             Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
               const Icon(Icons.search_off_rounded, size: 42),
               const SizedBox(height: 10),
-              Text('لا توجد أدوية مطابقة', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              Text(l.tr('لا توجد أدوية مطابقة','No matching medicines','Aucun médicament correspondant'), style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 5),
-              const Text('جرّب تغيير البحث أو الفلتر.'),
+              Text(l.tr('جرّب تغيير البحث أو الفلتر.','Try changing the search or filter.','Essayez de modifier la recherche ou le filtre.')),
             ])))
           else
             ...items.map((item) => Padding(
@@ -530,15 +530,15 @@ class _NextDoseRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (schedules.any((s) => s.type == ScheduleType.prn) && nextDose == null) {
-      return Row(children: [const Icon(Icons.event_available_rounded, size: 19), const SizedBox(width: 7), Text('الجرعة التالية: عند الحاجة', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700))]);
+      return Row(children: [const Icon(Icons.event_available_rounded, size: 19), const SizedBox(width: 7), Text(l.tr('الجرعة التالية: عند الحاجة','Next dose: as needed','Prochaine dose : selon les besoins'), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700))]);
     }
-    if (nextDose == null) return Row(children: [const Icon(Icons.event_busy_rounded, size: 19), const SizedBox(width: 7), Text('لا توجد جرعة قادمة', style: theme.textTheme.bodyMedium)]);
+    if (nextDose == null) return Row(children: [const Icon(Icons.event_busy_rounded, size: 19), const SizedBox(width: 7), Text(l.tr('لا توجد جرعة قادمة','No upcoming dose','Aucune dose à venir'), style: theme.textTheme.bodyMedium)]);
     final now = DateTime.now();
     final sameDay = DateTimeUtils.isSameDate(nextDose!, now);
     final date = DateTimeUtils.formatShortDate(nextDose!);
     final time = '${nextDose!.hour.toString().padLeft(2, '0')}:${nextDose!.minute.toString().padLeft(2, '0')}';
     final label = sameDay ? 'اليوم $time' : '$date · $time';
-    return Row(children: [const Icon(Icons.schedule_rounded, size: 19), const SizedBox(width: 7), Expanded(child: Text('الجرعة التالية: $label', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)))]);
+    return Row(children: [const Icon(Icons.schedule_rounded, size: 19), const SizedBox(width: 7), Expanded(child: Text(l.tr('الجرعة التالية: $label','Next dose: $label','Prochaine dose : $label'), maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)))]);
   }
 }
 
@@ -567,7 +567,7 @@ class _StockSummary extends StatelessWidget {
           const Icon(Icons.inventory_2_outlined, size: 20),
           const SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('المخزون: $stock $unit', style: const TextStyle(fontWeight: FontWeight.w800)),
+            Text(l.tr('المخزون: $stock $unit','Stock: $stock $unit','Stock : $stock $unit'), style: const TextStyle(fontWeight: FontWeight.w800)),
             const SizedBox(height: 2),
             Text(dailyConsumption > 0 ? 'يكفي تقريبًا $days · استهلاك ${_format(dailyConsumption)}/يوم' : 'لا يمكن تقدير الاستهلاك اليومي', style: Theme.of(context).textTheme.bodySmall),
           ])),

@@ -37,7 +37,7 @@ class MedicationProvider extends ChangeNotifier {
     _notify();
 
     try {
-      final loadedMedications = await _repo.fetchMedications(forPatientId);
+      final loadedMedications = await _repo.fetchMedications(forPatientId, activeOnly: false);
       if (_disposed || generation != _loadGeneration) return;
 
       final scheduleEntries = await Future.wait(
@@ -324,7 +324,10 @@ class MedicationProvider extends ChangeNotifier {
       debugPrintStack(stackTrace: st);
     }
 
-    medications.removeWhere((m) => m.id == medication.id);
+    final index = medications.indexWhere((m) => m.id == medication.id);
+    if (index >= 0) {
+      medications[index] = _copyMedication(medications[index], active: false);
+    }
     schedulesByMedicationId.remove(medication.id);
     _notify();
     debugPrint('DawaCare medication STOP SUCCESS id=${medication.id}');
@@ -383,7 +386,7 @@ class MedicationProvider extends ChangeNotifier {
     }
   }
 
-  Medication _copyMedication(Medication medication, {String? imageUrl, bool clearImage = false, bool? stockEnabled, double? stockQuantity, String? stockUnit}) {
+  Medication _copyMedication(Medication medication, {String? imageUrl, bool clearImage = false, bool? active, bool? stockEnabled, double? stockQuantity, String? stockUnit}) {
     return Medication(
       id: medication.id,
       patientId: medication.patientId,
@@ -395,7 +398,7 @@ class MedicationProvider extends ChangeNotifier {
       imageUrl: clearImage ? null : (imageUrl ?? medication.imageUrl),
       startDate: medication.startDate,
       endDate: medication.endDate,
-      active: medication.active,
+      active: active ?? medication.active,
       createdBy: medication.createdBy,
       createdAt: medication.createdAt,
       stockEnabled: stockEnabled ?? medication.stockEnabled,

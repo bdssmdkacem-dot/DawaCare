@@ -12,16 +12,31 @@ class LocaleController extends ChangeNotifier {
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    _languageCode = prefs.getString(_key);
+    _languageCode = _normalize(prefs.getString(_key));
     _loaded = true;
     notifyListeners();
   }
 
   Future<void> setLanguage(String languageCode) async {
-    if (!['ar', 'en', 'fr'].contains(languageCode)) return;
-    _languageCode = languageCode;
+    final normalized = _normalize(languageCode);
+    if (normalized == null) return;
+    if (_languageCode == normalized) return;
+    _languageCode = normalized;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, languageCode);
+    await prefs.setString(_key, normalized);
     notifyListeners();
   }
+
+  Future<void> syncFromProfile(String? languageCode) async {
+    final normalized = _normalize(languageCode);
+    if (normalized == null) return;
+    if (_languageCode == normalized) return;
+    _languageCode = normalized;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, normalized);
+    notifyListeners();
+  }
+
+  static String? _normalize(String? value) =>
+      value != null && ['ar', 'en', 'fr'].contains(value) ? value : null;
 }

@@ -47,7 +47,9 @@ Deno.serve(async (req) => {
   }
 
   const { data: sender } = await admin.from('profiles').select('full_name').eq('id', user.id).single();
-  const senderName = sender?.full_name || 'متابعك';
+  const { data: recipientProfile } = await admin.from('profiles').select('language').eq('id', message.patient_id).maybeSingle();
+  const language = recipientProfile?.language === 'en' || recipientProfile?.language === 'fr' ? recipientProfile.language : 'ar';
+  const senderName = sender?.full_name || (language === 'en' ? 'Your caregiver' : language === 'fr' ? 'Votre accompagnant' : 'متابعك');
   const { data: devices } = await admin
     .from('devices')
     .select('push_token')
@@ -68,8 +70,8 @@ Deno.serve(async (req) => {
           message: {
             token: device.push_token,
             notification: {
-              title: 'رسالة صوتية جديدة 🎙️',
-              body: `${senderName} أرسل لك رسالة صوتية.`,
+              title: language === 'en' ? 'New voice message 🎙️' : language === 'fr' ? 'Nouveau message vocal 🎙️' : 'رسالة صوتية جديدة 🎙️',
+              body: language === 'en' ? `${senderName} sent you a voice message.` : language === 'fr' ? `${senderName} vous a envoyé un message vocal.` : `${senderName} أرسل لك رسالة صوتية.`,
             },
             data: { type: 'VOICE_MESSAGE', voice_message_id: message.id },
             android: { priority: 'high', notification: { channel_id: 'caregiver_alerts' } },

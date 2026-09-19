@@ -244,7 +244,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
         if (remaining > 0 && total > 0) ...[
           const SizedBox(height: 10),
           Text(
-            '$remaining جرعة متبقية اليوم',
+            l.tr('$remaining جرعة متبقية اليوم', '$remaining doses remaining today', '$remaining doses restantes aujourd’hui'),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -303,7 +303,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
       final taken = doses.where((d) => d.status == DoseStatus.taken).length;
       final summary = doses.isEmpty
           ? l.noScheduledMedicines
-          : '$taken / ${doses.length} مكتملة';
+          : l.tr('$taken / ${doses.length} مكتملة', '$taken / ${doses.length} completed', '$taken / ${doses.length} terminées');
 
       widgets.add(_patientHeader(link, subtitle: summary));
 

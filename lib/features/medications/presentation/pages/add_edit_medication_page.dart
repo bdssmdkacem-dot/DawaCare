@@ -616,7 +616,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         ),
                         decoration: InputDecoration(
                           labelText: localizations.tr('محتوى العبوة','Package quantity','Contenu de la boîte'),
-                          suffixText: _unitLabel(_unit),
+                          suffixText: _unitLabel(_unit, AppLocalizations.of(context)),
                         ),
                         validator: (value) {
                           if ((value ?? '').trim().isEmpty) return null;
@@ -637,7 +637,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   ),
                   decoration: InputDecoration(
                     labelText: localizations.tr('حد المخزون المنخفض','Low stock threshold','Seuil de stock faible'),
-                    suffixText: _unitLabel(_unit),
+                    suffixText: _unitLabel(_unit, AppLocalizations.of(context)),
                   ),
                   validator: (value) {
                     final number = _number(value ?? '');

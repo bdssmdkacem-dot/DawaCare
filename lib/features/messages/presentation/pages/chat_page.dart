@@ -239,7 +239,7 @@ class _ChatPageState extends State<ChatPage> {
     appBar: AppBar(title: Text(widget.otherName)),
     body: _loading ? const Center(child: CircularProgressIndicator()) : RefreshIndicator(
       onRefresh: _refresh,
-      child: ListView(controller: _scroll, physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), children: _messages.isEmpty ? [const SizedBox(height: 300, child: Center(child: Text(AppLocalizations.of(context).tr('لا توجد رسائل بعد.', 'No messages yet.', 'Aucun message pour le moment.'))))] : _messages.map(_bubble).toList()),
+      child: ListView(controller: _scroll, physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), children: _messages.isEmpty ? [SizedBox(height: 300, child: Center(child: Text(AppLocalizations.of(context).tr('لا توجد رسائل بعد.', 'No messages yet.', 'Aucun message pour le moment.'))))] : _messages.map(_bubble).toList()),
     ),
     bottomNavigationBar: _composer(),
   );

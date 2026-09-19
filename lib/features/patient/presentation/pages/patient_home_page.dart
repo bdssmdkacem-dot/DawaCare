@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/utils/date_time_utils.dart';
-import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../models/caregiver_link.dart';
 import '../../../../models/dose_instance.dart';
@@ -348,7 +347,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
   }
 
   Widget _patientHeader(CaregiverLink link, {required String subtitle}) {
-    final name = link.patientName.trim().isEmpty ? l.tr('مريض','Patient','Patient') : link.patientName.trim();
+    final name = link.patientName.trim().isEmpty ? AppLocalizations.of(context).tr('مريض','Patient','Patient') : link.patientName.trim();
     final initials = _initials(name);
     final avatarUrl = link.patientAvatarUrl;
 

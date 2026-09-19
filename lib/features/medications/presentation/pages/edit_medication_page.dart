@@ -359,7 +359,7 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
                   spacing: 6,
                   children: List.generate(7, (i) {
                     final day = i + 1;
-                    final labels = [l.sunday, l.monday, l.tuesday, l.wednesday, l.thursday, l.friday, l.saturday];
+                    final labels = List.generate(7, (index) => l.weekdayLabel(index + 1));
                     return FilterChip(
                       label: Text(labels[i]),
                       selected: _days.contains(day),

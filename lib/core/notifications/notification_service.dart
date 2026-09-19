@@ -6,6 +6,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -36,6 +37,18 @@ class NotificationService {
   static const int _snoozeNotificationIndex = 99;
   static const Duration _snoozeDuration = Duration(minutes: 10);
 
+  Future<String> _language() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString('dawacare_locale');
+    return ['ar', 'en', 'fr'].contains(value) ? value! : 'ar';
+  }
+
+  String _tr(String language, String ar, String en, String fr) => switch (language) {
+        'en' => en,
+        'fr' => fr,
+        _ => ar,
+      };
+
   Stream<String> get voiceMessageOpened => _voiceMessageController.stream;
   Stream<String> get notificationOpened => _notificationController.stream;
 
@@ -56,20 +69,25 @@ class NotificationService {
     const initSettings = InitializationSettings(android: androidInit);
     await _plugin.initialize(initSettings, onDidReceiveNotificationResponse: _onNotificationResponse);
 
-    const channel = AndroidNotificationChannel(
+    final language = await _language();
+    final doseChannelName = _tr(language, 'تذكير الجرعات', 'Dose reminders', 'Rappels de médicaments');
+    final doseChannelDescription = _tr(language, 'إشعارات تذكير بمواعيد الأدوية', 'Medicine schedule reminders', 'Notifications de rappel des prises');
+    final caregiverChannelName = _tr(language, 'تنبيهات العائلة', 'Family alerts', 'Alertes familiales');
+    final caregiverChannelDescription = _tr(language, 'تنبيه عند تفويت أحد أفراد العائلة لجرعة دواء', 'Alerts when a family member misses a medicine dose', 'Alerte lorsqu’un membre de la famille oublie une dose');
+    final channel = AndroidNotificationChannel(
       _channelId,
-      'تذكير الجرعات',
-      description: 'إشعارات تذكير بمواعيد الأدوية',
+      doseChannelName,
+      description: doseChannelDescription,
       importance: Importance.max,
       enableVibration: true,
     );
     final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await android?.createNotificationChannel(channel);
 
-    const caregiverChannel = AndroidNotificationChannel(
+    final caregiverChannel = AndroidNotificationChannel(
       _caregiverChannelId,
-      'تنبيهات العائلة',
-      description: 'تنبيه عند تفويت أحد أفراد العائلة لجرعة دواء',
+      caregiverChannelName,
+      description: caregiverChannelDescription,
       importance: Importance.high,
       enableVibration: true,
     );
@@ -280,23 +298,26 @@ class NotificationService {
     await cancelDoseReminders(dose.id);
     final snoozeTime = tz.TZDateTime.now(tz.local).add(_snoozeDuration);
     final imagePath = await _prepareMedicationImage(dose);
+    final language = await _language();
+    final doseChannelName = _tr(language, 'تذكير الجرعات', 'Dose reminders', 'Rappels de médicaments');
+    final doseChannelDescription = _tr(language, 'إشعارات تذكير بمواعيد الأدوية', 'Medicine schedule reminders', 'Notifications de rappel des prises');
     final androidDetails = AndroidNotificationDetails(
       _channelId,
-      'تذكير الجرعات',
-      channelDescription: 'إشعارات تذكير بمواعيد الأدوية',
+      doseChannelName,
+      channelDescription: doseChannelDescription,
       importance: Importance.max,
       priority: Priority.high,
       category: AndroidNotificationCategory.reminder,
       largeIcon: imagePath == null ? null : FilePathAndroidBitmap(imagePath),
       styleInformation: imagePath == null ? null : BigPictureStyleInformation(FilePathAndroidBitmap(imagePath), hideExpandedLargeIcon: false, contentTitle: dose.medicationName, summaryText: dose.doseAmount),
       actions: const [
-        AndroidNotificationAction(_actionTaken, 'تم أخذ الدواء', showsUserInterface: false, cancelNotification: true),
-        AndroidNotificationAction(_actionSnooze, 'تأجيل 10 دقائق', showsUserInterface: false, cancelNotification: true),
+        AndroidNotificationAction(_actionTaken, _tr(language, 'تم أخذ الدواء', 'Taken', 'Prise effectuée'), showsUserInterface: false, cancelNotification: true),
+        AndroidNotificationAction(_actionSnooze, _tr(language, 'تأجيل 10 دقائق', 'Snooze 10 minutes', 'Reporter de 10 minutes'), showsUserInterface: false, cancelNotification: true),
       ],
     );
     await _schedule(
       _notificationId(dose.id, _snoozeNotificationIndex),
-      'تذكير: حان وقت الدواء 💊',
+      _tr(language, 'تذكير: حان وقت الدواء 💊', 'Reminder: medicine time 💊', 'Rappel : c’est l’heure du médicament 💊'),
       '${dose.medicationName} — ${dose.doseAmount}',
       snoozeTime,
       NotificationDetails(android: androidDetails),
@@ -334,8 +355,8 @@ class NotificationService {
     if (!beforeTime.isBefore(now)) {
       await _schedule(
         _notificationId(dose.id, 0),
-        'اقترب موعد الدواء 💊',
-        'بعد 5 دقائق: ${dose.medicationName} — ${dose.doseAmount}',
+        _tr(language, 'اقترب موعد الدواء 💊', 'Medicine time is in 5 minutes 💊', 'Le médicament est prévu dans 5 minutes 💊'),
+        _tr(language, 'بعد 5 دقائق: ${dose.medicationName} — ${dose.doseAmount}', 'In 5 minutes: ${dose.medicationName} — ${dose.doseAmount}', 'Dans 5 minutes : ${dose.medicationName} — ${dose.doseAmount}'),
         beforeTime,
         NotificationDetails(android: androidDetails),
         payload: dose.id,
@@ -347,7 +368,7 @@ class NotificationService {
       if (fireTime.isBefore(now)) continue;
       await _schedule(
         _notificationId(dose.id, i + 1),
-        i == 0 ? 'حان موعد الدواء 💊' : 'تذكير: الجرعة لم تُؤكَّد بعد',
+        i == 0 ? _tr(language, 'حان موعد الدواء 💊', 'Medicine time 💊', 'C’est l’heure du médicament 💊') : _tr(language, 'تذكير: الجرعة لم تُؤكَّد بعد', 'Reminder: dose not confirmed yet', 'Rappel : dose non confirmée'),
         '${dose.medicationName} — ${dose.doseAmount}',
         fireTime,
         NotificationDetails(android: androidDetails),
@@ -391,8 +412,8 @@ class NotificationService {
       const NotificationDetails(
         android: AndroidNotificationDetails(
           _caregiverChannelId,
-          'تنبيهات العائلة',
-          channelDescription: 'تنبيه عند تفويت أحد أفراد العائلة لجرعة دواء',
+          'Family alerts',
+          channelDescription: 'Family medicine alerts',
           importance: Importance.high,
           priority: Priority.high,
         ),

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RichPushNotificationService {
   RichPushNotificationService._();
@@ -15,7 +16,23 @@ class RichPushNotificationService {
   Stream<String> get messageOpened => _messageController.stream;
 
   static const channelId = 'caregiver_alerts_v2';
-  static const channelName = 'تنبيهات العائلة';
+  Future<String> _channelName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return switch (prefs.getString('dawacare_locale')) {
+      'en' => 'Family alerts',
+      'fr' => 'Alertes familiales',
+      _ => 'تنبيهات العائلة',
+    };
+  }
+
+  Future<String> _channelDescription() async {
+    final prefs = await SharedPreferences.getInstance();
+    return switch (prefs.getString('dawacare_locale')) {
+      'en' => 'Message and follow-up request notifications',
+      'fr' => 'Notifications de messages et demandes de suivi',
+      _ => 'إشعارات الرسائل وطلبات المتابعة',
+    };
+  }
 
   Future<void> init() async {
     if (_initialized) return;
@@ -36,11 +53,13 @@ class RichPushNotificationService {
 
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
+    final channelName = await _channelName();
+    final channelDescription = await _channelDescription();
     await android?.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         channelId,
         channelName,
-        description: 'إشعارات الرسائل وطلبات المتابعة',
+        description: channelDescription,
         importance: Importance.high,
         enableVibration: true,
         playSound: true,
@@ -65,8 +84,8 @@ class RichPushNotificationService {
 
     final details = AndroidNotificationDetails(
       channelId,
-      channelName,
-      channelDescription: 'إشعارات الرسائل وطلبات المتابعة',
+      await _channelName(),
+      channelDescription: await _channelDescription(),
       importance: Importance.high,
       priority: Priority.high,
       playSound: true,

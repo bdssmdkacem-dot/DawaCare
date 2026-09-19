@@ -57,9 +57,19 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> signUp({required String email, required String password, required String fullName}) {
+  Future<bool> signUp({
+    required String email,
+    required String password,
+    required String fullName,
+    required String languageCode,
+  }) {
     if (isLoading) return Future.value(false);
-    return _run(() => _repo.signUp(email: email, password: password, fullName: fullName));
+    return _run(() => _repo.signUp(
+          email: email,
+          password: password,
+          fullName: fullName,
+          languageCode: languageCode,
+        ));
   }
 
   Future<bool> signIn({required String email, required String password}) {

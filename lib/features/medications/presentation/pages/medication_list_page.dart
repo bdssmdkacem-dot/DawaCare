@@ -329,7 +329,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
                 onEdit: () => _editMedication(item.medication),
                 onChangeImage: () => _changeImage(item.medication),
                 onRemoveImage: item.medication.imageUrl == null ? null : () => _removeImage(item.medication),
-                onDeactivate: () => _confirmDeactivate(item.medication),
+                onDeactivate: item.medication.active ? () => _confirmDeactivate(item.medication) : null,
                 onAddStock: () => _addStock(item.medication),
                 onStockDetails: () => _openStockDetails(item.medication),
               ),
@@ -366,7 +366,7 @@ class _MedicationItem {
   const _MedicationItem({required this.medication, required this.schedules, required this.info});
 }
 
-enum _MedicationStatus { active, lowStock, outOfStock, endingSoon }
+enum _MedicationStatus { active, lowStock, outOfStock, endingSoon, stopped }
 
 class _MedicationInsights {
   final DateTime? nextDose;
@@ -389,7 +389,7 @@ class _MedicationInsights {
     final daily = StockIntelligence.dailyConsumption(medication: medication, schedules: schedules);
     final daysRemaining = StockIntelligence.daysRemaining(medication: medication, schedules: schedules);
     final status = !medication.active
-        ? _MedicationStatus.endingSoon
+        ? _MedicationStatus.stopped
         : StockIntelligence.isOutOfStock(medication)
             ? _MedicationStatus.outOfStock
             : StockIntelligence.isLowStock(medication)
@@ -441,7 +441,7 @@ class _SmartMedicationTile extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onChangeImage;
   final VoidCallback? onRemoveImage;
-  final VoidCallback onDeactivate;
+  final VoidCallback? onDeactivate;
   final VoidCallback onAddStock;
   final VoidCallback onStockDetails;
 
@@ -497,14 +497,14 @@ class _SmartMedicationTile extends StatelessWidget {
                   case 'edit': onEdit(); break;
                   case 'change_image': onChangeImage(); break;
                   case 'remove_image': onRemoveImage?.call(); break;
-                  case 'deactivate': onDeactivate(); break;
+                  case 'deactivate': onDeactivate?.call(); break;
                 }
               },
               itemBuilder: (_) => [
                 PopupMenuItem(value: 'edit', child: Text(l.tr('تعديل الدواء','Edit medicine','Modifier le médicament'))),
                 PopupMenuItem(value: 'change_image', child: Text(l.changeMedicineImage)),
                 if (onRemoveImage != null) PopupMenuItem(value: 'remove_image', child: Text(l.deleteMedicineImage)),
-                PopupMenuItem(value: 'deactivate', child: Text(l.deactivateMedicine)),
+                if (medication.active) PopupMenuItem(value: 'deactivate', child: Text(l.deactivateMedicine)),
               ],
             ),
           ]),
@@ -608,6 +608,7 @@ class _StatusChip extends StatelessWidget {
       _MedicationStatus.lowStock => (l.tr('مخزون منخفض', 'Low stock', 'Stock faible'), Icons.warning_amber_rounded),
       _MedicationStatus.outOfStock => (l.tr('نفد المخزون', 'Out of stock', 'Stock épuisé'), Icons.error_outline_rounded),
       _MedicationStatus.endingSoon => (l.tr('ينتهي قريبًا', 'Ending soon', 'Bientôt épuisé'), Icons.event_busy_rounded),
+      _MedicationStatus.stopped => (l.tr('متوقف', 'Stopped', 'Arrêté'), Icons.pause_circle_outline_rounded),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),

@@ -453,7 +453,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(
-                    _frequencyHint(),
+                    _frequencyHint(localizations),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
@@ -475,7 +475,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         labelText: localizations.doseAmount,
                         prefixIcon: const Icon(Icons.exposure_plus_1_rounded),
                         suffixText: _unitLabel(_unit, localizations),
-                        helperText: _formHint(),
+                        helperText: _formHint(localizations),
                       ),
                       validator: (value) =>
                           _validatePositive(value, 'الجرعة'),
@@ -597,7 +597,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                         ),
                         decoration: InputDecoration(
                           labelText: localizations.tr('الكمية الحالية','Current quantity','Quantité actuelle'),
-                          suffixText: _unitLabel(_unit),
+                          suffixText: _unitLabel(_unit, localizations),
                         ),
                         validator: (value) {
                           final number = _number(value ?? '');
@@ -794,7 +794,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
             ),
           ),
           child: _image == null
-              ? const Column(
+              ? Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(

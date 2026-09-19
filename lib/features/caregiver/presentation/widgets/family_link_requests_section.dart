@@ -19,7 +19,6 @@ class FamilyLinkRequestsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
     final incoming = provider.incomingRequests;
     final sent = provider.sentRequests;
     if (incoming.isEmpty && sent.isEmpty) return const SizedBox.shrink();

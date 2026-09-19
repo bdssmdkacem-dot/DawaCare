@@ -80,9 +80,20 @@ Deno.serve(async (_req) => {
       .eq('id', dose.patient_id)
       .single();
     const patientName = patientProfile?.full_name || 'أحد أفراد العائلة';
-    const message = `لم يتم تأكيد جرعة دواء ${patientName} في موعدها.`;
 
     for (const link of caregivers ?? []) {
+      const { data: caregiverProfile } = await supabase
+        .from('profiles')
+        .select('language')
+        .eq('id', link.caregiver_id)
+        .maybeSingle();
+      const language = caregiverProfile?.language === 'en' || caregiverProfile?.language === 'fr' ? caregiverProfile.language : 'ar';
+      const message = language === 'en'
+        ? `Medicine dose for ${patientName} was not confirmed on time.`
+        : language === 'fr'
+          ? `La prise du médicament de ${patientName} n’a pas été confirmée à temps.`
+          : `لم يتم تأكيد جرعة دواء ${patientName} في موعدها.`;
+
       // Unique index + ignoreDuplicates makes cron retries and worker races safe.
       const { data: alert, error: alertError } = await supabase
         .from('caregiver_alerts')
@@ -234,7 +245,10 @@ async function sendPushToUser(
         body: JSON.stringify({
           message: {
             token: device.push_token,
-            notification: { title: 'دواء كير — تنبيه', body: message },
+            notification: {
+              title: language === 'en' ? 'DawaCare — Alert' : language === 'fr' ? 'DawaCare — Alerte' : 'دواء كير — تنبيه',
+              body: message,
+            },
             data: {
               type: 'CAREGIVER_ALERT',
               alert_id: alertId,

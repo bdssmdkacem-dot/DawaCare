@@ -61,7 +61,6 @@ class _PatientOverviewPageState extends State<PatientOverviewPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
     final profile = context.watch<AuthProvider>().profile;
     final doses = context.watch<DoseProvider>();
     final medications = context.watch<MedicationProvider>();

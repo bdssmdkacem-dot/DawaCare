@@ -255,8 +255,6 @@ class _AdherenceHistoryPageState extends State<AdherenceHistoryPage> {
         ),
       );
 
-  String _weekday(int value) => AppLocalizations.of(context).weekdayLabel(value);
-
   /* String _weekday(int value) => switch (value) {
         DateTime.monday => 'الإثنين',
         DateTime.tuesday => 'الثلاثاء',

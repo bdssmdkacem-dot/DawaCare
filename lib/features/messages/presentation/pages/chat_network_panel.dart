@@ -42,7 +42,7 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
     try {
       final rows = await _db
           .from('caregiver_patient')
-          .select('patient_id, caregiver_id, role')
+          .select('patient_id, caregiver_id, role, relationship_label')
           .or('patient_id.eq.$me,caregiver_id.eq.$me');
 
       final all = rows
@@ -68,7 +68,7 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
           ? <dynamic>[]
           : await _db
               .from('caregiver_patient')
-              .select('patient_id, caregiver_id, role')
+              .select('patient_id, caregiver_id, role, relationship_label')
               .inFilter('patient_id', patientIds.toList());
 
       final ids = <String>{...patientIds};
@@ -127,6 +127,7 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
             name: (profile['full_name'] as String?)?.trim() ?? '',
             avatar: profile['avatar_url'] as String?,
             role: row['role'] as String? ?? 'CAREGIVER',
+            relationshipLabel: (row['relationship_label'] as String?)?.trim(),
           ));
         }
 
@@ -341,6 +342,17 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                 ),
               ),
+              if (contact.relationshipLabel != null && contact.relationshipLabel!.isNotEmpty)
+                SizedBox(
+                  width: 76,
+                  child: Text(
+                    contact.relationshipLabel!,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 9, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
             ],
           ),
         ),
@@ -386,6 +398,14 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
             ),
+            if (contact.relationshipLabel != null && contact.relationshipLabel!.isNotEmpty)
+              Text(
+                contact.relationshipLabel!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 9, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
           ],
         ),
       ),
@@ -472,11 +492,13 @@ class _ChatContact {
   final String name;
   final String? avatar;
   final String role;
+  final String? relationshipLabel;
 
   const _ChatContact({
     required this.id,
     required this.name,
     required this.avatar,
     required this.role,
+    this.relationshipLabel,
   });
 }

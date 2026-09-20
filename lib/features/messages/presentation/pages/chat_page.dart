@@ -23,9 +23,8 @@ class _ChatPageState extends State<ChatPage> {
   final _db = Supabase.instance.client;
   List<ChatMessage> _messages = [];
   final Map<String, Future<String>> _signedUrls = {};
-  bool _loading = true, _sending = false, _recording = false, _refreshing = false;
+  bool _loading = true, _sending = false, _refreshing = false;
   int _loadGeneration = 0;
-  DateTime? _recordStarted;
   String? _playing;
   RealtimeChannel? _channel;
   StreamSubscription<void>? _playerComplete;
@@ -36,14 +35,12 @@ class _ChatPageState extends State<ChatPage> {
     _load(scrollToBottom: true);
     _channel = _db.channel('chat-${widget.patientId}-${widget.otherUserId}')
       ..onPostgresChanges(event: PostgresChangeEvent.insert, schema: 'public', table: 'messages', filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'patient_id', value: widget.patientId), callback: (_) => _load(scrollToBottom: true))
+      ..onPostgresChanges(event: PostgresChangeEvent.update, schema: 'public', table: 'messages', filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'patient_id', value: widget.patientId), callback: (_) => _load())
       ..subscribe();
   }
 
   @override
   void dispose() {
-    if (_recording) {
-      unawaited(_service.cancelVoiceRecording());
-    }
     _playerComplete?.cancel();
     _channel?.unsubscribe();
     _text.dispose();
@@ -134,39 +131,6 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  Future<void> _toggleRecording() async {
-    final l = AppLocalizations.of(context);
-    if (_sending) return;
-    if (_recording) {
-      final path = await _service.stopVoiceRecording();
-      final started = _recordStarted;
-      if (mounted) {
-        setState(() {
-          _recording = false;
-          _recordStarted = null;
-        });
-      }
-      if (path != null && started != null) {
-        final ms = DateTime.now().difference(started).inMilliseconds;
-        if (ms > 0) {
-          await _run(() => _service.sendVoice(patientId: widget.patientId, recipientId: widget.otherUserId, localPath: path, durationMs: ms));
-        }
-      }
-    } else {
-      try {
-        await _service.startVoiceRecording();
-        if (mounted) {
-          setState(() {
-            _recordStarted = DateTime.now();
-            _recording = true;
-          });
-        }
-      } catch (_) {
-        _error(l.tr('تعذر بدء التسجيل.', 'Could not start recording.', 'Impossible de démarrer l’enregistrement.'));
-      }
-    }
-  }
-
   Future<void> _run(Future<ChatMessage> Function() action, {bool clearText = false}) async {
     final l = AppLocalizations.of(context);
     if (!mounted) return;
@@ -247,20 +211,72 @@ class _ChatPageState extends State<ChatPage> {
     bottomNavigationBar: _composer(),
   );
 
-  Widget _bubble(ChatMessage m) {
-    final mine = m.senderId == _db.auth.currentUser?.id;
-    return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
-      constraints: const BoxConstraints(maxWidth: 320), margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(11),
-      decoration: BoxDecoration(color: mine ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (m.type == 'text') Text(m.body!),
-        if (m.type == 'image') FutureBuilder<String>(future: _urlFor(m.storagePath!), builder: (c, s) => s.hasData ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(s.data!, width: 250, height: 250, fit: BoxFit.cover)) : SizedBox(width: 250, height: 100, child: Center(child: s.hasError ? const Icon(Icons.broken_image_outlined) : const CircularProgressIndicator()))),
-        if (m.type == 'voice') Row(mainAxisSize: MainAxisSize.min, children: [IconButton(onPressed: () => _play(m), icon: Icon(_playing == m.id ? Icons.stop_circle_outlined : Icons.play_circle_fill_rounded, size: 38)), if (m.durationMs != null) Text('${(m.durationMs! / 1000).ceil()} ${AppLocalizations.of(context).tr('ث', 's', 's')}')]),
-        Text('${m.createdAt.hour.toString().padLeft(2, '0')}:${m.createdAt.minute.toString().padLeft(2, '0')}', style: Theme.of(context).textTheme.labelSmall),
-      ]),
-    ));
+  String _dayKey(DateTime value) => '${value.year}-${value.month}-${value.day}';
+
+  String _dateLabel(DateTime value, AppLocalizations l) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(value.year, value.month, value.day);
+    final difference = today.difference(day).inDays;
+    if (difference == 0) return l.tr('اليوم', 'Today', 'Aujourd’hui');
+    if (difference == 1) return l.tr('أمس', 'Yesterday', 'Hier');
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
   }
 
+  String _time(DateTime value) => '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'U';
+    if (parts.length == 1) return parts.first.runes.take(2).map(String.fromCharCode).join().toUpperCase();
+    return '${String.fromCharCode(parts.first.runes.first)}${String.fromCharCode(parts.last.runes.first)}'.toUpperCase();
+  }
+
+  Widget _bubble(ChatMessage m) {
+    final l = AppLocalizations.of(context);
+    final mine = m.senderId == _db.auth.currentUser?.id;
+    final read = m.readAt != null;
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 340),
+        margin: EdgeInsets.only(bottom: 8, left: mine ? 42 : 0, right: mine ? 0 : 42),
+        padding: const EdgeInsets.fromLTRB(13, 11, 11, 8),
+        decoration: BoxDecoration(
+          color: mine ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.only(topLeft: const Radius.circular(18), topRight: const Radius.circular(18), bottomLeft: Radius.circular(mine ? 18 : 5), bottomRight: Radius.circular(mine ? 5 : 18)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (m.type == 'text') Text(m.body!),
+          if (m.type == 'image') FutureBuilder<String>(
+            future: _urlFor(m.storagePath!),
+            builder: (c, s) => s.hasData ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(s.data!, width: 250, height: 250, fit: BoxFit.cover)) : SizedBox(width: 250, height: 100, child: Center(child: s.hasError ? const Icon(Icons.broken_image_outlined) : const CircularProgressIndicator())),
+          ),
+          if (m.type == 'voice') Row(mainAxisSize: MainAxisSize.min, children: [
+            IconButton(onPressed: () => _play(m), icon: Icon(_playing == m.id ? Icons.stop_circle_outlined : Icons.play_circle_fill_rounded, size: 38)),
+            if (m.durationMs != null) Text('${(m.durationMs! / 1000).ceil()} ${l.tr('ث', 's', 's')}'),
+          ]),
+          const SizedBox(height: 4),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(_time(m.createdAt), style: Theme.of(context).textTheme.labelSmall),
+            if (mine) ...[
+              const SizedBox(width: 5),
+              Icon(read ? Icons.done_all_rounded : Icons.done_rounded, size: 16, color: read ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant),
+              const SizedBox(width: 3),
+              Text(read ? l.tr('مقروءة', 'Read', 'Lu') : l.tr('مرسلة', 'Sent', 'Envoyée'), style: Theme.of(context).textTheme.labelSmall),
+            ],
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  Widget _composer() => SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(8, 6, 8, 8), child: Row(children: [
+    IconButton(onPressed: _sending ? null : _sendImage, icon: const Icon(Icons.image_rounded), tooltip: AppLocalizations.of(context).tr('صورة', 'Image', 'Image')),
+    Expanded(child: TextField(controller: _text, textInputAction: TextInputAction.send, onSubmitted: (_) => _sendText(), decoration: InputDecoration(hintText: AppLocalizations.of(context).tr('اكتب رسالة...', 'Write a message...', 'Écrire un message...'), border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)))),
+    const SizedBox(width: 5),
+    IconButton(onPressed: _sending ? null : _sendText, icon: const Icon(Icons.send_rounded), tooltip: AppLocalizations.of(context).tr('إرسال', 'Send', 'Envoyer')),
+  ])));
   Widget _composer() => SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(8, 6, 8, 8), child: Row(children: [
     IconButton(onPressed: _sending || _recording ? null : _sendImage, icon: const Icon(Icons.image_rounded)),
     IconButton(onPressed: _sending ? null : _toggleRecording, icon: Icon(_recording ? Icons.stop_circle_rounded : Icons.mic_rounded)),

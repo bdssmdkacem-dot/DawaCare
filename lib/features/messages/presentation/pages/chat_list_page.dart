@@ -3,8 +3,20 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/app_localizations.dart';
 import 'chat_network_panel.dart';
 
-class ChatListPage extends StatelessWidget {
+class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
+
+  @override
+  State<ChatListPage> createState() => _ChatListPageState();
+}
+
+class _ChatListPageState extends State<ChatListPage> {
+  final GlobalKey<_ChatNetworkPanelState> _networkKey =
+      GlobalKey<_ChatNetworkPanelState>();
+
+  Future<void> _refresh() async {
+    await _networkKey.currentState?.reload();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,17 +26,12 @@ class ChatListPage extends StatelessWidget {
         title: Text(l.chats),
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          // The network panel owns its data lifecycle. A pull-to-refresh is
-          // handled by rebuilding the panel so every patient network is
-          // queried again.
-          await Future<void>.delayed(Duration.zero);
-        },
+        onRefresh: _refresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-          children: const [
-            ChatNetworkPanel(),
+          children: [
+            ChatNetworkPanel(key: _networkKey),
           ],
         ),
       ),

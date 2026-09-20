@@ -82,7 +82,15 @@ class MedicationRepository {
   }
   Future<void> deleteFuturePendingDoses(String scheduleId, DateTime from) async { await _client.from('dose_instances').delete().eq('schedule_id', scheduleId).eq('status', 'PENDING').gte('scheduled_at', from.toUtc().toIso8601String()); }
 
-  Future<void> reactivateMedication(String medicationId) async {\n    debugPrint('DawaCare medication REACTIVATE START id=$medicationId');\n    final rows = await _client.from('medications').update({'active': true}).eq('id', medicationId).select('id, active');\n    if (rows.isEmpty || rows.first['active'] != true) {\n      throw StateError('REACTIVATE_VERIFY_FAILED medication_id=$medicationId');\n    }\n  }\n\n  Future<void> deactivateMedication(String medicationId) async {
+  Future<void> reactivateMedication(String medicationId) async {
+    debugPrint('DawaCare medication REACTIVATE START id=$medicationId');
+    final rows = await _client.from('medications').update({'active': true}).eq('id', medicationId).select('id, active');
+    if (rows.isEmpty || rows.first['active'] != true) {
+      throw StateError('REACTIVATE_VERIFY_FAILED medication_id=$medicationId');
+    }
+  }
+
+  Future<void> deactivateMedication(String medicationId) async {
     debugPrint('DawaCare medication DEACTIVATE START id=$medicationId');
     try {
       final rows = await _client.from('medications').update({'active': false}).eq('id', medicationId).select('id, active');

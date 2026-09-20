@@ -370,7 +370,30 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
   String _formatNumber(double value) => value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
   String _formatDays(double value) => value < 1 ? '<1' : value < 10 ? value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '') : value.round().toString();
 
-  Future<void> _confirmReactivate() async {\n    final l = AppLocalizations.of(context);\n    final confirmed = await showDialog<bool>(\n      context: context,\n      builder: (ctx) => AlertDialog(\n        title: Text(l.reactivateMedicineTitle),\n        content: Text(l.reactivateMedicineBody(widget.medication.name)),\n        actions: [\n          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)),\n          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l.reactivateMedicine)),\n        ],\n      ),\n    );\n    if (!mounted || confirmed != true) return;\n    try {\n      await context.read<MedicationProvider>().reactivate(widget.medication);\n      if (mounted) Navigator.pop(context, true);\n    } catch (_) {\n      if (!mounted) return;\n      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.unexpectedError)));\n    }\n  }\n\n  Future<void> _confirmDeactivate() async {
+  Future<void> _confirmReactivate() async {
+    final l = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.reactivateMedicineTitle),
+        content: Text(l.reactivateMedicineBody(widget.medication.name)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l.reactivateMedicine)),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    try {
+      await context.read<MedicationProvider>().reactivate(widget.medication);
+      if (mounted) Navigator.pop(context, true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.unexpectedError)));
+    }
+  }
+
+  Future<void> _confirmDeactivate() async {
     final l = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
       title: Text(l.deactivateMedicineTitle),

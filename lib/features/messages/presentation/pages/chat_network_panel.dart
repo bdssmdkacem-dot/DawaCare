@@ -69,13 +69,13 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
           : await _db
               .from('caregiver_patient')
               .select('patient_id, caregiver_id, role')
-              .inFilter('patient_id', patientIds);
+              .inFilter('patient_id', patientIds.toList());
 
       final ids = <String>{...patientIds};
       for (final raw in networkRows) {
         final row = Map<String, dynamic>.from(raw);
         final caregiverId = row['caregiver_id'] as String?;
-        if (caregiverId != null) ids.add(caregiverId);
+        if (caregiverId != null) { ids.add(caregiverId); }
       }
 
       if (widget.patientId == null && ids.length == patientIds.length) {
@@ -113,7 +113,7 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
           final contactId = row['caregiver_id'] as String?;
           if (contactId == null || contactId == me) continue;
           final profile = profiles[contactId];
-          if (profile == null) continue;
+          if (profile == null) { continue; }
           contacts.add(_ChatContact(
             id: contactId,
             name: (profile['full_name'] as String?)?.trim() ?? '',
@@ -412,7 +412,7 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
     final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return 'U';
     if (parts.length == 1) return parts.first.runes.take(2).map(String.fromCharCode).join().toUpperCase();
-    return '${String.fromCharCode(parts.first.runes.first!)}${String.fromCharCode(parts.last.runes.first!)}'.toUpperCase();
+    return '${String.fromCharCode(parts.first.runes.first)}${String.fromCharCode(parts.last.runes.first)}'.toUpperCase();
   }
 
   void _openChat(String patientId, _ChatContact contact) {

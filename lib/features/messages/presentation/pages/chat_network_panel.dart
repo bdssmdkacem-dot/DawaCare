@@ -404,7 +404,7 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
     final parts = name.trim().split(RegExp(r'\\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return 'U';
     if (parts.length == 1) return parts.first.runes.take(2).map(String.fromCharCode).join().toUpperCase();
-    return '${parts.first.runes.first == null ? '' : String.fromCharCode(parts.first.runes.first!)}${parts.last.runes.first == null ? '' : String.fromCharCode(parts.last.runes.first!)}'.toUpperCase();
+    return '${String.fromCharCode(parts.first.runes.first!)}${String.fromCharCode(parts.last.runes.first!)}'.toUpperCase();
   }
 
   void _openChat(String patientId, _ChatContact contact) {

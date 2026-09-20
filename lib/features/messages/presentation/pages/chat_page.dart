@@ -232,6 +232,28 @@ class _ChatPageState extends State<ChatPage> {
     return '${String.fromCharCode(parts.first.runes.first)}${String.fromCharCode(parts.last.runes.first)}'.toUpperCase();
   }
 
+  List<Widget> _messageList(AppLocalizations l) {
+    final widgets = <Widget>[];
+    String? lastDay;
+    for (final message in _messages) {
+      final day = _dayKey(message.createdAt);
+      if (day != lastDay) {
+        widgets.add(_dateDivider(message.createdAt, l));
+        lastDay = day;
+      }
+      widgets.add(_bubble(message));
+    }
+    return widgets;
+  }
+
+  Widget _dateDivider(DateTime value, AppLocalizations l) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Row(children: [
+      const Expanded(child: Divider()),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text(_dateLabel(value, l), style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700))),
+      const Expanded(child: Divider()),
+    ]),
+  );
   Widget _bubble(ChatMessage m) {
     final l = AppLocalizations.of(context);
     final mine = m.senderId == _db.auth.currentUser?.id;
@@ -276,11 +298,5 @@ class _ChatPageState extends State<ChatPage> {
     Expanded(child: TextField(controller: _text, textInputAction: TextInputAction.send, onSubmitted: (_) => _sendText(), decoration: InputDecoration(hintText: AppLocalizations.of(context).tr('اكتب رسالة...', 'Write a message...', 'Écrire un message...'), border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)))),
     const SizedBox(width: 5),
     IconButton(onPressed: _sending ? null : _sendText, icon: const Icon(Icons.send_rounded), tooltip: AppLocalizations.of(context).tr('إرسال', 'Send', 'Envoyer')),
-  ])));
-  Widget _composer() => SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(8, 6, 8, 8), child: Row(children: [
-    IconButton(onPressed: _sending || _recording ? null : _sendImage, icon: const Icon(Icons.image_rounded)),
-    IconButton(onPressed: _sending ? null : _toggleRecording, icon: Icon(_recording ? Icons.stop_circle_rounded : Icons.mic_rounded)),
-    Expanded(child: TextField(controller: _text, enabled: !_recording, textInputAction: TextInputAction.send, onSubmitted: (_) => _sendText(), decoration: InputDecoration(hintText: AppLocalizations.of(context).tr('اكتب رسالة...', 'Write a message...', 'Écrire un message...'), border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(24))), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10)))),
-    const SizedBox(width: 5), IconButton(onPressed: _sending || _recording ? null : _sendText, icon: const Icon(Icons.send_rounded)),
   ])));
 }

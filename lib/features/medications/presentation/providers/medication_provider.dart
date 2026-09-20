@@ -351,7 +351,9 @@ class MedicationProvider extends ChangeNotifier {
     }
     _notify();
   }
-\n  /// Permanently removes the medication and all database dependents.
+
+
+  /// Permanently removes the medication and all database dependents.
   Future<void> deleteMedication(Medication medication) async {
     debugPrint('DawaCare medication DELETE START id=${medication.id} patient=${medication.patientId}');
     final now = DateTime.now();

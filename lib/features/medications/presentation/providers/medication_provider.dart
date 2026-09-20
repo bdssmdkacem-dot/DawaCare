@@ -98,17 +98,20 @@ class MedicationProvider extends ChangeNotifier {
       return false;
     }
 
+    final createdMedication = created;
+    if (createdMedication == null) return false;
+
     try {
-      final createdSchedule = await _repo.createSchedule(created.id, schedule);
+      final createdSchedule = await _repo.createSchedule(createdMedication.id, schedule);
       try {
-        await _syncMedicationFuture(patientId: created.patientId, medicationId: created.id);
+        await _syncMedicationFuture(patientId: createdMedication.patientId, medicationId: createdMedication.id);
       } catch (e, st) {
         debugPrint('DawaCare medication follow-up sync failed: $e');
         debugPrintStack(stackTrace: st);
       }
 
-      medications.insert(0, created);
-      schedulesByMedicationId[created.id] = [createdSchedule];
+      medications.insert(0, createdMedication);
+      schedulesByMedicationId[createdMedication.id] = [createdSchedule];
       _notify();
       return true;
     } catch (e, st) {
@@ -116,7 +119,7 @@ class MedicationProvider extends ChangeNotifier {
       debugPrintStack(stackTrace: st);
 
       try {
-        await _repo.deleteMedication(created.id);
+        await _repo.deleteMedication(createdMedication.id);
       } catch (deleteError, deleteStack) {
         debugPrint('DawaCare rollback medication failed: $deleteError');
         debugPrintStack(stackTrace: deleteStack);

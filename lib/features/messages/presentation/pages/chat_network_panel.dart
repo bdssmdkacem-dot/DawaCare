@@ -207,6 +207,14 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
               l.tr('مرافقوك وعائلتك', 'Caregivers and family', 'Accompagnants et famille'),
               style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
             ),
+            const SizedBox(height: 4),
+            Text(
+              l.tr('اضغط على الشخص لفتح المحادثة مباشرة.', 'Tap a person to open the conversation.', 'Touchez une personne pour ouvrir directement la conversation.'),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
+            ),
             const SizedBox(height: 10),
             if (network.contacts.isEmpty)
               Text(l.tr(
@@ -401,7 +409,7 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
   }
 
   String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return 'U';
     if (parts.length == 1) return parts.first.runes.take(2).map(String.fromCharCode).join().toUpperCase();
     return '${String.fromCharCode(parts.first.runes.first!)}${String.fromCharCode(parts.last.runes.first!)}'.toUpperCase();

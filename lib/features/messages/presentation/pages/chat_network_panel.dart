@@ -32,6 +32,12 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
     _load();
   }
 
+  Future<void> reload() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    await _load();
+  }
+
   Future<void> _load() async {
     final me = _db.auth.currentUser?.id;
     if (me == null) {

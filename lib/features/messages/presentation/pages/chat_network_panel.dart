@@ -403,8 +403,8 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
   String _initials(String name) {
     final parts = name.trim().split(RegExp(r'\\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return 'U';
-    if (parts.length == 1) return parts.first.characters.take(2).toString().toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
+    if (parts.length == 1) return parts.first.runes.take(2).map(String.fromCharCode).join().toUpperCase();
+    return '${parts.first.runes.first == null ? '' : String.fromCharCode(parts.first.runes.first!)}${parts.last.runes.first == null ? '' : String.fromCharCode(parts.last.runes.first!)}'.toUpperCase();
   }
 
   void _openChat(String patientId, _ChatContact contact) {

@@ -232,7 +232,7 @@ class ChatNetworkPanelState extends State<ChatNetworkPanel> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              l.tr('مرافقوك وعائلتك', 'Caregivers and family', 'Accompagnants et famille'),
+              _compactTitle(network, l),
               style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
             ),
             const SizedBox(height: 4),
@@ -269,6 +269,15 @@ class ChatNetworkPanelState extends State<ChatNetworkPanel> {
     );
   }
 
+  String _compactTitle(_PatientNetwork network, AppLocalizations l) {
+    final hasFamily = network.contacts.any((c) => c.role == 'VIEWER');
+    final hasCaregivers = network.contacts.any((c) => c.role == 'CAREGIVER' || c.role == 'PRIMARY_CAREGIVER');
+    final hasPatient = network.contacts.any((c) => c.role == 'PATIENT');
+    if (hasFamily && hasPatient) return l.tr('عائلتك والمريض', 'Family and patient', 'Famille et patient');
+    if (hasCaregivers) return l.tr('مرافقو المريض', 'Patient caregivers', 'Accompagnants du patient');
+    if (hasFamily) return l.tr('عائلة المريض', 'Patient family', 'Famille du patient');
+    return l.tr('المحادثات', 'Conversations', 'Conversations');
+  }
   Widget _networkTitle(_PatientNetwork network, AppLocalizations l) {
     final name = network.patientName.isEmpty
         ? l.tr('المريض', 'Patient', 'Patient')

@@ -133,8 +133,12 @@ class ChatNetworkPanelState extends State<ChatNetworkPanel> {
           if (row['patient_id'] != patientId) continue;
           final contactId = row['caregiver_id'] as String?
           if (contactId == null || contactId == me) continue;
-          if (widget.compact && meRole == 'VIEWER' && row['role'] != 'CAREGIVER' && row['role'] != 'PRIMARY_CAREGIVER') continue;
-          if (widget.compact && (meRole == 'CAREGIVER' || meRole == 'PRIMARY_CAREGIVER') && row['role'] != 'VIEWER') continue;
+          if (widget.compact && meRole == 'VIEWER' && row['role'] != 'CAREGIVER' && row['role'] != 'PRIMARY_CAREGIVER') {
+            continue;
+          }
+          if (widget.compact && (meRole == 'CAREGIVER' || meRole == 'PRIMARY_CAREGIVER') && row['role'] != 'VIEWER') {
+            continue;
+          }
           final profile = profiles[contactId];
           if (profile == null) {
             continue;

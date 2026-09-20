@@ -119,11 +119,22 @@ class ChatNetworkPanelState extends State<ChatNetworkPanel> {
         }
 
         final contacts = <_ChatContact>[];
+        String? meRole;
+        for (final raw in networkRows) {
+          final row = Map<String, dynamic>.from(raw);
+          if (row['patient_id'] == patientId && row['caregiver_id'] == me) {
+            meRole = row['role'] as String?;
+            break;
+          }
+        }
+
         for (final raw in networkRows) {
           final row = Map<String, dynamic>.from(raw);
           if (row['patient_id'] != patientId) continue;
-          final contactId = row['caregiver_id'] as String?;
+          final contactId = row['caregiver_id'] as String?
           if (contactId == null || contactId == me) continue;
+          if (widget.compact && meRole == 'VIEWER' && row['role'] != 'CAREGIVER' && row['role'] != 'PRIMARY_CAREGIVER') continue;
+          if (widget.compact && (meRole == 'CAREGIVER' || meRole == 'PRIMARY_CAREGIVER') && row['role'] != 'VIEWER') continue;
           final profile = profiles[contactId];
           if (profile == null) {
             continue;

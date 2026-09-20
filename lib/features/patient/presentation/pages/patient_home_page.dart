@@ -15,7 +15,7 @@ import '../../../doses/presentation/providers/dose_provider.dart';
 import '../../../medications/data/medication_repository.dart';
 import '../../../medications/presentation/providers/medication_provider.dart';
 import '../widgets/dose_card.dart';
-import 'voice_messages_page.dart';
+import '../../../messages/presentation/pages/chat_network_panel.dart';
 
 class PatientHomePage extends StatefulWidget {
   const PatientHomePage({super.key});
@@ -240,7 +240,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
           else ..._buildFollowedPatients(),
         ],
         const SizedBox(height: 22),
-        _voiceMessagesButton(l),
+        _chatContactsPanel(),
         if (remaining > 0 && total > 0) ...[
           const SizedBox(height: 10),
           Text(
@@ -506,27 +506,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
     );
   }
 
-  Widget _voiceMessagesButton(AppLocalizations l) => Card(
-        elevation: 0,
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: .16),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.mic_rounded, color: AppColors.accentDark),
-          ),
-          title: Text(l.followUpMessages, style: const TextStyle(fontWeight: FontWeight.w800)),
-          subtitle: Text(l.followUpMessagesSubtitle),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const VoiceMessagesPage()),
-          ),
-        ),
-      );
+  Widget _chatContactsPanel() => const ChatNetworkPanel(compact: true);
 
   Future<void> _confirmSkip(DoseInstance dose) async {
     final l = AppLocalizations.of(context);

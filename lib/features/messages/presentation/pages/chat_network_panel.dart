@@ -18,10 +18,10 @@ class ChatNetworkPanel extends StatefulWidget {
   final bool compact;
 
   @override
-  State<ChatNetworkPanel> createState() => _ChatNetworkPanelState();
+  State<ChatNetworkPanel> createState() => ChatNetworkPanelState();
 }
 
-class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
+class ChatNetworkPanelState extends State<ChatNetworkPanel> {
   final _db = Supabase.instance.client;
   bool _loading = true;
   List<_PatientNetwork> _networks = [];

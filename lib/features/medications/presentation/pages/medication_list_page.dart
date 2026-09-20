@@ -329,7 +329,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
                 onEdit: () => _editMedication(item.medication),
                 onChangeImage: () => _changeImage(item.medication),
                 onRemoveImage: item.medication.imageUrl == null ? null : () => _removeImage(item.medication),
-                onDeactivate: item.medication.active ? () => _confirmDeactivate(item.medication) : null,
+                onDeactivate: item.medication.active ? () => _confirmDeactivate(item.medication) : null,\n                 onReactivate: !item.medication.active ? () => _confirmReactivate(item.medication) : null,
                 onAddStock: () => _addStock(item.medication),
                 onStockDetails: () => _openStockDetails(item.medication),
               ),
@@ -341,7 +341,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
 
   Widget _filterChip(String label, _MedicationFilter filter, int count) => FilterChip(label: Text('$label ($count)'), selected: _filter == filter, onSelected: (_) => setState(() => _filter = filter));
 
-  Future<void> _confirmDeactivate(Medication medication) async {
+  Future<void> _confirmReactivate(Medication medication) async {\n    final l = AppLocalizations.of(context);\n    final confirmed = await showDialog<bool>(\n      context: context,\n      builder: (ctx) => AlertDialog(\n        title: Text(l.reactivateMedicineTitle),\n        content: Text(l.reactivateMedicineBody(medication.name)),\n        actions: [\n          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l.cancel)),\n          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l.reactivateMedicine)),\n        ],\n      ),\n    );\n    if (!mounted || confirmed != true) return;\n    try {\n      await context.read<MedicationProvider>().reactivate(medication);\n    } catch (_) {\n      if (!mounted) return;\n      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.read<MedicationProvider>().error ?? l.unexpectedError)));\n    }\n  }\n\n  Future<void> _confirmDeactivate(Medication medication) async {
     final l = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -441,11 +441,11 @@ class _SmartMedicationTile extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onChangeImage;
   final VoidCallback? onRemoveImage;
-  final VoidCallback? onDeactivate;
+  final VoidCallback? onDeactivate;\n  final VoidCallback? onReactivate;
   final VoidCallback onAddStock;
   final VoidCallback onStockDetails;
 
-  const _SmartMedicationTile({required this.item, required this.imageUrlFuture, required this.onTap, required this.onEdit, required this.onChangeImage, required this.onRemoveImage, required this.onDeactivate, required this.onAddStock, required this.onStockDetails});
+  const _SmartMedicationTile({required this.item, required this.imageUrlFuture, required this.onTap, required this.onEdit, required this.onChangeImage, required this.onRemoveImage, required this.onDeactivate, required this.onReactivate, required this.onAddStock, required this.onStockDetails});
 
   @override
   Widget build(BuildContext context) {
@@ -497,14 +497,14 @@ class _SmartMedicationTile extends StatelessWidget {
                   case 'edit': onEdit(); break;
                   case 'change_image': onChangeImage(); break;
                   case 'remove_image': onRemoveImage?.call(); break;
-                  case 'deactivate': onDeactivate?.call(); break;
+                  case 'deactivate': onDeactivate?.call(); break;\n                   case 'reactivate': onReactivate?.call(); break;
                 }
               },
               itemBuilder: (_) => [
                 PopupMenuItem(value: 'edit', child: Text(l.tr('تعديل الدواء','Edit medicine','Modifier le médicament'))),
                 PopupMenuItem(value: 'change_image', child: Text(l.changeMedicineImage)),
                 if (onRemoveImage != null) PopupMenuItem(value: 'remove_image', child: Text(l.deleteMedicineImage)),
-                if (medication.active) PopupMenuItem(value: 'deactivate', child: Text(l.deactivateMedicine)),
+                if (medication.active) PopupMenuItem(value: 'deactivate', child: Text(l.deactivateMedicine)),\n                 if (!medication.active) PopupMenuItem(value: 'reactivate', child: Text(l.reactivateMedicine)),
               ],
             ),
           ]),

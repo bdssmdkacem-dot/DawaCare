@@ -75,7 +75,9 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
       for (final raw in networkRows) {
         final row = Map<String, dynamic>.from(raw);
         final caregiverId = row['caregiver_id'] as String?;
-        if (caregiverId != null) { ids.add(caregiverId); }
+        if (caregiverId != null) {
+          ids.add(caregiverId);
+        }
       }
 
       if (widget.patientId == null && ids.length == patientIds.length) {
@@ -113,7 +115,9 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
           final contactId = row['caregiver_id'] as String?;
           if (contactId == null || contactId == me) continue;
           final profile = profiles[contactId];
-          if (profile == null) { continue; }
+          if (profile == null) {
+            continue;
+          }
           contacts.add(_ChatContact(
             id: contactId,
             name: (profile['full_name'] as String?)?.trim() ?? '',

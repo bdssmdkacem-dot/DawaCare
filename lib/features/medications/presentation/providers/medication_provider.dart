@@ -101,7 +101,7 @@ class MedicationProvider extends ChangeNotifier {
     try {
       final createdSchedule = await _repo.createSchedule(created.id, schedule);
       try {
-        await _syncMedicationFuture(patientId: created.patientId, medicationId: createdMedication.id);
+        await _syncMedicationFuture(patientId: created.patientId, medicationId: created.id);
       } catch (e, st) {
         debugPrint('DawaCare medication follow-up sync failed: $e');
         debugPrintStack(stackTrace: st);

@@ -203,10 +203,10 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(widget.otherName)),
+    appBar: AppBar(titleSpacing: 0, title: Row(children: [CircleAvatar(radius: 18, backgroundColor: Theme.of(context).colorScheme.primaryContainer, child: Text(_initials(widget.otherName), style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 12, fontWeight: FontWeight.w900))), const SizedBox(width: 10), Expanded(child: Text(widget.otherName, maxLines: 1, overflow: TextOverflow.ellipsis))])),
     body: _loading ? const Center(child: CircularProgressIndicator()) : RefreshIndicator(
       onRefresh: _refresh,
-      child: ListView(controller: _scroll, physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), children: _messages.isEmpty ? [SizedBox(height: 300, child: Center(child: Text(AppLocalizations.of(context).tr('لا توجد رسائل بعد.', 'No messages yet.', 'Aucun message pour le moment.'))))] : _messages.map(_bubble).toList()),
+      child: ListView(controller: _scroll, physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), children: _messages.isEmpty ? [SizedBox(height: 300, child: Center(child: Text(AppLocalizations.of(context).tr('لا توجد رسائل بعد.', 'No messages yet.', 'Aucun message pour le moment.'))))] : _messageList(AppLocalizations.of(context))),
     ),
     bottomNavigationBar: _composer(),
   );

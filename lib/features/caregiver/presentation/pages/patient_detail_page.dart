@@ -18,7 +18,7 @@ import '../widgets/adherence_chart.dart';
 import '../widgets/patient_status_header.dart';
 import 'caregiver_medication_detail_page.dart';
 import 'medication_reports_page.dart';
-import 'voice_recorder_page.dart';
+import '../../../messages/presentation/pages/chat_network_panel.dart';
 
 class PatientDetailPage extends StatefulWidget {
   final CaregiverLink link;
@@ -63,17 +63,6 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
       onBackgroundImageError: hasAvatar ? (_, __) {} : null,
       child: hasAvatar ? null : Text(_initials(widget.link.patientName), style: TextStyle(color: Colors.white, fontSize: radius * .55, fontWeight: FontWeight.w900)),
     );
-  }
-
-  void _openVoiceRecorder({DoseInstance? dose}) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => VoiceRecorderPage(
-      patientId: widget.link.patientId,
-      patientName: widget.link.patientName,
-      doseId: dose?.id,
-      medicationName: dose?.medicationName,
-      doseAmount: dose?.doseAmount,
-      scheduledAt: dose?.scheduledAt,
-    )));
   }
 
   void _openReports() {
@@ -196,7 +185,7 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
     return Padding(padding: const EdgeInsets.only(bottom: 10), child: DoseCard(
       dose: dose, medication: medication,
       imageUrlFuture: medication == null ? null : medicationProvider.signedMedicationImageUrl(medication.imageUrl),
-      onTap: medication == null ? () => _openVoiceRecorder(dose: dose) : () => _openMedication(medication),
+      onTap: medication == null ? null : () => _openMedication(medication),
       onConfirm: _permissions.canManageDose ? () => doseProvider.confirm(dose, source: 'CAREGIVER') : null,
       onSnooze: _permissions.canManageDose ? () => doseProvider.snooze(dose, source: 'CAREGIVER') : null,
       onSkip: _permissions.canManageDose ? () => doseProvider.skip(dose, source: 'CAREGIVER') : null,
@@ -262,12 +251,10 @@ class _PatientDetailPageState extends State<PatientDetailPage> {
                         else
                           ...todayDoses.map((d) => _doseCard(providerContext, d)),
                         const SizedBox(height: 12),
-                        Card(color: AppColors.primary.withValues(alpha: .055), child: ListTile(
-                          leading: const CircleAvatar(child: Icon(Icons.mic_rounded)),
-                          title: Text(l.sendGeneralVoice, style: const TextStyle(fontWeight: FontWeight.w800)),
-                          subtitle: Text(_tr(providerContext, 'أرسل رسالة صوتية عامة للمريض.', 'Send a general voice message to the patient.', 'Envoyer un message vocal général au patient.')),
-                          trailing: const Icon(Icons.chevron_right_rounded), onTap: () => _openVoiceRecorder(),
-                        )),
+                        ChatNetworkPanel(
+                          patientId: widget.link.patientId,
+                          compact: true,
+                        ),
                         if (_canUnlink) ...[
                           const SizedBox(height: 8),
                           Center(child: TextButton.icon(onPressed: () => _confirmUnlink(providerContext), icon: const Icon(Icons.link_off_rounded, color: AppColors.danger), label: Text(l.removeLink, style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700)))),

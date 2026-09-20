@@ -106,7 +106,9 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
       final networks = <_PatientNetwork>[];
       for (final patientId in patientIds) {
         final patient = profiles[patientId];
-        if (patient == null) continue;
+        if (patient == null) {
+          continue;
+        }
 
         final contacts = <_ChatContact>[];
         for (final raw in networkRows) {
@@ -161,10 +163,12 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
       }
     } catch (e) {
       debugPrint('chat network load: $e');
-      if (mounted) setState(() {
-        _networks = [];
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _networks = [];
+          _loading = false;
+        });
+      }
     }
   }
 

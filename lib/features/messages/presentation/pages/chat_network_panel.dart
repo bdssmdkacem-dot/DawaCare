@@ -82,10 +82,12 @@ class _ChatNetworkPanelState extends State<ChatNetworkPanel> {
 
       if (widget.patientId == null && ids.length == patientIds.length) {
         // No linked people.
-        if (mounted) setState(() {
-          _networks = [];
-          _loading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _networks = [];
+            _loading = false;
+          });
+        }
         return;
       }
 

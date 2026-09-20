@@ -11,8 +11,8 @@ class ChatListPage extends StatefulWidget {
 }
 
 class _ChatListPageState extends State<ChatListPage> {
-  final GlobalKey<_ChatNetworkPanelState> _networkKey =
-      GlobalKey<_ChatNetworkPanelState>();
+  final GlobalKey<ChatNetworkPanelState> _networkKey =
+      GlobalKey<ChatNetworkPanelState>();
 
   Future<void> _refresh() async {
     await _networkKey.currentState?.reload();

@@ -88,10 +88,10 @@ class _RootShellState extends State<RootShell> {
                 selectedIcon: const Icon(Icons.medication_rounded),
                 label: l10n.medicines,
               ),
-              const NavigationDestination(
-                icon: Icon(Icons.chat_bubble_outline_rounded),
-                selectedIcon: Icon(Icons.chat_bubble_rounded),
-                label: 'المحادثات',
+              NavigationDestination(
+                icon: const Icon(Icons.chat_bubble_outline_rounded),
+                selectedIcon: const Icon(Icons.chat_bubble_rounded),
+                label: l10n.chats,
               ),
               NavigationDestination(
                 icon: Badge(

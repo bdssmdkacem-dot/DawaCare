@@ -333,7 +333,7 @@ class MedicationProvider extends ChangeNotifier {
     debugPrint('DawaCare medication STOP SUCCESS id=${medication.id}');
   }
 
-  /// Permanently removes the medication and all database dependents.
+  Future<void> reactivate(Medication medication) async {\n    await _repo.reactivateMedication(medication.id);\n    try {\n      await _syncMedicationFuture(patientId: medication.patientId, medicationId: medication.id);\n    } catch (e, st) {\n      debugPrint('DawaCare medication REACTIVATE reminder sync failed: $e');\n      debugPrintStack(stackTrace: st);\n    }\n    final index = medications.indexWhere((m) => m.id == medication.id);\n    if (index >= 0) medications[index] = _copyMedication(medications[index], active: true);\n    _notify();\n  }\n\n  /// Permanently removes the medication and all database dependents.
   Future<void> deleteMedication(Medication medication) async {
     debugPrint('DawaCare medication DELETE START id=${medication.id} patient=${medication.patientId}');
     final now = DateTime.now();

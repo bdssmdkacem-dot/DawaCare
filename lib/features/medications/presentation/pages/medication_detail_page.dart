@@ -118,9 +118,9 @@ class _MedicationDetailPageState extends State<MedicationDetailPage> {
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: _confirmDeactivate,
-              icon: const Icon(Icons.stop_circle_outlined),
-              label: Text(AppLocalizations.of(context).deactivateMedicine),
+              onPressed: widget.medication.active ? _confirmDeactivate : _confirmReactivate,
+              icon: Icon(widget.medication.active ? Icons.stop_circle_outlined : Icons.replay_circle_filled_rounded),
+              label: Text(widget.medication.active ? AppLocalizations.of(context).deactivateMedicine : AppLocalizations.of(context).reactivateMedicine),
               style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.errorContainer, foregroundColor: Theme.of(context).colorScheme.onErrorContainer),
             ),
             const SizedBox(height: 10),

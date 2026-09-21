@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/localization/locale_controller.dart';
-import '../../../../core/notifications/notification_service.dart';
+import '../../../../core/notifications/routine_reminder_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import 'profile_page.dart';
 
@@ -48,7 +48,7 @@ class SettingsPage extends StatelessWidget {
             title: l.enableReminderNotifications,
             subtitle: l.reminderNotificationsRequired,
             onTap: () async {
-              await NotificationService.instance.requestPermissions();
+              await RoutineReminderService.instance.requestPermissions();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text(l.notificationPermissionRequested)),

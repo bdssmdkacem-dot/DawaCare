@@ -1,16 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+
 import '../app/theme/app_colors.dart';
 import '../core/ads/ad_banner.dart';
 import '../core/ads/ad_service.dart';
 import '../core/localization/app_localizations.dart';
-import '../core/notifications/push_notification_service.dart';
-import '../features/auth/presentation/providers/auth_provider.dart';
-import '../features/caregiver/presentation/pages/caregiver_home_page.dart';
-import '../features/caregiver/presentation/providers/caregiver_provider.dart';
-import '../features/medications/presentation/pages/medication_list_page.dart';
-import '../features/messages/presentation/pages/chat_list_page.dart';
-import '../features/patient/presentation/pages/patient_overview_page.dart';
+import '../features/routines/presentation/pages/routine_reminder_page.dart';
 import '../features/settings/presentation/pages/settings_page.dart';
 
 class RootShell extends StatefulWidget {
@@ -23,33 +17,19 @@ class RootShell extends StatefulWidget {
 class _RootShellState extends State<RootShell> {
   int _index = 0;
 
-  String? get _bannerAdUnitId {
-    switch (_index) {
-      case 0:
-        return AdService.homeBannerId;
-      case 1:
-        return AdService.medicinesBannerId;
-      default:
-        return null;
-    }
-  }
+  String? get _bannerAdUnitId =>
+      _index == 0 ? AdService.homeBannerId : null;
 
   @override
   Widget build(BuildContext context) {
-    final caregiver = context.watch<CaregiverProvider>();
-    final userId = context.read<AuthProvider>().profile?.id;
     final l10n = AppLocalizations.of(context);
-    final unread = caregiver.unreadAlertCount + caregiver.pendingApprovalCount;
     final bannerId = _bannerAdUnitId;
 
     return Scaffold(
       body: IndexedStack(
         index: _index,
         children: const [
-          PatientOverviewPage(),
-          MedicationListPage(),
-          ChatListPage(),
-          CaregiverHomePage(),
+          RoutineReminderPage(),
           SettingsPage(),
         ],
       ),
@@ -69,42 +49,13 @@ class _RootShellState extends State<RootShell> {
             onDestinationSelected: (i) {
               if (i == _index) return;
               setState(() => _index = i);
-              if (i == 3 && userId != null) {
-                caregiver.load(userId);
-              }
-              if (i == 2) {
-                PushNotificationService.instance.ensureRegistered();
-              }
               AdService.instance.showNavigationInterstitial();
             },
             destinations: [
               NavigationDestination(
-                icon: const Icon(Icons.today_outlined),
-                selectedIcon: const Icon(Icons.today_rounded),
-                label: l10n.today,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.medication_outlined),
-                selectedIcon: const Icon(Icons.medication_rounded),
-                label: l10n.medicines,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.chat_bubble_outline_rounded),
-                selectedIcon: const Icon(Icons.chat_bubble_rounded),
-                label: l10n.chats,
-              ),
-              NavigationDestination(
-                icon: Badge(
-                  isLabelVisible: unread > 0,
-                  label: Text('$unread'),
-                  child: const Icon(Icons.family_restroom_outlined),
-                ),
-                selectedIcon: Badge(
-                  isLabelVisible: unread > 0,
-                  label: Text('$unread'),
-                  child: const Icon(Icons.family_restroom_rounded),
-                ),
-                label: l10n.family,
+                icon: const Icon(Icons.event_note_outlined),
+                selectedIcon: const Icon(Icons.event_note_rounded),
+                label: l10n.reminders,
               ),
               NavigationDestination(
                 icon: const Icon(Icons.settings_outlined),

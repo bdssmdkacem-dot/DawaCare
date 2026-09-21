@@ -1,5 +1,5 @@
 name: dawacare
-description: "DawaCare (دواء كير) — تطبيق تذكير بالأدوية للمرضى والعائلة"
+description: "DawaCare — personal daily planner and reminders"
 publish_to: 'none'
 version: 1.0.1+2
 

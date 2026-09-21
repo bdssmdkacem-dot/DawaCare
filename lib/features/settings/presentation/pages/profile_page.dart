@@ -175,7 +175,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _sectionHeader(BuildContext context, IconData icon, String title) => Row(children: [Icon(icon, size: 20, color: AppColors.primary), const SizedBox(width: 8), Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))]);
 
-  Widget _infoCard(BuildContext context, IconData icon, String title, String value, {String? copyValue}) => Card(
+  Widget _infoCard(BuildContext context, IconData icon, String title, String value) => Card(
         elevation: 0,
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),

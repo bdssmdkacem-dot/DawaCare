@@ -16,6 +16,7 @@ class _RoutineReminderPageState extends State<RoutineReminderPage> {
   TimeOfDay _time = const TimeOfDay(hour: 9, minute: 0);
   List<RoutineReminder> _items = const [];
   bool _loading = true;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -39,28 +40,40 @@ class _RoutineReminderPageState extends State<RoutineReminderPage> {
   }
 
   Future<void> _add() async {
+    if (_saving) return;
     final title = _titleController.text.trim();
     if (title.isEmpty) return;
-    final next = [
-      ..._items,
-      RoutineReminder(
-        id: const Uuid().v4(),
-        title: title,
-        hour: _time.hour,
-        minute: _time.minute,
-      ),
-    ];
-    await RoutineReminderService.instance.save(next);
-    if (!mounted) return;
-    _titleController.clear();
-    setState(() => _items = next);
+
+    setState(() => _saving = true);
+    try {
+      await RoutineReminderService.instance.add(
+        RoutineReminder(
+          id: const Uuid().v4(),
+          title: title,
+          hour: _time.hour,
+          minute: _time.minute,
+        ),
+      );
+      final items = await RoutineReminderService.instance.load();
+      if (!mounted) return;
+      _titleController.clear();
+      setState(() => _items = items);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _remove(RoutineReminder item) async {
-    final next = _items.where((e) => e.id != item.id).toList();
-    await RoutineReminderService.instance.save(next);
-    if (!mounted) return;
-    setState(() => _items = next);
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await RoutineReminderService.instance.remove(item);
+      final items = await RoutineReminderService.instance.load();
+      if (!mounted) return;
+      setState(() => _items = items);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _pickTime() async {
@@ -80,7 +93,9 @@ class _RoutineReminderPageState extends State<RoutineReminderPage> {
         actions: [
           IconButton(
             tooltip: 'Notification permissions',
-            onPressed: RoutineReminderService.instance.requestPermissions,
+            onPressed: _saving
+                ? null
+                : RoutineReminderService.instance.requestPermissions,
             icon: const Icon(Icons.notifications_active_outlined),
           ),
         ],
@@ -111,18 +126,16 @@ class _RoutineReminderPageState extends State<RoutineReminderPage> {
                           children: [
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: _pickTime,
+                                onPressed: _saving ? null : _pickTime,
                                 icon: const Icon(Icons.schedule_rounded),
-                                label: Text(
-                                  'Time: ${_time.format(context)}',
-                                ),
+                                label: Text('Time: ${_time.format(context)}'),
                               ),
                             ),
                             const SizedBox(width: 10),
                             FilledButton.icon(
-                              onPressed: _add,
+                              onPressed: _saving ? null : _add,
                               icon: const Icon(Icons.add_rounded),
-                              label: const Text('Add'),
+                              label: Text(_saving ? 'Saving...' : 'Add'),
                             ),
                           ],
                         ),
@@ -140,10 +153,8 @@ class _RoutineReminderPageState extends State<RoutineReminderPage> {
                         children: [
                           Icon(Icons.event_note_rounded, size: 42),
                           SizedBox(height: 10),
-                          Text(
-                            'No reminders yet',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
+                          Text('No reminders yet',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
                           SizedBox(height: 5),
                           Text(
                             'Create simple daily reminders for your routine.',
@@ -166,14 +177,12 @@ class _RoutineReminderPageState extends State<RoutineReminderPage> {
                             color: AppColors.primary,
                           ),
                         ),
-                        title: Text(
-                          item.title,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                        title: Text(item.title,
+                            style: const TextStyle(fontWeight: FontWeight.w700)),
                         subtitle: Text('Daily at ${_timeText(item)}'),
                         trailing: IconButton(
                           tooltip: 'Delete',
-                          onPressed: () => _remove(item),
+                          onPressed: _saving ? null : () => _remove(item),
                           icon: const Icon(Icons.delete_outline_rounded),
                         ),
                       ),

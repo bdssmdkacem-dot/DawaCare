@@ -33,17 +33,11 @@ dependencies:
   flutter_timezone: ^3.0.1
   permission_handler: ^11.3.1
 
-  # Push notifications (caregiver missed-dose alerts)
-  firebase_core: ^4.4.0
-  firebase_messaging: ^16.1.1
-
   # Connectivity / sync
   connectivity_plus: ^6.1.0
 
   # Media
   image_picker: ^1.1.2
-  record: 6.2.1
-  audioplayers: ^6.8.1
 
   # Ads
   google_mobile_ads: ^9.1.0

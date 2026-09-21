@@ -69,9 +69,7 @@ class _RoutineReminderPageState extends State<RoutineReminderPage> {
   }
 
   String _timeText(RoutineReminder item) {
-    return item.hour.toString().padLeft(2, '0') +
-        ':' +
-        item.minute.toString().padLeft(2, '0');
+    return '${item.hour.toString().padLeft(2, '0')}:${item.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -116,7 +114,7 @@ class _RoutineReminderPageState extends State<RoutineReminderPage> {
                                 onPressed: _pickTime,
                                 icon: const Icon(Icons.schedule_rounded),
                                 label: Text(
-                                  'Time: ' + _time.format(context),
+                                  'Time: ${_time.format(context)}',
                                 ),
                               ),
                             ),
@@ -172,7 +170,7 @@ class _RoutineReminderPageState extends State<RoutineReminderPage> {
                           item.title,
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
-                        subtitle: Text('Daily at ' + _timeText(item)),
+                        subtitle: Text('Daily at ${_timeText(item)}'),
                         trailing: IconButton(
                           tooltip: 'Delete',
                           onPressed: () => _remove(item),

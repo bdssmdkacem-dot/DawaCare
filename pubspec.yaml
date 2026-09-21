@@ -16,6 +16,8 @@ dependencies:
 
   # Backend / Auth / DB
   supabase_flutter: ^2.8.0
+  # Kept for dormant legacy source files; not initialized by the personal runtime.
+  firebase_core: ^4.4.0
 
   # State management
   provider: ^6.1.2
@@ -38,6 +40,8 @@ dependencies:
 
   # Media
   image_picker: ^1.1.2
+  # Kept for dormant legacy voice-message source; not used by the personal runtime.
+  audioplayers: ^6.8.1
 
   # Ads
   google_mobile_ads: ^9.1.0

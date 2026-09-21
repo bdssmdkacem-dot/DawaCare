@@ -1,5 +1,5 @@
 name: dawacare
-description: "DawaCare (دواء كير) — تطبيق تذكير بالأدوية للمرضى والعائلة"
+description: "DawaCare — personal daily planner and reminders"
 publish_to: 'none'
 version: 1.0.1+2
 
@@ -16,6 +16,8 @@ dependencies:
 
   # Backend / Auth / DB
   supabase_flutter: ^2.8.0
+  # Kept for dormant legacy source files; not initialized by the personal runtime.
+  firebase_core: ^4.4.0
 
   # State management
   provider: ^6.1.2
@@ -33,17 +35,13 @@ dependencies:
   flutter_timezone: ^3.0.1
   permission_handler: ^11.3.1
 
-  # Push notifications (caregiver missed-dose alerts)
-  firebase_core: ^4.4.0
-  firebase_messaging: ^16.1.1
-
   # Connectivity / sync
   connectivity_plus: ^6.1.0
 
   # Media
   image_picker: ^1.1.2
-  record: 6.2.1
-  audioplayers: ^6.8.1
+  # Kept for dormant legacy voice-message source; Flutter 3.41.9-compatible version.
+  audioplayers: ^6.7.1
 
   # Ads
   google_mobile_ads: ^9.1.0

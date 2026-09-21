@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../core/notifications/push_notification_service.dart';
 import '../../../../models/user_profile.dart';
 import '../../data/auth_repository.dart';
 
@@ -48,7 +47,6 @@ class AuthProvider extends ChangeNotifier {
         profile = p;
         status = AuthStatus.signedIn;
         notifyListeners();
-        unawaited(PushNotificationService.instance.ensureRegistered());
         return;
       }
       await Future.delayed(const Duration(milliseconds: 400));
@@ -82,18 +80,7 @@ class AuthProvider extends ChangeNotifier {
     return _run(() => _repo.resetPassword(email));
   }
 
-  Future<void> signOut() async {
-    final userId = profile?.id;
-    if (userId != null) {
-      try {
-        await PushNotificationService.instance.unregister(userId);
-      } catch (e) {
-        // Push cleanup must never prevent the user from signing out.
-        debugPrint('DawaCare sign out: push unregister failed: $e');
-      }
-    }
-    await _repo.signOut();
-  }
+  Future<void> signOut() => _repo.signOut();
 
   Future<void> refreshProfile() => _loadProfile();
 

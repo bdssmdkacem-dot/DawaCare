@@ -8,7 +8,6 @@ import 'core/config/supabase_config.dart';
 import 'core/localization/locale_controller.dart';
 import 'core/notifications/routine_reminder_service.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
-import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

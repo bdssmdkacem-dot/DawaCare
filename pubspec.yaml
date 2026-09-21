@@ -40,8 +40,8 @@ dependencies:
 
   # Media
   image_picker: ^1.1.2
-  # Kept for dormant legacy voice-message source; not used by the personal runtime.
-  audioplayers: ^6.8.1
+  # Kept for dormant legacy voice-message source; Flutter 3.41.9-compatible version.
+  audioplayers: ^6.7.1
 
   # Ads
   google_mobile_ads: ^9.1.0

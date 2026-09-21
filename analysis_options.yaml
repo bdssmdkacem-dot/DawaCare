@@ -1,7 +1,8 @@
 include: package:flutter_lints/flutter.yaml
 
 # The personal-account branch no longer exposes the legacy health workflows.
-# Keep the old source isolated while the non-health product is finalized.
+# Keep old health/messaging implementation isolated while the non-health
+# product is finalized.
 analyzer:
   exclude:
     - lib/features/patient/**
@@ -9,6 +10,8 @@ analyzer:
     - lib/features/doses/**
     - lib/features/caregiver/**
     - lib/features/messages/**
+    - lib/core/notifications/push_notification_service.dart
+    - lib/core/voice/voice_message_service.dart
 
 linter:
   rules:

@@ -44,15 +44,15 @@ jobs:
 
       - name: Restore Android release signing
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.DAWACARE_UPLOAD_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.DAWACARE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.DAWACARE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.DAWACARE_KEY_PASSWORD }}
         run: |
-          test -n "$KEYSTORE_BASE64" || { echo "Missing KEYSTORE_BASE64"; exit 1; }
-          test -n "$KEYSTORE_PASSWORD" || { echo "Missing KEYSTORE_PASSWORD"; exit 1; }
-          test -n "$KEY_ALIAS" || { echo "Missing KEY_ALIAS"; exit 1; }
-          test -n "$KEY_PASSWORD" || { echo "Missing KEY_PASSWORD"; exit 1; }
+          test -n "$KEYSTORE_BASE64" || { echo "Missing DAWACARE_UPLOAD_KEYSTORE_BASE64"; exit 1; }
+          test -n "$KEYSTORE_PASSWORD" || { echo "Missing DAWACARE_KEYSTORE_PASSWORD"; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "Missing DAWACARE_KEY_ALIAS"; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "Missing DAWACARE_KEY_PASSWORD"; exit 1; }
 
           mkdir -p android
           echo "$KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks

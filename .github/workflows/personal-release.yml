@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - personal/non-health-dawacare
+  pull_request:
+    branches:
+      - personal/non-health-dawacare
   workflow_dispatch:
 
 permissions:

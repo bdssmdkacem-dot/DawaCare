@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -29,8 +30,8 @@ class RoutineReminder {
   factory RoutineReminder.fromJson(Map<String, dynamic> json) => RoutineReminder(
         id: json['id'] as String,
         title: json['title'] as String,
-        hour: json['hour'] as int,
-        minute: json['minute'] as int,
+        hour: (json['hour'] as num).toInt(),
+        minute: (json['minute'] as num).toInt(),
       );
 }
 
@@ -41,10 +42,13 @@ class RoutineReminderService {
   static const _storageKey = 'dawacare_routine_reminders';
   static const _channelId = 'routine_reminders';
   final _plugin = FlutterLocalNotificationsPlugin();
+
   bool _initialized = false;
+  Future<void> _writeQueue = Future<void>.value();
 
   Future<void> init() async {
     if (_initialized) return;
+
     tz_data.initializeTimeZones();
     try {
       final zone = await FlutterTimezone.getLocalTimezone();
@@ -52,10 +56,12 @@ class RoutineReminderService {
     } catch (_) {
       tz.setLocalLocation(tz.getLocation('Africa/Casablanca'));
     }
+
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
     await _plugin.initialize(settings);
+
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     await android?.createNotificationChannel(
@@ -67,6 +73,7 @@ class RoutineReminderService {
         enableVibration: true,
       ),
     );
+
     _initialized = true;
   }
 
@@ -82,62 +89,99 @@ class RoutineReminderService {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_storageKey);
     if (raw == null || raw.isEmpty) return const [];
+
     try {
       return (jsonDecode(raw) as List)
-          .map((item) => RoutineReminder.fromJson(
-                Map<String, dynamic>.from(item as Map),
-              ))
+          .map(
+            (item) => RoutineReminder.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
           .toList();
     } catch (_) {
       return const [];
     }
   }
 
-  Future<void> save(List<RoutineReminder> reminders) async {
+  Future<void> save(List<RoutineReminder> reminders) {
+    final operation = _writeQueue.then((_) => _saveInternal(reminders));
+    _writeQueue = operation.catchError((_) {});
+    return operation;
+  }
+
+  Future<void> add(RoutineReminder reminder) async {
+    await _writeQueue;
+    final current = await load();
+    await save([...current, reminder]);
+  }
+
+  Future<void> remove(RoutineReminder reminder) async {
+    await _writeQueue;
+    final current = await load();
+    final next = current.where((item) => item.id != reminder.id).toList();
+    await _writeStorage(next);
+    await _rescheduleSafely(next);
+  }
+
+  Future<void> _saveInternal(List<RoutineReminder> reminders) async {
+    await _writeStorage(reminders);
+    await _rescheduleSafely(reminders);
+  }
+
+  Future<void> _writeStorage(List<RoutineReminder> reminders) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _storageKey,
       jsonEncode(reminders.map((e) => e.toJson()).toList()),
     );
-    await _reschedule(reminders);
+  }
+
+  Future<void> _rescheduleSafely(List<RoutineReminder> reminders) async {
+    try {
+      await _reschedule(reminders);
+    } catch (_) {}
   }
 
   Future<void> _reschedule(List<RoutineReminder> reminders) async {
     await init();
     await _plugin.cancelAll();
+
     for (final reminder in reminders) {
-      final now = tz.TZDateTime.now(tz.local);
-      var next = tz.TZDateTime(
-        tz.local,
-        now.year,
-        now.month,
-        now.day,
-        reminder.hour,
-        reminder.minute,
-      );
-      if (!next.isAfter(now)) {
-        next = next.add(const Duration(days: 1));
-      }
-      await _plugin.zonedSchedule(
-        _id(reminder.id),
-        reminder.title,
-        'Your scheduled reminder',
-        next,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            'Daily reminders',
-            channelDescription: 'Personal reminders and routines',
-            importance: Importance.high,
-            priority: Priority.high,
-            category: AndroidNotificationCategory.reminder,
+      try {
+        final now = tz.TZDateTime.now(tz.local);
+        var next = tz.TZDateTime(
+          tz.local,
+          now.year,
+          now.month,
+          now.day,
+          reminder.hour,
+          reminder.minute,
+        );
+        if (!next.isAfter(now)) {
+          next = next.add(const Duration(days: 1));
+        }
+
+        await _plugin.zonedSchedule(
+          _id(reminder.id),
+          reminder.title,
+          'Your scheduled reminder',
+          next,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channelId,
+              'Daily reminders',
+              channelDescription: 'Personal reminders and routines',
+              importance: Importance.high,
+              priority: Priority.high,
+              category: AndroidNotificationCategory.reminder,
+            ),
           ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-      );
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      } catch (_) {}
     }
   }
 

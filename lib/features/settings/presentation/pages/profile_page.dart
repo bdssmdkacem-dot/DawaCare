@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -141,8 +140,6 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 10),
             _infoCard(context, Icons.email_outlined, l.email, email.isEmpty ? '—' : email),
             const SizedBox(height: 10),
-            _infoCard(context, Icons.family_restroom_rounded, _tr(context, 'رمز العائلة', 'Family code', 'Code famille'), profile.familyCode.isEmpty ? '—' : profile.familyCode, copyValue: profile.familyCode.isEmpty ? null : profile.familyCode),
-            const SizedBox(height: 10),
             _infoCard(context, Icons.public_rounded, _tr(context, 'المنطقة الزمنية', 'Timezone', 'Fuseau horaire'), profile.timezone),
             const SizedBox(height: 24),
             FilledButton.icon(
@@ -185,15 +182,7 @@ class _ProfilePageState extends State<ProfilePage> {
           leading: CircleAvatar(backgroundColor: AppColors.primary.withValues(alpha: 0.10), child: Icon(icon, color: AppColors.primary)),
           title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
           subtitle: Padding(padding: const EdgeInsets.only(top: 3), child: Text(value)),
-          trailing: copyValue == null ? null : IconButton(
-            tooltip: _tr(context, 'نسخ', 'Copy', 'Copier'),
-            icon: const Icon(Icons.copy_rounded),
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: copyValue));
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_tr(context, 'تم نسخ رمز العائلة.', 'Family code copied.', 'Code famille copié.'))));
-            },
-          ),
+          trailing: null,
         ),
       );
 
